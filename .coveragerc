@@ -1,7 +1,7 @@
 [run]
 branch = True
-source = mindt
-include = */mindt/*
+source = sammba
+include = */sammba/*
 omit =
-    */mindt/externals/*
+    */sammba/externals/*
     */setup.py

@@ -7,10 +7,10 @@ Introduction: Small-animal MRI pipelines
     :depth: 1
 
 
-What is MINDt: Multimodal Imaging of Neurodegenerative Diseases and Therapies
+What is sammba-MRI: Multimodal Imaging of Neurodegenerative Diseases and Therapies
 =============================================================================
 
-    MINDt builds **easy-to-use** pipelines to process small animal brain MRI multimodal images. Examples include (but are not restricted to) mouse models of Alzheimer disease.
+    sammba-MRI builds **easy-to-use** pipelines to process small animal brain MRI multimodal images. Examples include (but are not restricted to) mouse models of Alzheimer disease.
 
 
 Dependencies
@@ -71,11 +71,11 @@ use of the standalone MCR version of spm by appending the following lines to the
 
 Installation
 ============
-For the moment MINDt is available as a development version. To download the source code, run the shell command::
+For the moment sammba-MRI is available as a development version. To download the source code, run the shell command::
 
-    git clone https://github.com/small-animal-MRI/MINDt
+    git clone https://github.com/small-animal-MRI/sammba-MRI
 
-In the ``MINDt`` directory created by the previous step, run
+In the ``sammba-MRI`` directory created by the previous step, run
 (again, as a shell command)::
 
     python setup.py install --user

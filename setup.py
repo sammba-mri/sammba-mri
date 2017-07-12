@@ -11,7 +11,7 @@ def read(fname):
 
 
 setup(
-    name="mindt",
+    name="sammba",
     version="alpha",
     maintainer="Nachiket Nadkarni",
     maintainer_email="nadkarni@fastmail.fm",
@@ -19,7 +19,7 @@ setup(
     license="CeCILL-B",
     keywords="rodents registration dicom",
     url="https://small-animal-mri.github.io",
-    packages=['mindt', ],
+    packages=['sammba', ],
     long_description=read('README.rst'),
     classifiers=[
         "Topic :: Scientific/Engineering",

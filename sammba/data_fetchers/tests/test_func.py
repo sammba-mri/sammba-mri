@@ -6,7 +6,7 @@ from nose.tools import assert_equal, assert_true, assert_not_equal
 from nilearn.datasets import utils
 from nilearn.datasets.tests import test_utils as tst
 
-from mindt.data_fetchers import func
+from sammba.data_fetchers import func
 
 
 def setup_mock():

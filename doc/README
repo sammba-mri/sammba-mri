@@ -1,5 +1,5 @@
 ========================================================
-MINDt: small-animal MRI with pydicom, nipype and nilearn
+sammba-MRI: small-animal MRI with pydicom, nipype and nilearn
 ========================================================
 
 This repository contains code and documentation to use python

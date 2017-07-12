@@ -1,5 +1,5 @@
 ===============================
-MINDt API Reference
+sammba-MRI API Reference
 ===============================
 
 .. contents:: **List of modules**
@@ -8,16 +8,16 @@ MINDt API Reference
 
 .. _data_fetchers_ref:
 
-:mod:`mindt.data_fetchers`: Datasets and atlas
+:mod:`sammba.data_fetchers`: Datasets and atlas
 =====================================================
 
-.. automodule:: mindt.data_fetchers
+.. automodule:: sammba.data_fetchers
    :no-members:
    :no-inherited-members:
 
 **Functions**:
 
-.. currentmodule:: mindt.data_fetchers
+.. currentmodule:: sammba.data_fetchers
 
 .. autosummary::
    :toctree: generated/

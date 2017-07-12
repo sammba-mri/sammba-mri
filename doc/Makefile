@@ -87,17 +87,17 @@ qthelp:
 	@echo
 	@echo "Build finished; now you can run "qcollectiongenerator" with the" \
 	      ".qhcp project file in $(BUILDDIR)/qthelp, like this:"
-	@echo "# qcollectiongenerator $(BUILDDIR)/qthelp/mindt.qhcp"
+	@echo "# qcollectiongenerator $(BUILDDIR)/qthelp/sammba.qhcp"
 	@echo "To view the help file:"
-	@echo "# assistant -collectionFile $(BUILDDIR)/qthelp/mindt.qhc"
+	@echo "# assistant -collectionFile $(BUILDDIR)/qthelp/sammba.qhc"
 
 devhelp:
 	$(SPHINXBUILD) -b devhelp $(ALLSPHINXOPTS) $(BUILDDIR)/devhelp
 	@echo
 	@echo "Build finished."
 	@echo "To view the help file:"
-	@echo "# mkdir -p $$HOME/.local/share/devhelp/mindt"
-	@echo "# ln -s $(BUILDDIR)/devhelp $$HOME/.local/share/devhelp/mindt"
+	@echo "# mkdir -p $$HOME/.local/share/devhelp/sammba"
+	@echo "# ln -s $(BUILDDIR)/devhelp $$HOME/.local/share/devhelp/sammba"
 	@echo "# devhelp"
 
 epub:
@@ -184,7 +184,7 @@ html-noplot:
 	@echo "Build finished. The HTML pages are in $(BUILDDIR)/html."
 
 install:
-	rm -rf _build/doctrees _build/small-animal-mri.github.io/MINDt
+	rm -rf _build/doctrees _build/small-animal-mri.github.io/sammba-MRI
 	# first clone the nilearn.github.io repo because it may ask
 	# for password and we don't want to delay this long build in
 	# the middle of it
