@@ -1,0 +1,7 @@
+[run]
+branch = True
+source = mindt
+include = */mindt/*
+omit =
+    */mindt/externals/*
+    */setup.py

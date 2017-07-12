@@ -1,0 +1,17 @@
+========================================================
+MINDt: small-animal MRI with pydicom, nipype and nilearn
+========================================================
+
+This repository contains code and documentation to use python
+neuroimaging modules for small-animal MRI. The only
+requirements are nipype, nilearn and nibabel ( http://nipy.org/nibabel ), as
+well as their dependencies (numpy, scipy and matplotlib).
+
+The code comes with fully-runnable examples that download the data
+required from Internet.
+
+License
+--------
+
+As indicated in the COPYING file, all the code and documentation is
+CECILL-licensed.
