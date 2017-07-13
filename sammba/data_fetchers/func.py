@@ -61,7 +61,7 @@ def fetch_zurich_test_retest(subjects=range(15), sessions=[1], data_dir=None,
     if url is None:
         url = 'https://central.xnat.org'
 
-    dataset_name = 'zurich'
+    dataset_name = 'zurich_retest'
     data_dir = _get_dataset_dir(dataset_name, data_dir=data_dir,
                                 verbose=verbose)
 
