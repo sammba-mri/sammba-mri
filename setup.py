@@ -18,7 +18,7 @@ setup(
     description=("MRI Rodents processing in python."),
     license="CeCILL-B",
     keywords="rodents registration dicom",
-    url="https://small-animal-mri.github.io",
+    url="https://sammba-mri.github.io",
     packages=['sammba', ],
     long_description=read('README.rst'),
     classifiers=[

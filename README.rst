@@ -1,16 +1,16 @@
 .. -*- mode: rst -*-
 
-.. image:: https://travis-ci.org/small-animal-MRI/sammba-MRI.svg?branch=master
-   :target: https://travis-ci.org/small-animal-MRI/sammba-MRI
+.. image:: https://travis-ci.org/sammba-mri/sammba-mri.svg?branch=master
+   :target: https://travis-ci.org/sammba-mri/sammba-mri
    :alt: Build Status
 
-.. image:: https://coveralls.io/repos/github/small-animal-MRI/sammba-MRI/badge.svg?branch=master
-    :target: https://coveralls.io/github/small-animal-MRI/sammba-MRI?branch=master
+.. image:: https://coveralls.io/repos/github/sammba-mri/sammba-mri/badge.svg?branch=master
+    :target: https://coveralls.io/github/sammba-mri/sammba-mri?branch=master
 
 sammba-MRI
-=====
+==========
 
-Mindt builds relevant **pipelines** for processing multimodal small animal brain MRI images.
+sammba-MRI builds relevant **pipelines** for processing multimodal small mammals brain MRI images.
 
 Dependencies
 ============
@@ -39,4 +39,4 @@ Installation
 
 For the moment process-asl is available as a development version. You can download the source code with the command::
 
-    git clone https://github.com/small-animal-MRI/sammba-MRI
+    git clone https://github.com/sammba-mri/sammba-mri
