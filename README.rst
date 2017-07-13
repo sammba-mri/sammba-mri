@@ -1,7 +1,7 @@
 .. -*- mode: rst -*-
 
 .. image:: https://travis-ci.org/sammba-mri/sammba-mri.svg?branch=master
-   :target: https://travis-ci.org/sammba-mri/sammba-mri
+    :target: https://travis-ci.org/sammba-mri/sammba-mri
 
 .. image:: https://coveralls.io/repos/github/sammba-mri/sammba-mri/badge.svg?branch=master
    :target: https://coveralls.io/github/sammba-mri/sammba-mri?branch=master
