@@ -38,7 +38,7 @@ def test_fetch_zurich_test_retest():
                                 'Result': result,
                                 'title': 'Matching experiments'}}
     # Create a dummy urls file
-    zurich_dir = os.path.join(tst.tmpdir, 'zurich')
+    zurich_dir = os.path.join(tst.tmpdir, 'zurich_retest')
     os.mkdir(zurich_dir)
     json_file = os.path.join(zurich_dir, 'experiments.html')
     with open(json_file, 'wb') as f:
