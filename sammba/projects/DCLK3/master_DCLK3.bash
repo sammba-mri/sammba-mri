@@ -2,15 +2,16 @@
 
 #bash -xef /home/nadkarni/git/sammba-mri/sammba/projects/DCLK3/master_DCLK3.bash 2>&1 | tee /home/Pplateforme/Plate-forme_RMN/NachiketNadkarni/DCLK3/$(date +%Y%m%d_%H%M%S).log
 
-PATH=$PATH:/home/nadkarni/git/sammba-mri/sammba/spatialregistration
+PATH=$PATH:/home/nadkarni/git/sammba-mri/sammba/common
 PATH=$PATH:/home/nadkarni/git/sammba-mri/sammba/projects/DCLK3
 export PATH
 
 PYTHONPATH=$PYTHONPATH:$PATH
 export PYTHONPATH
 
-rawdatadir=/home/Pplateforme/Plate-forme_RMN/JulienF/Plateforme_IRM/Raw_data/raw_data_117T/data_Souris_DCLK3/fevrier_2017
-savedir=/home/Pplateforme/Plate-forme_RMN/NachiketNadkarni/DCLK3/processed_20170726/MRIsessions
+rawdatadir1=/home/Pplateforme/Plate-forme_RMN/JulienF/Plateforme_IRM/Raw_data/raw_data_117T/data_Souris_DCLK3/fevrier_2017
+rawdatadir2=/home/Pplateforme/Plate-forme_RMN/JulienF/Plateforme_IRM/Raw_data/raw_data_117T/data_Souris_DCLK3/juillet_2017
+savedir=/home/Pplateforme/Plate-forme_RMN/NachiketNadkarni/DCLK3/processed_20170727/MRIsessions
 mkdir $savedir
 
 finres=0.1
@@ -22,7 +23,11 @@ Urad=18.3
 b=70
 t=80
 
-bash convert_DCLK3.bash $rawdatadir $savedir 0.1
+bash convert_DCLK3.bash $rawdatadir1 $savedir 0.1
+rm -f $savedir/raw_mean.nii.gz
+rm -f $savedir/raw_video.nii.gz
+bash convert_DCLK3.bash $rawdatadir2 $savedir 0.1
+
 bash MRIT2_extrcen.bash $savedir $brainvol $Urad $b $t
 
 template=$savedir/UnBmBeCC_mean.nii.gz
