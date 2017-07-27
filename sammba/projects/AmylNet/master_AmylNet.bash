@@ -2,7 +2,7 @@
 
 #bash -xef /home/nadkarni/git/sammba-mri/sammba/projects/AmylNet/master_AmylNet.bash 2>&1 | tee /home/Promane/2014-ROMANE/5_Experimental-Plan-Experiments-Results/mouse/AmylNet/$(date +%Y%m%d_%H%M%S).log
 
-PATH=$PATH:/home/nadkarni/git/sammba-mri/sammba/spatialregistration
+PATH=$PATH:/home/nadkarni/git/sammba-mri/sammba/common
 export PATH
 
 PYTHONPATH=$PYTHONPATH:$PATH
@@ -26,6 +26,11 @@ subpipeline=perslice_registration_subpipeline.bash #13
 Urad=18.3 #14
 brainvol=400 #15
 scale=0.1 #16
+T1blood=2800 #17
+lambda=0.9 #18
+multiplier=6000000 #19
+T1guess=1600 #20
+mccores=16 #21
 
-#					  1			2				 3			  4		 5		6	  7		8			9		  10				 11		 12					 13			  14	15		  16
-pipeline_wrapper.bash $pipeline $MRIsessionslist $analysisdir $brain $atlas $mask $head $headweight $basetype $dofolderoverwrite $tmpdir $registerfunctional $subpipeline $Urad $brainvol $scale
+#					  1			2				 3			  4		 5		6	  7		8			9		  10				 11		 12					 13			  14	15		  16	 17		  18	  19		  20	   21	
+pipeline_wrapper.bash $pipeline $MRIsessionslist $analysisdir $brain $atlas $mask $head $headweight $basetype $dofolderoverwrite $tmpdir $registerfunctional $subpipeline $Urad $brainvol $scale $T1blood $lambda $multiplier $T1guess $mccores
