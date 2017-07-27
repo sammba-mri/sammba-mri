@@ -44,7 +44,7 @@ if [[ -r "${a_rss[0]}" && -r "${a_Qwanats[0]}" ]]; then
 
 			counter=$(expr $counter + 1); echo "processing $counter of ${#a_rss[@]}"
 
-			tpattern.r $(3dinfo -tr -nk "$p".nii.gz) "$p"_tpattern.txt
+			tpattern.R $(3dinfo -tr -nk "$p".nii.gz) "$p"_tpattern.txt
 			3dTshift -prefix "$p"_Ts.nii.gz -tpattern @"$p"_tpattern.txt "$p".nii.gz
 			#fsl5.0-fslcpgeom "$p".nii.gz "$p"_Ts.nii.gz -d #remarkably it's not needed	
 			thresh=$(3dClipLevel "$p"_Ts.nii.gz)
