@@ -1,6 +1,7 @@
 library(oro.nifti)
 library(minpack.lm)
 library(parallel)
+library(plyr)
 
 #lambda is the assumed blood tissue partition coefficient of water in ml per g
 #multiplier converts to desired units (usually ml per 100g per min)
@@ -16,6 +17,41 @@ library(parallel)
 #UPDATE: not sure if tested that with the newer robust LM equation below
 #this code is not adaptive to T1, tend to just use max(TIs), need to make it
 #more flexible
+
+RefTablegenerator = function(MouseIDs, StudyCages, Treatments, MRISessions,
+                             DOD, outputfile
+                             ) {
+  
+  MouseIDs = read.table(MouseIDs, header = T, sep = "\t")
+  StudyCages = read.table(StudyCages, header = T, sep = "\t")
+  Treatments = read.table(Treatments, header = T, sep = "\t")
+  MRISessions = read.table(MRISessions, header = T, sep = "\t")
+  DOD = read.table(DOD, header = T, sep = "\t")
+  
+  RefTable = merge(MouseIDs, StudyCages)
+  RefTable = merge(RefTable, Treatments)
+  RefTable = merge(RefTable, MRISessions)
+  RefTable = merge(RefTable, DOD)
+  
+  RefTable <- RefTable[!duplicated(RefTable), ]
+  
+  RefTable$ScanDate = substring(basename(as.character(RefTable$DICOMdir)), 1, 8)
+  RefTable$ScanTime = substring(basename(as.character(RefTable$DICOMdir)), 10, 15)
+  
+  RefTable = RefTable[, c("MouseID", "altID", "DOB", "DOD", "Gender",
+                          "Genotype", "StudyCage", "Study", "Treatment",
+                          "Session", "DICOMdir", "Notes", "ScanDate",
+                          "ScanTime", "Weight"
+                          )
+                      ]
+  
+  write.table(RefTable, file = paste(normalizePath(dirname(outputfile)),
+                                     basename(outputfile), sep="/"
+                                     ),
+              quote = FALSE, sep = "\t", row.names = FALSE
+              )
+  
+}
 
 
 NIfTIreader = function(NIfTIfile) {
@@ -326,4 +362,311 @@ perfFAIREPIROI = function(perfFAIREPIdata,
   selS0s = perfFAIREPIdata[selS0sselector, ]$NZMean
   nonselS0s = perfFAIREPIdata[nonselS0sselector, ]$NZMean
   perfFAIREPIfitter(T1blood, lambda, TIs, multiplier, T1guess, selS0s, nonselS0s)
+}
+
+
+#####FORMERLY IN A SEPARATE DOCUMENT#####
+
+
+readRBMdata = function(RBMfname) {
+  iRBMdata = read.table(text = system(paste("/usr/lib/afni/bin/3dhistog -int", RBMfname),
+                                      intern = TRUE, ignore.stderr = TRUE), 
+                        col.names = c("label", "count", "CumFreq"))
+  iRBMdata$CumFreq = NULL
+  iRBMdata$fname = RBMfname
+  iRBMdata
+}
+
+
+#using nz does not cause any bias, just excludes noisy data
+readperfdata = function(perffname, mask) {
+  if (mask == "no") mask = paste(dirname(perffname), 
+                                 gsub("perfFAIREPI", 
+                                      gsub("_NaMe.nii.gz", basename(perffname), 
+                                           replacement = "_M0_N3.nii.gz"
+                                           ), 
+                                      replacement = "atlas_Na1_Op_perfFAIREPI"
+                                      ), 
+                                 sep = "/"
+                                 )
+  read.delim(text = system(paste("/usr/lib/afni/bin/3dROIstats -mask", mask,
+                                 "-nzmean -nzvoxels", perffname),
+                           intern = TRUE, ignore.stderr = TRUE
+                           )
+             )
+}
+
+
+readrsdata = function(rsfname) {
+  mask = paste(dirname(rsfname), gsub("rs",
+                                      gsub("_TsAv_NaMe.nii.gz",
+                                           basename(rsfname),
+                                           replacement = "_TsAvAvN3.nii.gz"
+                                           ),
+                                      replacement = "atlas_Na1_Op_rs"
+                                      ),
+               sep = "/"
+               )
+  read.delim(text=system(paste("/usr/lib/afni/bin/3dROIstats -mask",
+                               mask, rsfname
+                               ),
+                         intern = TRUE, ignore.stderr = TRUE)
+             )
+}
+
+
+cor.mtest <- function(mat, conf.level = 0.95){
+  mat <- as.matrix(mat)
+  n <- ncol(mat)
+  p.mat <- lowCI.mat <- uppCI.mat <- matrix(NA, n, n)
+  diag(p.mat) <- 0
+  diag(lowCI.mat) <- diag(uppCI.mat) <- 1
+  for(i in 1:(n-1)){
+    for(j in (i+1):n){
+      tmp <- cor.test(mat[,i], mat[,j], conf.level = conf.level)
+      p.mat[i,j] <- p.mat[j,i] <- tmp$p.value
+      lowCI.mat[i,j] <- lowCI.mat[j,i] <- tmp$conf.int[1]
+      uppCI.mat[i,j] <- uppCI.mat[j,i] <- tmp$conf.int[2]
+    }
+  }
+  return(list(p.mat, lowCI.mat, uppCI.mat))
+}
+
+
+RBMdataproc = function(MRIsessionspath, filepattern, regions, RefTable) {
+  
+  RBMfnames = list.files(path = MRIsessionspath, pattern = filepattern,
+                         recursive = T, full.names = T
+                         )
+  RBMdata = llply(RBMfnames, readRBMdata, .progress = "text")
+  
+  RBMdata = do.call(rbind, RBMdata)
+  
+  RBMdata$region = RBMdata$label
+  RBMdata$side = RBMdata$label
+  
+  for (n in 1:nrow(regions)) {
+    label = regions$label[n]
+    RBMdata$region[which(RBMdata$label == label)] = as.character(regions$structure[n])
+    RBMdata$side[which(RBMdata$label == label)] = as.character(regions$side[n])
+  }
+  
+  RBMdata = RBMdata[RBMdata$side == "left" |
+                      RBMdata$side == "right" |
+                      RBMdata$side == "both",
+                    ] #gets rid of non-existent VOInumbers
+  
+  RefTable$dname = basename(as.character(RefTable$DICOMdir))
+  RBMdata$dname = gsub("/", "",
+                       gsub("/analyses", "",
+                            gsub(filepattern, "",
+                                 gsub(MRIsessionspath, "", RBMdata$fname)
+                                 )
+                            )
+                       )
+  
+  RBMdata = merge(RefTable, RBMdata)
+  
+  RBMdata$fname = NULL
+  
+  RBMdataleftrightboth = ddply(.data = RBMdata[RBMdata$side != "both",],
+                               c(names(RefTable), "region"),
+                               summarise, count = sum(count)
+                               )
+  RBMdataleftrightboth$label = NA
+  RBMdataleftrightboth$side = "both"
+  RBMdata = rbind(RBMdata, RBMdataleftrightboth)
+  
+  RBMdatatotalboth = ddply(.data = RBMdata[RBMdata$side == "both",],
+                           c(names(RefTable)), summarise, count=sum(count)
+                           )
+  RBMdatatotalboth$label = NA
+  RBMdatatotalboth$region = "Total"
+  RBMdatatotalboth$side = "both"
+  RBMdatatotalleft = ddply(.data = RBMdata[RBMdata$side == "left",],
+                           c(names(RefTable), "side"), summarise,
+                           count=sum(count)
+                           )
+  RBMdatatotalleft$label = NA
+  RBMdatatotalleft$region = "Total"
+  RBMdatatotalright=ddply(.data = RBMdata[RBMdata$side == "right",],
+                          c(names(RefTable), "side"), summarise,
+                          count=sum(count)
+                          )
+  RBMdatatotalright$label = NA
+  RBMdatatotalright$region = "Total"
+  
+  RBMdata = rbind(RBMdata, RBMdatatotalboth, RBMdatatotalleft, RBMdatatotalright)
+  
+  RBMdata
+  
+}
+
+
+perfdataproc = function(MRIsessionspath, filepattern, mask, averageacross,
+                        regions, RefTable, T1blood, lambda, TIs, multiplier,
+                        T1guess, fTotalexcludedregions
+                        ) {
+  
+  perffnames = list.files(path = MRIsessionspath, pattern = filepattern,
+                          recursive = T, full.names = T
+                          )
+  perfdata = llply(perffnames, readperfdata, mask, .progress="text")
+  
+  perfdata = do.call(rbind.fill, perfdata)
+  
+  perfdata = reshape(perfdata, varying = 3:ncol(perfdata), timevar = "label",
+                     direction = "long", sep="_"
+                     )
+  perfdata$id = NULL
+  perfdata = split(perfdata, list(perfdata$File, perfdata$label))
+  
+  selS0sselector = seq(1, 2*length(TIs), 2)
+  nonselS0sselector = seq(2, 2*length(TIs), 2)
+  
+  perfcalc=llply(perfdata, perfFAIREPIROI, selS0sselector, nonselS0sselector,
+                 T1blood, lambda, TIs, multiplier, T1guess, .progress = "text") #parallel does not work yet
+  
+  #this is disgusting, need a better way to extract this data
+  CBF = as.numeric(sapply(perfcalc, function(x) 
+    tryCatch(x[["CBF", exact = FALSE]], 
+             error = function(cond) return(NA)
+             )
+                          )
+                   )
+  File = as.character(sapply(perfdata, function(x) 
+    tryCatch(x[["File", exact = FALSE]][1],
+             error = function(cond) return(NA) 
+             )
+                             )
+                      )
+  label = as.character(sapply(perfdata, function(x)
+    tryCatch(x[["label", exact = FALSE]][1],
+             error = function(cond) return(NA)
+             )
+                              )
+                       )
+  vcount = as.numeric(sapply(perfdata, function(x)
+    tryCatch(x[["NZcount", exact = FALSE]][1],
+             error = function(cond) return(NA)
+             )
+                             )
+                      )
+  
+  pd = data.frame(File, label, vcount, CBF)
+  
+  pd = pd[!is.na(pd$vcount) & !is.na(pd$CBF),]
+  pd$File = as.character(pd$File)
+  pd = subset(pd, ave(seq(label), label, FUN = length) >= 
+                length(levels(as.factor(pd$File)))
+              ) #remove labels not present in every acquisition
+  
+  pd$region = as.character(pd$label)
+  pd$side = as.character(pd$label)
+  
+  for (n in 1:nrow(regions)) {
+    label = regions$label[n] #label reused here, may change if above disgusting code is improved
+    pd$region[which(pd$label == label)] = as.character(regions$structure[n])
+    pd$side[which(pd$label == label)] = as.character(regions$side[n])
+  }
+  
+  RefTable$dname = basename(as.character(RefTable$DICOMdir))
+  pd$dname = gsub("/", "",
+                  gsub("/analyses", "",
+                       gsub(filepattern, "",
+                            gsub(MRIsessionspath, "", pd$File)
+                            )
+                       )
+                  )
+  
+  pd = merge(RefTable, pd)
+  
+  #voxel-weighted CBF; to combine left and right need to weight by VOI size as
+  #left and right are not always symmetrical
+  #also needed for any other VOI combinations that may be inserted after here
+  pd$VCwCBF = pd$vcount * pd$CBF
+  
+  pdBLR = ddply(.data = pd[pd$side != "both",],
+                c(names(RefTable), "dname", "File", "region"), summarise, 
+                vcount = sum(vcount), CBF = mean(CBF), VCwCBF = sum(VCwCBF)
+                )
+  pdBLR$label = NA
+  pdBLR$side = "both"
+  pd = rbind(pd, pdBLR)
+  
+  pdBT = ddply(.data = pd[pd$side == "both",],
+               c(names(RefTable), "dname", "File"), summarise,
+               vcount = sum(vcount), CBF = mean(CBF), VCwCBF = sum(VCwCBF)
+               )
+  pdBT$label = NA
+  pdBT$region = "Total"
+  pdBT$side = "both"
+  pdLT = ddply(.data = pd[pd$side == "left",],
+               c(names(RefTable), "dname", "File", "side"), summarise,
+               vcount = sum(vcount), CBF = mean(CBF), VCwCBF = sum(VCwCBF)
+               )
+  pdLT$label = NA
+  pdLT$region = "Total"
+  pdRT = ddply(.data = pd[pd$side == "right",],
+               c(names(RefTable), "dname", "File", "side"), summarise,
+               vcount = sum(vcount), CBF = mean(CBF), VCwCBF = sum(VCwCBF)
+               )
+  pdRT$label = NA
+  pdRT$region = "Total"
+  
+  pdBfT = ddply(.data = pd[pd$side == "both" & !(pd$region %in% fTotalexcludedregions),],
+                c(names(RefTable), "dname", "File"), summarise,
+                vcount = sum(vcount), CBF = mean(CBF), VCwCBF = sum(VCwCBF)
+                )
+  pdBfT$label = NA
+  pdBfT$region = "fTotal"
+  pdBfT$side = "both"
+  pdLfT=ddply(.data = pd[pd$side == "left" & !(pd$region %in% fTotalexcludedregions),],
+              c(names(RefTable), "dname", "File", "side"), summarise,
+              vcount = sum(vcount), CBF = mean(CBF), VCwCBF = sum(VCwCBF)
+              )
+  pdLfT$label = NA
+  pdLfT$region = "fTotal"
+  pdRfT = ddply(.data = pd[pd$side == "right" & !(pd$region %in% fTotalexcludedregions),],
+                c(names(RefTable), "dname", "File", "side"), summarise,
+                vcount = sum(vcount), CBF = mean(CBF), VCwCBF = sum(VCwCBF)
+                )
+  pdRfT$label = NA
+  pdRfT$region = "fTotal"
+  
+  pd = rbind(pd, pdBT, pdLT, pdRT, pdBfT, pdLfT, pdRfT)
+  pd$Session = as.factor(pd$Session)
+  pd$wCBF = pd$VCwCBF / pd$vcount
+  
+  #average across all perfusion measures per session
+  if (averageacross=="yes") {
+    pd = ddply(pd, c(names(RefTable), "label", "region", "side"), summarise,
+               vcount = mean(vcount),
+               CBF = mean(CBF),
+               VCwCBF = mean(VCwCBF),
+               wCBF = mean(wCBF)
+               )
+  }
+  #NEED: to add all the lost columns into above (or somehow make them automatically produce NAs),
+  #then rbind to perfcalc. Call Session=0
+  
+  pd
+  
+}
+
+
+rsdataproc = function(MRIsessionspath, filepattern, regions, RefTable) {
+  rsnames = list.files(path = MRIsessionspath, pattern = filepattern,
+                       recursive = T, full.names = T)
+  rsdata = llply(rsfnames, readrsdata, .progress="text")
+  rsdata = do.call(rbind.fill, rsdata)
+  rsdata$dname = gsub("/", "",
+                      gsub("/analyses", "",
+                           gsub(filepattern, "",
+                                gsub(MRIsessionspath, "", rsdata$File)
+                                )
+                           )
+                      )
+  RefTable$dname = basename(as.character(RefTable$DICOMdir))
+  merge(RefTable, rsdata)
 }
