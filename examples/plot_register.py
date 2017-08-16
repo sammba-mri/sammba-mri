@@ -1,4 +1,5 @@
-from nipype.interfaces import afni, fsl
+import numpy as np
+from nipype.interfaces import afni, fsl, ants
 from nipype.caching import Memory
 
 
@@ -9,16 +10,22 @@ def save_inverted_affine(oned_matrix_file, inverted_matrix_file):
     v = np.array([v1, v2, v3])
     u_new = np.linalg.inv(u)
     v_new = -u_new.dot(v)
+    np.savetxt(inverted_matrix_file,
+               np.hstack((u_new[0], v_new[:1], u_new[1], v_new[1:2],
+                          u_new[2], v_new[2:])))
 
 
 memory = Memory('/tmp')
 basename = '/tmp/test_anat/anat'
 template_file = '/usr/share/fsl/5.0/data/standard/MNI152_T1_2mm_brain.nii.gz'
 head_file = '/usr/share/fsl/5.0/data/standard/MNI152_T1_2mm.nii.gz'
-#N4BiasFieldCorrection -i "$anat".nii.gz -o "$anat"_N4.nii.gz
+
+bias_correct = memory.cache(ants.N4BiasFieldCorrection)
+out_bias_correct = bias_correct(input_image=basename + '.nii.gz',
+                                output_image=basename + '_N4.nii.gz')
 
 unifize = memory.cache(afni.Unifize)
-out_unifize = unifize(in_file=basename + '.nii.gz',
+out_unifize = unifize(in_file=out_bias_correct.outputs.output_image,
                       urad=18.3,
                       out_file=basename + '_Un.nii.gz')
 
@@ -46,13 +53,13 @@ out_allineate = allineate(in_file=out_apply_mask.outputs.out_file,
                           cost='nmi',
                           convergence=.05,
                           two_pass=True,
-#                         two_blur=6.,  # XXX debug two_blur
+                          two_blur=6.,
                           center_of_mass='',
-#                         maxrot=90,  # XXX: add to Allineate options
+                          maxrot=90,
                           out_file=basename + '_UnBmBeAl.nii.gz')
 
-
-#cat_matvec -ONELINE "$anat"_"$Bc"BmBeAl.aff12.1D -I > "$anat"_"$Bc"BmBeAl_INV.aff12.1D
+save_inverted_affine(out_allineate.outputs.matrix,
+                     basename + '_UnBmBeAl_INV.aff12.1D')
 
 # Application to the whole head image. can also be used for a good
 # demonstration of linear vs. non-linear registration quality
@@ -73,9 +80,3 @@ out_qwarp = qwarp(in_file=out_allineate2.outputs.out_file,
                   iwarp=True,
                   blur=[0],
                   out_file=basename + '_UnAaQw.nii.gz')
-
-3dQwarp -base MNI152_T1_2mm_brain.nii.gz -blur 0.0 -source anat_UnAa.nii.gz -iwarp -nmi -noneg -prefix /tmp/test_anat/anat_UnAaQw.nii.gz
-
-	3dQwarp -base $brain -source "$anat"_"$Bc"Aa.nii.gz -prefix "$anat"_"$Bc"AaQw.nii.gz -nmi -iwarp -noneg -blur 0
-fi
-
