@@ -19,8 +19,7 @@ library(plyr)
 #more flexible
 
 RefTablegenerator = function(MouseIDs, StudyCages, Treatments, MRISessions,
-                             DOD, outputfile
-                             ) {
+                             DOD, outputfile) {
   
   MouseIDs = read.table(MouseIDs, header = T, sep = "\t")
   StudyCages = read.table(StudyCages, header = T, sep = "\t")
@@ -41,22 +40,18 @@ RefTablegenerator = function(MouseIDs, StudyCages, Treatments, MRISessions,
   RefTable = RefTable[, c("MouseID", "altID", "DOB", "DOD", "Gender",
                           "Genotype", "StudyCage", "Study", "Treatment",
                           "Session", "DICOMdir", "Notes", "ScanDate",
-                          "ScanTime", "Weight"
-                          )
-                      ]
+                          "ScanTime", "Weight")]
   
   write.table(RefTable, file = paste(normalizePath(dirname(outputfile)),
-                                     basename(outputfile), sep="/"
-                                     ),
-              quote = FALSE, sep = "\t", row.names = FALSE
-              )
+                                     basename(outputfile), sep = "/"),
+              quote = FALSE, sep = "\t", row.names = FALSE)
   
 }
 
 
 NIfTIreader = function(NIfTIfile) {
   #no error function in case TRs or TEs is the wrong length, whatevs
-  readNIfTI(file.path(normalizePath(NIfTIfile)), reorient=F)
+  readNIfTI(file.path(normalizePath(NIfTIfile)), reorient = F)
 }
 
 
@@ -66,16 +61,10 @@ NIfTIreader = function(NIfTIfile) {
 #converts the 4D NIfTI to 5D, aperm then swaps TEs and Z, before a second array
 #function returns it to 4D 
 T1_T2map_RAREreorder = function(T1_T2map_RARENIfTI, TRs, TEs) {
-  array(aperm(array(T1_T2map_RARENIfTI,
-                    dim = c(dim(T1_T2map_RARENIfTI)[1:3],
-                            length(TEs),
-                            length(TRs)
-                            )
-                    ),
-                    perm = c(1,2,4,3,5)
-              ),
-          dim = dim(T1_T2map_RARENIfTI)
-        )
+  array(aperm(array(T1_T2map_RARENIfTI, dim = c(dim(T1_T2map_RARENIfTI)[1:3],
+                                                length(TEs), length(TRs))),
+              perm = c(1,2,4,3,5)),
+        dim = dim(T1_T2map_RARENIfTI))
 }
 
 
@@ -96,25 +85,16 @@ coordlistgen=function(NIfTI) {
 perfT1fitter = function(S0s, TIs, T1guess) {
   tryCatch(summary(nlsLM(S0s ~ bias + abs(M0 * (1 - 2 * exp(-TIs / T1))),
                          start = list(bias = 0, M0 = mean(S0s), T1 = T1guess),
-                         lower = c(0, 0, 0)
-                         )
-                   ),
-           error = function(cond) return(NA)
-           )
+                         lower = c(0, 0, 0))),
+           error = function(cond) return(NA))
 }
 
 
-perfFAIREPIfitter = function(T1blood,
-                             lambda,
-                             TIs,
-                             multiplier,
-                             T1guess,
-                             selS0s,
-                             nonselS0s
-							 ) {
+perfFAIREPIfitter = function(T1blood, lambda, TIs, multiplier, T1guess, selS0s,
+                             nonselS0s) {
 
-  sel=perfT1fitter(selS0s,TIs,T1guess)
-  nonsel=perfT1fitter(nonselS0s,TIs,T1guess)    
+  sel = perfT1fitter(selS0s, TIs, T1guess)
+  nonsel = perfT1fitter(nonselS0s, TIs, T1guess)    
 
   if (!is.list(sel) | !is.list(nonsel)) {
     NA
@@ -123,10 +103,7 @@ perfFAIREPIfitter = function(T1blood,
     T1sel = sel[["coefficients"]]["T1","Estimate"]
     T1nonsel = nonsel[["coefficients"]]["T1","Estimate"]
     rCBF = 100 * (T1nonsel - T1sel) / T1nonsel
-    CBF = multiplier *
-          lambda *
-          (T1nonsel / T1blood) *
-          ((1 / T1sel) - (1 / T1nonsel))
+    CBF = multiplier * lambda * (T1nonsel / T1blood) * ((1 / T1sel) - (1 / T1nonsel))
     list(sel = sel, nonsel = nonsel, rCBF = rCBF, CBF = CBF)
     }
     
@@ -135,85 +112,41 @@ perfFAIREPIfitter = function(T1blood,
 
 T1T2fitter = function(fitT1orT2, S0s, TRsorTEs, T1orT2guess) {
   if (fitT1orT2 == "T1") {
-    T1orT2fit = tryCatch(summary(nlsLM(S0s ~ bias +
-                                             M0 * (1 - exp(-TRsorTEs / T1)),
-                                       start = list(bias = 0,
-                                                    M0 = mean(S0s),
-                                                    T1 = T1orT2guess
-                                                    ),
-                                       lower = c(0, 0, 0)
-                                       )
-                                 ),
-                         error = function(cond) return(NA)
-                         )
+    T1orT2fit =
+      tryCatch(summary(nlsLM(S0s ~ bias + M0 * (1 - exp(-TRsorTEs / T1)),
+                             start = list(bias = 0, M0 = mean(S0s), T1 = T1orT2guess),
+                             lower = c(0, 0, 0))),
+               error = function(cond) return(NA))
   }
   if (fitT1orT2 == "T2") {
-    T1orT2fit = tryCatch(summary(nlsLM(S0s ~ bias + M0 * exp(-TRsorTEs / T2),
-                                       start = list(bias = 0,
-                                                    M0 = mean(S0s),
-                                                    T2 = T1orT2guess
-                                                    ),
-                                       lower = c(0, 0, 0)
-                                       )
-                                 ),
-                         error=function(cond) return(NA)
-                         )
+    T1orT2fit =
+      tryCatch(summary(nlsLM(S0s ~ bias + M0 * exp(-TRsorTEs / T2),
+                             start = list(bias = 0, M0 = mean(S0s), T2 = T1orT2guess),
+                             lower = c(0, 0, 0))),
+               error = function(cond) return(NA))
   if (!is.list(T1orT2fit)) NA else T1orT2fit
   }
 }
 
 
-perfFAIREPIvoxel = function(coord,
-                            selselector,
-                            nonselselector,
-                            perfFAIREPINIfTI,
-                            T1blood,
-                            lambda,
-                            TIs,
-                            multiplier,
-                            T1guess
-                            ) {
-  perfFAIREPIfitter(T1blood,
-                    lambda,
-                    TIs,
-                    multiplier,
-                    T1guess,
-                    perfFAIREPINIfTI[coord[["xd"]],
-                                     coord[["yd"]],
-                                     coord[["zd"]],
-                                     selselector
-                                     ],
-                    perfFAIREPINIfTI[coord[["xd"]],
-                                     coord[["yd"]],
-                                     coord[["zd"]],
-                                     nonselselector
-                                     ]
-                    )
+perfFAIREPIvoxel = function(coord, selselector, nonselselector, perfFAIREPINIfTI,
+                            T1blood, lambda, TIs, multiplier, T1guess) {
+  perfFAIREPIfitter(T1blood, lambda, TIs, multiplier, T1guess,
+    perfFAIREPINIfTI[coord[["xd"]], coord[["yd"]], coord[["zd"]], selselector],
+    perfFAIREPINIfTI[coord[["xd"]], coord[["yd"]], coord[["zd"]], nonselselector])
 }
 
-T1_T2map_RAREvoxel = function(coord,
-                              selector,
-                              T1_T2map_RARENIfTI,
-                              fitT1orT2,
-                              TRsorTEs,
-                              T1orT2guess
-                              ) {
+T1_T2map_RAREvoxel = function(coord, selector, T1_T2map_RARENIfTI, fitT1orT2,
+                              TRsorTEs, T1orT2guess) {
   T1T2fitter(fitT1orT2,
-             T1_T2map_RARENIfTI[coord[["xd"]],
-                                coord[["yd"]],
-                                coord[["zd"]],
-                                selector
-                                ],
-             TRsorTEs,
-             T1orT2guess
-             )
+    T1_T2map_RARENIfTI[coord[["xd"]], coord[["yd"]], coord[["zd"]], selector],
+    TRsorTEs, T1orT2guess)
 }
 
 
 T1_T2map_RAREcalcparamextract = function(T1_T2map_RAREcalc, param, paramtype) {
-  tryCatch(T1_T2map_RAREcalc[["coefficients"]][param,paramtype],
-           error=function(cond) return(NA)
-           )
+  tryCatch(T1_T2map_RAREcalc[["coefficients"]][param, paramtype],
+           error = function(cond) return(NA))
 }
 
 
@@ -222,25 +155,15 @@ T1_T2map_RAREtoNIfTI = function(NIfTI, TRs, TEs, T1guess, T2guess, mc.cores) {
   NIfTI = T1_T2map_RAREreorder(NIfTIreader(NIfTI), TRs, TEs)
   coordlist = coordlistgen(NIfTI)
   
-  T1calc = mclapply(coordlist,
-                    T1_T2map_RAREvoxel,
+  T1calc = mclapply(coordlist, T1_T2map_RAREvoxel,
                     selector = seq(1, length(TRs) * length(TEs), length(TEs)),
-                    T1_T2map_RARENIfTI = NIfTI,
-                    fitT1orT2 = "T1",
-                    TRsorTEs = TRs,
-                    T1orT2guess = T1guess,
-                    mc.cores = mc.cores
-                    )
+                    T1_T2map_RARENIfTI = NIfTI, fitT1orT2 = "T1",
+                    TRsorTEs = TRs, T1orT2guess = T1guess, mc.cores = mc.cores)
                     
-  T2calc = mclapply(coordlist,
-                    T1_T2map_RAREvoxel,
+  T2calc = mclapply(coordlist, T1_T2map_RAREvoxel,
                     selector = 1:length(TEs),
-                    T1_T2map_RARENIfTI = NIfTI,
-                    fitT1orT2 = "T2",
-                    TRsorTEs = TEs,
-                    T1orT2guess = T2guess,
-                    mc.cores = mc.cores
-                    )
+                    T1_T2map_RARENIfTI = NIfTI, fitT1orT2 = "T2",
+                    TRsorTEs = TEs, T1orT2guess = T2guess, mc.cores = mc.cores)
 
   #this is disgusting, find a better way
   T1bias   = sapply(T1calc, T1_T2map_RAREcalcparamextract, "bias", "Estimate")
@@ -256,45 +179,22 @@ T1_T2map_RAREtoNIfTI = function(NIfTI, TRs, TEs, T1guess, T2guess, mc.cores) {
   T2T2     = sapply(T2calc, T1_T2map_RAREcalcparamextract, "T2",   "Estimate")
   T2T2SE   = sapply(T2calc, T1_T2map_RAREcalcparamextract, "T2",   "Std. Error")
   
-  as.nifti(array(c(T1bias,
-                   T1biasSE,
-                   T1M0,
-                   T1M0SE,
-                   T1T1,
-                   T1T1SE,
-                   T2bias,
-                   T2biasSE,
-                   T2M0,
-                   T2M0SE,
-                   T2T2,
-                   T2T2SE
-                   ),
-                 dim = c(dim(NIfTI)[1:3], 12)
-                 )
-           )
+  as.nifti(array(c(T1bias, T1biasSE, T1M0, T1M0SE, T1T1, T1T1SE, T2bias,
+                   T2biasSE, T2M0, T2M0SE, T2T2, T2T2SE),
+                 dim = c(dim(NIfTI)[1:3], 12)))
   
 }
 
 
-perfFAIREPIcalcparamextract = function(perfFAIREPIcalc,
-                                       selornonsel,
-                                       param,
-                                       paramtype
-									   ) {
-  tryCatch(perfFAIREPIcalc[[selornonsel]][["coefficients"]][param,paramtype],
-           error=function(cond) return(NA)
-           )
+perfFAIREPIcalcparamextract = function(perfFAIREPIcalc, selornonsel, param,
+                                       paramtype) {
+  tryCatch(perfFAIREPIcalc[[selornonsel]][["coefficients"]][param, paramtype],
+           error = function(cond) return(NA))
 }
 
 
-perfFAIREPItoNIfTI = function(NIfTI,
-                              T1blood,
-                              lambda,
-                              TIs,
-                              multiplier,
-                              T1guess,
-                              mc.cores
-							  ) {
+perfFAIREPItoNIfTI = function(NIfTI, T1blood, lambda, TIs, multiplier, T1guess,
+                              mc.cores) {
   
   NIfTI = NIfTIreader(NIfTI)
   coordlist = coordlistgen(NIfTI)
@@ -302,18 +202,11 @@ perfFAIREPItoNIfTI = function(NIfTI,
   selselector = seq(1, dim(NIfTI)[4], 2)
   nonselselector = seq(2, dim(NIfTI)[4], 2)
     
-  perfcalc = mclapply(coordlist,
-                      perfFAIREPIvoxel,
-                      selselector = selselector,
-                      nonselselector = nonselselector,
-                      perfFAIREPINIfTI = NIfTI,
-                      T1blood = T1blood,
-                      lambda = lambda,
-                      TIs = TIs,
-                      multiplier = multiplier,
-                      T1guess = T1guess,
-                      mc.cores = mc.cores
-					  )
+  perfcalc = mclapply(coordlist, perfFAIREPIvoxel, selselector = selselector,
+                      nonselselector = nonselselector, perfFAIREPINIfTI = NIfTI,
+                      T1blood = T1blood, lambda = lambda, TIs = TIs,
+                      multiplier = multiplier, T1guess = T1guess,
+                      mc.cores = mc.cores)
 
   selbias      = sapply(perfcalc, perfFAIREPIcalcparamextract, "sel",    "bias", "Estimate")
   selbiasSE    = sapply(perfcalc, perfFAIREPIcalcparamextract, "sel",    "bias", "Std. Error")
@@ -330,35 +223,15 @@ perfFAIREPItoNIfTI = function(NIfTI,
   rCBF         = sapply(perfcalc, function(x) tryCatch(x[["rCBF"]], error = function(cond) return(NA) ))
   CBF          = sapply(perfcalc, function(x) tryCatch(x[["CBF"]], error = function(cond) return(NA) ))
   
-  as.nifti(array(c(selbias,
-                   selbiasSE,
-                   selM0,
-                   selM0SE,
-                   selT1,
-                   selT1SE,
-                   nonselbias,
-                   nonselbiasSE,
-                   nonselM0,
-                   nonselM0SE,
-                   nonselT1,
-                   nonselT1SE,
-                   rCBF,CBF
-                   ),
-                 dim=c(dim(NIfTI)[1:3], 14)
-                 )
-           )
+  as.nifti(array(c(selbias, selbiasSE, selM0, selM0SE, selT1, selT1SE,
+                   nonselbias, nonselbiasSE, nonselM0, nonselM0SE, nonselT1,
+                   nonselT1SE, rCBF,CBF),
+                 dim = c(dim(NIfTI)[1:3], 14)))
 }
 
 
-perfFAIREPIROI = function(perfFAIREPIdata,
-                          selS0sselector,
-                          nonselS0sselector,
-                          T1blood,
-                          lambda,
-                          TIs,
-                          multiplier,
-                          T1guess
-                          ) {
+perfFAIREPIROI = function(perfFAIREPIdata, selS0sselector, nonselS0sselector,
+                          T1blood, lambda, TIs, multiplier, T1guess) {
   selS0s = perfFAIREPIdata[selS0sselector, ]$NZMean
   nonselS0s = perfFAIREPIdata[nonselS0sselector, ]$NZMean
   perfFAIREPIfitter(T1blood, lambda, TIs, multiplier, T1guess, selS0s, nonselS0s)
@@ -380,38 +253,31 @@ readRBMdata = function(RBMfname) {
 
 #using nz does not cause any bias, just excludes noisy data
 readperfdata = function(perffname, mask) {
-  if (mask == "no") mask = paste(dirname(perffname), 
-                                 gsub("perfFAIREPI", 
-                                      gsub("_NaMe.nii.gz", basename(perffname), 
-                                           replacement = "_M0_N3.nii.gz"
-                                           ), 
-                                      replacement = "atlas_Na1_Op_perfFAIREPI"
-                                      ), 
-                                 sep = "/"
-                                 )
+  if (mask == "no")
+    mask = paste(dirname(perffname),
+                 gsub("perfFAIREPI", 
+                      gsub("_NaMe.nii.gz",
+                           basename(perffname),
+                           replacement = "_M0_N3.nii.gz"), 
+                      replacement = "atlas_Na1_Op_perfFAIREPI"), 
+                 sep = "/")
   read.delim(text = system(paste("/usr/lib/afni/bin/3dROIstats -mask", mask,
                                  "-nzmean -nzvoxels", perffname),
-                           intern = TRUE, ignore.stderr = TRUE
-                           )
-             )
+                           intern = TRUE, ignore.stderr = TRUE))
 }
 
 
 readrsdata = function(rsfname) {
-  mask = paste(dirname(rsfname), gsub("rs",
-                                      gsub("_TsAv_NaMe.nii.gz",
-                                           basename(rsfname),
-                                           replacement = "_TsAvAvN3.nii.gz"
-                                           ),
-                                      replacement = "atlas_Na1_Op_rs"
-                                      ),
-               sep = "/"
-               )
-  read.delim(text=system(paste("/usr/lib/afni/bin/3dROIstats -mask",
-                               mask, rsfname
-                               ),
-                         intern = TRUE, ignore.stderr = TRUE)
-             )
+    mask = paste(dirname(rsfname),
+                 gsub("rs",
+                      gsub("_TsAv_NaMe.nii.gz",
+                           basename(rsfname),
+                           replacement = "_TsAvAvN3.nii.gz"),
+                      replacement = "atlas_Na1_Op_rs"),
+                 sep = "/")
+  read.delim(text = system(paste("/usr/lib/afni/bin/3dROIstats -mask", mask,
+                                 rsfname),
+                           intern = TRUE, ignore.stderr = TRUE))
 }
 
 
@@ -436,8 +302,7 @@ cor.mtest <- function(mat, conf.level = 0.95){
 RBMdataproc = function(MRIsessionspath, filepattern, regions, RefTable) {
   
   RBMfnames = list.files(path = MRIsessionspath, pattern = filepattern,
-                         recursive = T, full.names = T
-                         )
+                         recursive = T, full.names = T)
   RBMdata = llply(RBMfnames, readRBMdata, .progress = "text")
   
   RBMdata = do.call(rbind, RBMdata)
@@ -451,48 +316,36 @@ RBMdataproc = function(MRIsessionspath, filepattern, regions, RefTable) {
     RBMdata$side[which(RBMdata$label == label)] = as.character(regions$side[n])
   }
   
-  RBMdata = RBMdata[RBMdata$side == "left" |
-                      RBMdata$side == "right" |
-                      RBMdata$side == "both",
-                    ] #gets rid of non-existent VOInumbers
+  RBMdata = RBMdata[RBMdata$side == "left" | RBMdata$side == "right" |
+                    RBMdata$side == "both", ] #gets rid of non-existent VOInumbers
   
   RefTable$dname = basename(as.character(RefTable$DICOMdir))
   RBMdata$dname = gsub("/", "",
                        gsub("/analyses", "",
                             gsub(filepattern, "",
-                                 gsub(MRIsessionspath, "", RBMdata$fname)
-                                 )
-                            )
-                       )
+                                 gsub(MRIsessionspath, "", RBMdata$fname))))
   
   RBMdata = merge(RefTable, RBMdata)
   
   RBMdata$fname = NULL
   
   RBMdataleftrightboth = ddply(.data = RBMdata[RBMdata$side != "both",],
-                               c(names(RefTable), "region"),
-                               summarise, count = sum(count)
-                               )
+                               c(names(RefTable), "region"), summarise, count = sum(count))
   RBMdataleftrightboth$label = NA
   RBMdataleftrightboth$side = "both"
   RBMdata = rbind(RBMdata, RBMdataleftrightboth)
   
   RBMdatatotalboth = ddply(.data = RBMdata[RBMdata$side == "both",],
-                           c(names(RefTable)), summarise, count=sum(count)
-                           )
+                           c(names(RefTable)), summarise, count = sum(count))
   RBMdatatotalboth$label = NA
   RBMdatatotalboth$region = "Total"
   RBMdatatotalboth$side = "both"
   RBMdatatotalleft = ddply(.data = RBMdata[RBMdata$side == "left",],
-                           c(names(RefTable), "side"), summarise,
-                           count=sum(count)
-                           )
+                           c(names(RefTable), "side"), summarise, count = sum(count))
   RBMdatatotalleft$label = NA
   RBMdatatotalleft$region = "Total"
-  RBMdatatotalright=ddply(.data = RBMdata[RBMdata$side == "right",],
-                          c(names(RefTable), "side"), summarise,
-                          count=sum(count)
-                          )
+  RBMdatatotalright = ddply(.data = RBMdata[RBMdata$side == "right",],
+                            c(names(RefTable), "side"), summarise, count = sum(count))
   RBMdatatotalright$label = NA
   RBMdatatotalright$region = "Total"
   
@@ -505,61 +358,45 @@ RBMdataproc = function(MRIsessionspath, filepattern, regions, RefTable) {
 
 perfdataproc = function(MRIsessionspath, filepattern, mask, averageacross,
                         regions, RefTable, T1blood, lambda, TIs, multiplier,
-                        T1guess, fTotalexcludedregions
-                        ) {
+                        T1guess, fTotalexcludedregions) {
   
   perffnames = list.files(path = MRIsessionspath, pattern = filepattern,
-                          recursive = T, full.names = T
-                          )
-  perfdata = llply(perffnames, readperfdata, mask, .progress="text")
+                          recursive = T, full.names = T)
+  perfdata = llply(perffnames, readperfdata, mask, .progress = "text")
   
   perfdata = do.call(rbind.fill, perfdata)
   
   perfdata = reshape(perfdata, varying = 3:ncol(perfdata), timevar = "label",
-                     direction = "long", sep="_"
-                     )
+                     direction = "long", sep = "_")
   perfdata$id = NULL
   perfdata = split(perfdata, list(perfdata$File, perfdata$label))
   
-  selS0sselector = seq(1, 2*length(TIs), 2)
-  nonselS0sselector = seq(2, 2*length(TIs), 2)
+  selS0sselector = seq(1, 2 * length(TIs), 2)
+  nonselS0sselector = seq(2, 2 * length(TIs), 2)
   
-  perfcalc=llply(perfdata, perfFAIREPIROI, selS0sselector, nonselS0sselector,
-                 T1blood, lambda, TIs, multiplier, T1guess, .progress = "text") #parallel does not work yet
+  perfcalc = llply(perfdata, perfFAIREPIROI, selS0sselector, nonselS0sselector,
+                   T1blood, lambda, TIs, multiplier, T1guess, .progress = "text") #parallel does not work yet
   
   #this is disgusting, need a better way to extract this data
   CBF = as.numeric(sapply(perfcalc, function(x) 
     tryCatch(x[["CBF", exact = FALSE]], 
-             error = function(cond) return(NA)
-             )
-                          )
-                   )
+             error = function(cond) return(NA))))
   File = as.character(sapply(perfdata, function(x) 
     tryCatch(x[["File", exact = FALSE]][1],
-             error = function(cond) return(NA) 
-             )
-                             )
-                      )
+             error = function(cond) return(NA))))
   label = as.character(sapply(perfdata, function(x)
     tryCatch(x[["label", exact = FALSE]][1],
-             error = function(cond) return(NA)
-             )
-                              )
-                       )
+             error = function(cond) return(NA))))
   vcount = as.numeric(sapply(perfdata, function(x)
     tryCatch(x[["NZcount", exact = FALSE]][1],
-             error = function(cond) return(NA)
-             )
-                             )
-                      )
+             error = function(cond) return(NA))))
   
   pd = data.frame(File, label, vcount, CBF)
   
-  pd = pd[!is.na(pd$vcount) & !is.na(pd$CBF),]
+  pd = pd[!is.na(pd$vcount) & !is.na(pd$CBF), ]
   pd$File = as.character(pd$File)
   pd = subset(pd, ave(seq(label), label, FUN = length) >= 
-                length(levels(as.factor(pd$File)))
-              ) #remove labels not present in every acquisition
+                length(levels(as.factor(pd$File)))) #remove labels not present in every acquisition
   
   pd$region = as.character(pd$label)
   pd$side = as.character(pd$label)
@@ -574,10 +411,7 @@ perfdataproc = function(MRIsessionspath, filepattern, mask, averageacross,
   pd$dname = gsub("/", "",
                   gsub("/analyses", "",
                        gsub(filepattern, "",
-                            gsub(MRIsessionspath, "", pd$File)
-                            )
-                       )
-                  )
+                            gsub(MRIsessionspath, "", pd$File))))
   
   pd = merge(RefTable, pd)
   
@@ -588,49 +422,42 @@ perfdataproc = function(MRIsessionspath, filepattern, mask, averageacross,
   
   pdBLR = ddply(.data = pd[pd$side != "both",],
                 c(names(RefTable), "dname", "File", "region"), summarise, 
-                vcount = sum(vcount), CBF = mean(CBF), VCwCBF = sum(VCwCBF)
-                )
+                vcount = sum(vcount), CBF = mean(CBF), VCwCBF = sum(VCwCBF))
   pdBLR$label = NA
   pdBLR$side = "both"
   pd = rbind(pd, pdBLR)
   
   pdBT = ddply(.data = pd[pd$side == "both",],
                c(names(RefTable), "dname", "File"), summarise,
-               vcount = sum(vcount), CBF = mean(CBF), VCwCBF = sum(VCwCBF)
-               )
+               vcount = sum(vcount), CBF = mean(CBF), VCwCBF = sum(VCwCBF))
   pdBT$label = NA
   pdBT$region = "Total"
   pdBT$side = "both"
   pdLT = ddply(.data = pd[pd$side == "left",],
                c(names(RefTable), "dname", "File", "side"), summarise,
-               vcount = sum(vcount), CBF = mean(CBF), VCwCBF = sum(VCwCBF)
-               )
+               vcount = sum(vcount), CBF = mean(CBF), VCwCBF = sum(VCwCBF))
   pdLT$label = NA
   pdLT$region = "Total"
   pdRT = ddply(.data = pd[pd$side == "right",],
                c(names(RefTable), "dname", "File", "side"), summarise,
-               vcount = sum(vcount), CBF = mean(CBF), VCwCBF = sum(VCwCBF)
-               )
+               vcount = sum(vcount), CBF = mean(CBF), VCwCBF = sum(VCwCBF))
   pdRT$label = NA
   pdRT$region = "Total"
   
   pdBfT = ddply(.data = pd[pd$side == "both" & !(pd$region %in% fTotalexcludedregions),],
                 c(names(RefTable), "dname", "File"), summarise,
-                vcount = sum(vcount), CBF = mean(CBF), VCwCBF = sum(VCwCBF)
-                )
+                vcount = sum(vcount), CBF = mean(CBF), VCwCBF = sum(VCwCBF))
   pdBfT$label = NA
   pdBfT$region = "fTotal"
   pdBfT$side = "both"
   pdLfT=ddply(.data = pd[pd$side == "left" & !(pd$region %in% fTotalexcludedregions),],
               c(names(RefTable), "dname", "File", "side"), summarise,
-              vcount = sum(vcount), CBF = mean(CBF), VCwCBF = sum(VCwCBF)
-              )
+              vcount = sum(vcount), CBF = mean(CBF), VCwCBF = sum(VCwCBF))
   pdLfT$label = NA
   pdLfT$region = "fTotal"
   pdRfT = ddply(.data = pd[pd$side == "right" & !(pd$region %in% fTotalexcludedregions),],
                 c(names(RefTable), "dname", "File", "side"), summarise,
-                vcount = sum(vcount), CBF = mean(CBF), VCwCBF = sum(VCwCBF)
-                )
+                vcount = sum(vcount), CBF = mean(CBF), VCwCBF = sum(VCwCBF))
   pdRfT$label = NA
   pdRfT$region = "fTotal"
   
@@ -639,13 +466,10 @@ perfdataproc = function(MRIsessionspath, filepattern, mask, averageacross,
   pd$wCBF = pd$VCwCBF / pd$vcount
   
   #average across all perfusion measures per session
-  if (averageacross=="yes") {
+  if (averageacross == "yes") {
     pd = ddply(pd, c(names(RefTable), "label", "region", "side"), summarise,
-               vcount = mean(vcount),
-               CBF = mean(CBF),
-               VCwCBF = mean(VCwCBF),
-               wCBF = mean(wCBF)
-               )
+               vcount = mean(vcount), CBF = mean(CBF), VCwCBF = mean(VCwCBF),
+               wCBF = mean(wCBF))
   }
   #NEED: to add all the lost columns into above (or somehow make them automatically produce NAs),
   #then rbind to perfcalc. Call Session=0
@@ -658,15 +482,12 @@ perfdataproc = function(MRIsessionspath, filepattern, mask, averageacross,
 rsdataproc = function(MRIsessionspath, filepattern, regions, RefTable) {
   rsnames = list.files(path = MRIsessionspath, pattern = filepattern,
                        recursive = T, full.names = T)
-  rsdata = llply(rsfnames, readrsdata, .progress="text")
+  rsdata = llply(rsfnames, readrsdata, .progress = "text")
   rsdata = do.call(rbind.fill, rsdata)
   rsdata$dname = gsub("/", "",
                       gsub("/analyses", "",
                            gsub(filepattern, "",
-                                gsub(MRIsessionspath, "", rsdata$File)
-                                )
-                           )
-                      )
+                                gsub(MRIsessionspath, "", rsdata$File))))
   RefTable$dname = basename(as.character(RefTable$DICOMdir))
   merge(RefTable, rsdata)
 }
