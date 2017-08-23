@@ -8,7 +8,7 @@ setuptools >= 3.3
 scikit-learn >= 0.15
 nilearn >= 0.1.3
 pandas >= 0.12
-scipy >= 0.11
+scipy >= 0.13.3
 numpydoc >= 0.5
 ipython
 Sphinx
