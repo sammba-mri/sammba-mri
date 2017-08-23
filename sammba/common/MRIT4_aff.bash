@@ -12,7 +12,7 @@ weight=$7
 
 cd $savedir
 
-for dir in $(ls -d */ | sed 's/\///g'); do
+for dir in $(find -mindepth 1 -maxdepth 1 -type d); do
 	
 	3dAllineate -base $template -source $dir/UnCCAa"$n1".nii.gz -prefix $dir/UnCCAl"$n2".nii.gz -1Dmatrix_save $dir/UnCCAl"$n2".aff12.1D -conv $conv -onepass -twoblur $twoblur -weight $weight
 	cat_matvec -ONELINE $dir/UnBmBeCCAl"$n1".aff12.1D $dir/UnCCAl"$n2".aff12.1D > $dir/UnBmBeCCAl"$n1"UnCCAl"$n2".aff12.1D

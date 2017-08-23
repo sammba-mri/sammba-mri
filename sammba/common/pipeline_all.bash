@@ -14,6 +14,11 @@ subpipeline=${11}
 Urad=${12}
 brainvol=${13}
 scale=${14}
+T1blood=${15}
+lambda=${16}
+multiplier=${17}
+T1guess=${18}
+mccores=${19}
 
 echo "1 rawimdir" $rawimdir
 echo "2 NIfTIdir" $NIfTIdir
@@ -29,6 +34,15 @@ echo "11 subpipeline" $subpipeline
 echo "12 Urad" $Urad
 echo "13 brainvol" $brainvol
 echo "14 scale" $scale
+echo "15 T1blood" $T1blood
+echo "16 lambda" $lambda
+echo "17 multiplier" $multiplier
+echo "18 T1guess" $T1guess
+echo "19 mccores" $mccores
 
 python -m PVEnDCMtoNIfTI.py /usr/bin/dcmdump $rawimdir $NIfTIdir yes
 IDsequencetypes.bash $NIfTIdir
+anattotemplate.bash $NIfTIdir yes 3dUnifize $brainvol $scale $brain $atlas $mask $head $headweight $basetype $Urad
+perfFAIREPI.bash $NIfTIdir $T1blood $lambda $multiplier $T1guess $mccores
+perfFAIREPI_spatnorm.bash $NIfTIdir $subpipeline $brain $tmpdir $registerfunctional $scale $brainvol
+rs.bash $NIfTIdir $subpipeline $brain $tmpdir $registerfunctional yes $brainvol

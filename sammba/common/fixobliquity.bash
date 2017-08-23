@@ -1,3 +1,5 @@
+#!/bin/bash
+
 #https://afni.nimh.nih.gov/afni/community/board/read.php?1,149385,149385#msg-149385
 #https://afni.nimh.nih.gov/afni/community/board/read.php?1,74225,74225#msg-74225
 

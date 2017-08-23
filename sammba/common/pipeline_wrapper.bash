@@ -16,6 +16,11 @@ subpipeline=${13}
 Urad=${14}
 brainvol=${15}
 scale=${16}
+T1blood=${17}
+lambda=${18}
+multiplier=${19}
+T1guess=${20}
+mccores=${21}
 
 echo "1 pipeline" $pipeline
 echo "2 MRIsessionslist" $MRIsessionslist
@@ -33,6 +38,11 @@ echo "13 subpipeline" $subpipeline
 echo "14 Urad" $Urad
 echo "15 brainvol" $brainvol
 echo "16 scale" $scale
+echo "17 T1blood" $T1blood
+echo "18 lambda" $lambda
+echo "19 multiplier" $multiplier
+echo "20 T1guess" $T1guess
+echo "21 mccores" $mccores
 
 tmpdirsuffix="$RANDOM"
 tmpdir=$tmpdir/tmpanaldir_$tmpdirsuffix
@@ -70,8 +80,8 @@ for ((a=2; a<=$nlines; a++)); do
 
 	if [[ $runpipeline == "yes" ]]; then
 #skips 10 ($dofolderoverwrite)
-#				  1			2		  3		 4		5	  6		7			8		  9		  10				  11		   12	 13		   14
-		$pipeline $rawimdir $NIfTIdir $brain $atlas $mask $head $headweight $basetype $tmpdir $registerfunctional $subpipeline $Urad $brainvol $scale
+#				  1			2		  3		 4		5	  6		7			8		  9		  10				  11		   12	 13		   14	  15	   16	   17		   18		19
+		$pipeline $rawimdir $NIfTIdir $brain $atlas $mask $head $headweight $basetype $tmpdir $registerfunctional $subpipeline $Urad $brainvol $scale $T1blood $lambda $multiplier $T1guess $mccores
 	fi
 	
 done

@@ -7,7 +7,7 @@ warp=$2
 
 cd $savedir
 
-for dir in $(ls -d */ | sed 's/\///g'); do
+for dir in $(find -mindepth 1 -maxdepth 1 -type d); do
 	
 	3dNwarpFuncs -nwarp $dir/$warp -prefix $dir/bulk.nii.gz -bulk
 	3dNwarpFuncs -nwarp $dir/$warp -prefix $dir/shear.nii.gz -shear
