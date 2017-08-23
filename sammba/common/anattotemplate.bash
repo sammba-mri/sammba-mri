@@ -72,4 +72,4 @@ fi
 
 #inverted application of registrations to the atlas
 3dNwarpApply -nwarp "$anat"_"$Bc"BmBeAl_INV.aff12.1D "$anat"_"$Bc"AaQw_WARPINV.nii.gz -source $atlas -master "$anat"_"$Bc".nii.gz -ainterp NN -prefix $procdir/atlas_Na1.nii.gz
-fixobliquity.sh "$anat"_"$Bc".nii.gz $procdir/atlas_Na1.nii.gz #3dNwarpApply removes obliquity, readd
+fixobliquity.bash "$anat"_"$Bc".nii.gz $procdir/atlas_Na1.nii.gz #3dNwarpApply removes obliquity, readd

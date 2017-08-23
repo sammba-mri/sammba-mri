@@ -21,16 +21,16 @@ for ((a=1; a<=$nlines; a++)); do
 
 	AimsFileConvert -i "$fdfdir"/slice001image001echo001.fdf -o $newniftidir/$newnifti.nii.gz -r 1 --omin 0 --omax 1000
 
-	fsl5.0-fslswapdim $newniftidir/$newnifti.nii.gz -x -y z $newniftidir/T2anat.nii.gz
+	fsl5.0-fslswapdim $newniftidir/$newnifti.nii.gz -x -y z $newniftidir/anat.nii.gz
 
-	nifti_tool -disp_hdr -field srow_x -field srow_y -field srow_z -infiles $newniftidir/T2anat.nii.gz -quiet > $newniftidir/sform.txt
+	nifti_tool -disp_hdr -field srow_x -field srow_y -field srow_z -infiles $newniftidir/anat.nii.gz -quiet > $newniftidir/sform.txt
 
-	fsl5.0-fslorient -setsform $(cat_matvec -ONELINE $newniftidir/sform.txt $savedir/x90.1d $savedir/y180.1d) 0 0 0 1 $newniftidir/T2anat.nii.gz
-	fsl5.0-fslorient -copysform2qform $newniftidir/T2anat.nii.gz
-	3dresample -dxyz $resampleres $resampleres $resampleres -rmode Cubic -prefix $newniftidir/T2anat.nii.gz -inset $newniftidir/T2anat.nii.gz
-	3dZeropad -RL 256 -AP 256 -IS 256 -prefix $newniftidir/T2anat.nii.gz $newniftidir/T2anat.nii.gz
+	fsl5.0-fslorient -setsform $(cat_matvec -ONELINE $newniftidir/sform.txt $savedir/x90.1d $savedir/y180.1d) 0 0 0 1 $newniftidir/anat.nii.gz
+	fsl5.0-fslorient -copysform2qform $newniftidir/anat.nii.gz
+	3dresample -dxyz $resampleres $resampleres $resampleres -rmode Cubic -prefix $newniftidir/anat.nii.gz -inset $newniftidir/anat.nii.gz
+	3dZeropad -RL 256 -AP 256 -IS 256 -prefix $newniftidir/anat.nii.gz $newniftidir/anat.nii.gz
 	
 done
 
-3dTcat -prefix $savedir/raw_video.nii.gz $(find $savedir -name 'T2anat.nii.gz')
+3dTcat -prefix $savedir/raw_video.nii.gz $(find $savedir -name 'anat.nii.gz')
 3dTstat -prefix $savedir/raw_mean.nii.gz $savedir/raw_video.nii.gz

@@ -1,9 +1,17 @@
 #!/bin/bash
 
+#bash -xef /home/nadkarni/git/sammba-mri/sammba/projects/MLA/master_MLA.bash 2>&1 | tee /home/Pmamobipet/Tvx-Manips-MD_/MD_1701-Microcebe-Creation-Atlas/$(date +%Y%m%d_%H%M%S).log
+
 export AFNI_DECONFLICT=OVERWRITE
 
-rawdatadir=$(readlink -e $1)
-savedir=$(readlink -e $2)
+PATH=$PATH:/home/nadkarni/git/sammba-mri/sammba/common
+PATH=$PATH:/home/nadkarni/git/sammba-mri/sammba/projects/MLA
+export PATH
+
+projectdir=/home/Pmamobipet/Tvx-Manips-MD_/MD_1701-Microcebe-Creation-Atlas
+rawdatadir=$projectdir/MRI-Images-Brutes
+savedir=$projectdir/processed_20170731
+mkdir $savedir
 
 finres=0.115
 conv=0.01
@@ -14,9 +22,21 @@ Urad=18.3
 b=70
 t=80
 
-bash MRIT1_Mcbconv.bash $rawdatadir $savedir $finres
+bash convert_MLA.bash $rawdatadir $savedir $finres
 bash MRIT2_extrcen.bash $savedir $brainvol $Urad $b $t
-bash MRIT3_shr.bash $savedir $savedir/UnBmBeCC_mean.nii.gz 1 $conv $twoblur
+
+3dcopy $projectdir/bonsatlasprocessing/bonstack_dupflipcomb.hdr $savedir/bons.nii.gz
+echo 1 0 0 0 0 0 1 0 0 -1 0 0 > $savedir/x90.1d
+echo -1 0 0 0 0 1 0 0 0 0 -1 0 > $savedir/y180.1d
+echo -1 0 0 0 -0 -1 0 0 0 0 1 0 > $savedir/z180.1d
+nifti_tool -disp_hdr -field srow_x -field srow_y -field srow_z -infiles $savedir/bons.nii.gz -quiet > $savedir/sform.txt
+fsl5.0-fslorient -setsform $(cat_matvec -ONELINE $savedir/sform.txt $savedir/x90.1d $savedir/y180.1d $savedir/z180.1d) 0 0 0 1 $savedir/bons.nii.gz
+fsl5.0-fslorient -copysform2qform $savedir/bons.nii.gz
+3dCM -set 0 0 0 $savedir/bons.nii.gz
+3dresample -master $savedir/UnCC_mean.nii.gz -rmode Cubic -prefix $savedir/bons.nii.gz -inset $savedir/bons.nii.gz
+bons=$savedir/bons.nii.gz
+
+bash MRIT3_shr.bash $savedir $bons 1 $conv $twoblur
 bash MRIT3_shr.bash $savedir $savedir/shr1_mean.nii.gz 2 $conv $twoblur
 bash MRIT4_aff.bash $savedir $savedir/shr2_meanhead.nii.gz 2 3 $conv $twoblur $savedir/shr2_count.nii.gz
 

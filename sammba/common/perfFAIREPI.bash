@@ -3,8 +3,18 @@
 export AFNI_DECONFLICT=OVERWRITE
 
 procdir=$(readlink -e $1)
+T1blood=$2
+lambda=$3
+multiplier=$4
+T1guess=$5
+mccores=$6
 
 echo "1 procdir" $procdir
+echo "2 T1blood" $T1blood
+echo "3 lambda" $lambda
+echo "4 multiplier" $multiplier
+echo "5 T1guess" $T1guess
+echo "6 mccores" $mccores
 
 echo "processing perfFAIREPI for bias, M0, T1, rCBF and CBF..."
 
@@ -23,7 +33,7 @@ if [ -r "${a_perfs[0]}" ]; then
 		echo "file $file"
 		echo "TIsfile $TIsfile"
 		echo "TIs $TIs"
-		perfFAIREPItoNIfTI.r "$p".nii.gz 2800 0.9 $TIs 6000000 1600 16 "$p"_calc $(which perfFAIREPI+T1_T2map_RARE_fitters.r)
+		perfFAIREPItoNIfTI.R "$p".nii.gz $T1blood $lambda $TIs $multiplier $T1guess $mccores "$p"_calc
 		#R script does not produce a good header
 		3dcalc -a "$p".nii.gz[0-13] -expr 'a' -prefix "$p"_0-13.nii.gz
 		fsl5.0-fslcpgeom "$p"_0-13.nii.gz "$p"_calc.nii.gz

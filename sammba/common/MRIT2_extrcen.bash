@@ -10,9 +10,9 @@ t=$5
 
 cd $savedir
 
-for dir in $(ls -d */ | sed 's/\///g'); do
+for dir in $(find -mindepth 1 -maxdepth 1 -type d); do
 
-	3dUnifize -prefix $dir/Un.nii.gz -input $dir/T2anat.nii.gz -rbt $R $b $t
+	3dUnifize -prefix $dir/Un.nii.gz -input $dir/anat.nii.gz -rbt $R $b $t
 
 	thresh=$(3dClipLevel $dir/Un.nii.gz)
 	printf -v thresh %.0f "$thresh"
@@ -23,7 +23,7 @@ for dir in $(ls -d */ | sed 's/\///g'); do
 	fsl5.0-fslmaths $dir/Un.nii.gz -mas $dir/UnBm.nii.gz $dir/UnBmBe.nii.gz
 	
 	3dCM -set 0 0 0 $dir/UnBmBe.nii.gz
-	3drefit -duporigin $dir/UnBmBe.nii.gz $dir/T2anat.nii.gz
+	3drefit -duporigin $dir/UnBmBe.nii.gz $dir/anat.nii.gz
 	3drefit -duporigin $dir/UnBmBe.nii.gz $dir/Un.nii.gz
 	3drefit -duporigin $dir/UnBmBe.nii.gz $dir/UnBm.nii.gz
 	
@@ -37,9 +37,9 @@ done
 3dUndump -master $savedir/UnBmBe_mean.nii.gz -prefix $savedir/emptytemplate.nii.gz
 3drefit -xorigin cen -yorigin cen -zorigin cen $savedir/emptytemplate.nii.gz
 
-for dir in $(ls -d */ | sed 's/\///g'); do
+for dir in $(find -mindepth 1 -maxdepth 1 -type d); do
 
-	3dresample -master $savedir/emptytemplate.nii.gz -prefix $dir/T2anatCC.nii.gz -inset $dir/T2anat.nii.gz
+	3dresample -master $savedir/emptytemplate.nii.gz -prefix $dir/anatCC.nii.gz -inset $dir/anat.nii.gz
 	3dresample -master $savedir/emptytemplate.nii.gz -prefix $dir/UnCC.nii.gz -inset $dir/Un.nii.gz
 	3dresample -master $savedir/emptytemplate.nii.gz -prefix $dir/UnBmCC.nii.gz -inset $dir/UnBm.nii.gz
 	3dresample -master $savedir/emptytemplate.nii.gz -prefix $dir/UnBmBeCC.nii.gz -inset $dir/UnBmBe.nii.gz

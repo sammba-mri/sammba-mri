@@ -10,7 +10,7 @@ twoblur=$5
 
 cd $savedir
 
-for dir in $(ls -d */ | sed 's/\///g'); do
+for dir in $(find -mindepth 1 -maxdepth 1 -type d); do
 	
 	3dAllineate -base $template -source $dir/UnBmBeCC.nii.gz -prefix $dir/UnBmBeCCAl$n.nii.gz -1Dmatrix_save $dir/UnBmBeCCAl$n.aff12.1D -conv $conv -twoblur $twoblur -warp shr
 	3dAllineate -input $dir/UnCC.nii.gz -master $template -prefix $dir/UnCCAa$n.nii.gz -1Dmatrix_apply $dir/UnBmBeCCAl$n.aff12.1D

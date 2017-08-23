@@ -65,8 +65,8 @@ fi
 cat_matvec -ONELINE "$anatlab"_Op_"$base".aff12.1D -I > "$anatlab"_Op_"$base"_INV.aff12.1D
 
 #3dWarp doesn't put the obliquity in the header, so do it manually
-fixobliquity.sh $base.nii.gz "$anatlab"_Op_"$base".nii.gz
-fixobliquity.sh $base.nii.gz "$atlaslab"_Op_"$base".nii.gz #not used later (yet)
+fixobliquity.bash $base.nii.gz "$anatlab"_Op_"$base".nii.gz
+fixobliquity.bash $base.nii.gz "$atlaslab"_Op_"$base".nii.gz #not used later (yet)
 
 #slice functional, anatomical and atlas up
 fsl5.0-fslslice "$anatlab"_Op_"$base".nii.gz "$anatlab"_Op_"$base"
@@ -108,7 +108,7 @@ for func in ${imfilearray[@]}; do
 				3dresample -dxyz $(3dinfo -ad3 "$func"_slice_"$(printf "%04d\n" $q)".nii.gz) -prefix "$func"_slice_"$(printf "%04d\n" $q)"_Na.nii.gz -inset "$func"_slice_"$(printf "%04d\n" $q)"_Na.nii.gz
 				rm -f "$anatlab"_Op_"$func"_slice_"$(printf "%04d\n" $q)"_res.nii.gz
 				rm -f "$func"_slice_"$(printf "%04d\n" $q)"_res.nii.gz
-				fixobliquity.sh "$anatlab"_Op_"$func"_slice_"$(printf "%04d\n" $q)".nii.gz "$func"_slice_"$(printf "%04d\n" $q)"_Na.nii.gz #3dQwarp removes obliquity, readd
+				fixobliquity.bash "$anatlab"_Op_"$func"_slice_"$(printf "%04d\n" $q)".nii.gz "$func"_slice_"$(printf "%04d\n" $q)"_Na.nii.gz #3dQwarp removes obliquity, readd
 				#apply inverse warp to atlas. does not work with either method due to frequent failure to generate inverse map
 				#3dNwarpApply -nwarp "$func"_slice_"$(printf "%04d\n" $q)"_Na_WARPINV.nii.gz -source "$atlaslab"_Op_"$func"_slice_"$(printf "%04d\n" $q)".nii.gz -master "$func"_slice_"$(printf "%04d\n" $q)".nii.gz -ainterp NN -prefix "$atlaslab"_Op_"$func"_slice_"$(printf "%04d\n" $q)"_Na.nii.gz
 				#3dNwarpApply -nwarp "$func"_slice_"$(printf "%04d\n" $q)"_Na_WARP.nii.gz -iwarp -source "$atlaslab"_Op_"$func"_slice_"$(printf "%04d\n" $q)".nii.gz -master "$func"_slice_"$(printf "%04d\n" $q)".nii.gz -ainterp NN -prefix "$atlaslab"_Op_"$func"_slice_"$(printf "%04d\n" $q)"_Na.nii.gz
@@ -117,7 +117,7 @@ for func in ${imfilearray[@]}; do
 				
 				#apply warp to functional (unnecessary for the first functional which is done above but can act as a paranoia check: should be an exact copy
 				3dNwarpApply -nwarp "$base"_slice_"$(printf "%04d\n" $q)"_Na_WARP.nii.gz -source "$func"_slice_"$(printf "%04d\n" $q)".nii.gz -master "$func"_slice_"$(printf "%04d\n" $q)".nii.gz -prefix "$func"_slice_"$(printf "%04d\n" $q)"_Na.nii.gz
-				fixobliquity.sh "$func"_slice_"$(printf "%04d\n" $q)".nii.gz "$func"_slice_"$(printf "%04d\n" $q)"_Na.nii.gz #3dNwarpApply removes obliquity, readd
+				fixobliquity.bash "$func"_slice_"$(printf "%04d\n" $q)".nii.gz "$func"_slice_"$(printf "%04d\n" $q)"_Na.nii.gz #3dNwarpApply removes obliquity, readd
 				
 			fi
 
@@ -127,7 +127,7 @@ for func in ${imfilearray[@]}; do
 			#into template space, both linear (commented out) and non-linear options
 			#3dAllineate -input "$func"_Na_Op_"$anatlab"_MeDoReSd.nii.gz -master $template -prefix "$func"_Na_Op_"$anatlab"_MeDoReSdAa.nii.gz -1Dmatrix_apply "$anatlab"_DoReSdBmBeAl.aff12.1D
 			3dWarp -oblique_parent "$anatlab".nii.gz -gridset "$anatlab".nii.gz -prefix "$func"_slice_"$(printf "%04d\n" $q)"_Na_Op_"$anatlab".nii.gz "$func"_slice_"$(printf "%04d\n" $q)"_Na.nii.gz
-			fixobliquity.sh "$anatlab".nii.gz "$func"_slice_"$(printf "%04d\n" $q)"_Na_Op_"$anatlab".nii.gz
+			fixobliquity.bash "$anatlab".nii.gz "$func"_slice_"$(printf "%04d\n" $q)"_Na_Op_"$anatlab".nii.gz
 			#to avoid the double-step, maybe cat_matvec the two aff12.1Ds which might avoid the need to intervene with a fixobliquity
 			#-ainterp linear (or maybe NN is intellectually neatest, though ugly) avoid slice boundary artefacts during 3dMean below
 			3dNwarpApply -nwarp $workdir/"$anatlab"AaQw_WARP.nii.gz $workdir/"$anatlab"BmBeAl.aff12.1D -source "$func"_slice_"$(printf "%04d\n" $q)"_Na_Op_"$anatlab".nii.gz -master $template -ainterp linear -prefix "$func"_slice_"$(printf "%04d\n" $q)"_NaNa.nii.gz		
