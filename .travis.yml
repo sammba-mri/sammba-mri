@@ -10,7 +10,7 @@ virtualenv:
 
 before_install:
     - bash <(wget -q -O- http://neuro.debian.net/_files/neurodebian-travis.sh)
-    - sudo apt-get install -qq python-pip
+    - sudo apt-get install -qq python-pip python-numpy
     - pip install "scipy>=0.13.3"    
     - pip install "scikit-learn>=0.15"
     - pip install "nilearn>=0.1.3"
