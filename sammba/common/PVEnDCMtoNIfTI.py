@@ -273,8 +273,8 @@ def EnDCM_to_NII(dcmdump_path, EnDCM, save_directory, SIAPfix, valstart, splt1, 
 
 
 #%% #fsp = first slice position, lsp = last slice position
-    fsp = np.array(ptbl.slicepos[ptbl.slice == 1].tolist()[1])
-    lsp = np.array(ptbl.slicepos[ptbl.slice == slices].tolist()[1])
+    fsp = np.array(ptbl.slicepos[ptbl.slice == 1].tolist()[0])
+    lsp = np.array(ptbl.slicepos[ptbl.slice == slices].tolist()[0])
     
     #https://en.wikipedia.org/wiki/Euclidean_distance
     #not used yet
