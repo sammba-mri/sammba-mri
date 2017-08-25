@@ -39,6 +39,11 @@ cp $workdir/"$anatlab"BmBe.nii.gz .
 for func in ${imfilearray[@]}; do cp $workdir/"$func".nii.gz .; done
 cp $workdir/"$atlaslab".nii.gz .
 
+origanatlab=$anatlab
+echo 1 0 0 0 0 1 0 0 0 0 1 0 > ident.1d
+cat_matvec -ONELINE ident.1d > ident.aff12.1D
+suppanatwarp=ident.aff12.1D
+
 #optional prior whole brain rigid body registration.
 if [[ $dorigidbody == "yes" ]]; then
 	thresh=$(3dClipLevel $base.nii.gz) #can be included directly in the next command; keep here as want the value displayed.
@@ -46,22 +51,21 @@ if [[ $dorigidbody == "yes" ]]; then
 	echo "brain/background threshold=$thresh"
 	#use some fancy tool to identify the brain
 	RATS_MM $base.nii.gz "$base"_Bm.nii.gz -v $brainvol -t $thresh
-	fsl5.0-fslmaths $base.nii.gz -mas "$base"_Bm.nii.gz "$base"_BmBe.nii.gz
-	#3dcalc -a "$base".nii.gz -expr "a*ispositive(a-$thresh)" -prefix "$base"_BmBe.nii.gz
+	3dcalc -a "$base".nii.gz -b "$base"_Bm.nii.gz -expr "a*b" -prefix "$base"_BmBe.nii.gz
 	3dAllineate -base "$anatlab"BmBe.nii.gz -source "$base"_BmBe.nii.gz -prefix "$base"_BmBe_shr.nii.gz -1Dmatrix_save "$base"_BmBe_shr.aff12.1D -cmass -warp shr
-	#3dAllineate -base "$base"_BmBe.nii.gz -source "$anatlab"BmBe.nii.gz -prefix "$anatlab"BmBe_shr.nii.gz -1Dmatrix_save "$anatlab"BmBe_shr.aff12.1D -cmass -warp shr
-	#cat_matvec -ONELINE "$anatlab"BmBe_shr.aff12.1D > "$anatlab"_Op_"$base".aff12.1D #reformat (actually in this case just rename!) transform matrix
-	cat_matvec -ONELINE "$base"_BmBe_shr.aff12.1D -I > "$anatlab"_Op_"$base".aff12.1D
-	3dAllineate -input "$anatlab".nii.gz -master $base.nii.gz -prefix "$anatlab"_Op_"$base".nii.gz -1Dmatrix_apply "$anatlab"_Op_"$base".aff12.1D
-	3dAllineate -input "$atlaslab".nii.gz -master $base.nii.gz -prefix "$atlaslab"_Op_"$base".nii.gz -1Dmatrix_apply "$anatlab"_Op_"$base".aff12.1D #not used later (yet)
-else
-	#transform anatomical and atlas to functional space. atlas is already in anatomical space, so only need to record matrix once, from the anatomical
-	3dWarp -verb -oblique_parent $base.nii.gz -quintic -gridset $base.nii.gz -prefix "$anatlab"_Op_"$base".nii.gz $anatlab.nii.gz > "$anatlab"_Op_"$base"_orig.mat
-	3dWarp -oblique_parent $base.nii.gz -NN -gridset $base.nii.gz -prefix "$atlaslab"_Op_"$base".nii.gz "$atlaslab".nii.gz #not used later (yet)
-	cat_matvec -ONELINE "$anatlab"_Op_"$base"_orig.mat > "$anatlab"_Op_"$base".aff12.1D #reformat transform matrix
+	cat_matvec -ONELINE "$base"_BmBe_shr.aff12.1D -I > "$base"_BmBe_shr_INV.aff12.1D
+	3dAllineate -input "$anatlab".nii.gz -master $base.nii.gz -prefix "$anatlab"_shr_"$base".nii.gz -1Dmatrix_apply "$base"_BmBe_shr_INV.aff12.1D
+	3dAllineate -input "$atlaslab".nii.gz -master $base.nii.gz -prefix "$atlaslab"_shr_"$base".nii.gz -1Dmatrix_apply "$base"_BmBe_shr_INV.aff12.1D #not used later (yet)
+	anatlab="$anatlab"_shr_"$base"
+	suppanatwarp="$base"_BmBe_shr.aff12.1D
 fi
 
-#invert transform matrix
+#transform anatomical and atlas to functional space. atlas is already in anatomical space, so only need to record matrix once, from the anatomical
+3dWarp -verb -oblique_parent $base.nii.gz -quintic -gridset $base.nii.gz -prefix "$anatlab"_Op_"$base".nii.gz $anatlab.nii.gz > "$anatlab"_Op_"$base"_orig.mat
+3dWarp -oblique_parent $base.nii.gz -NN -gridset $base.nii.gz -prefix "$atlaslab"_Op_"$base".nii.gz "$atlaslab".nii.gz #not used later (yet)
+cat_matvec -ONELINE "$anatlab"_Op_"$base"_orig.mat > "$anatlab"_Op_"$base".aff12.1D #reformat transform matrix
+
+#invert transform matrix (just in case it's needed, not used for the moment)
 cat_matvec -ONELINE "$anatlab"_Op_"$base".aff12.1D -I > "$anatlab"_Op_"$base"_INV.aff12.1D
 
 #3dWarp doesn't put the obliquity in the header, so do it manually
@@ -130,7 +134,7 @@ for func in ${imfilearray[@]}; do
 			fixobliquity.bash "$anatlab".nii.gz "$func"_slice_"$(printf "%04d\n" $q)"_Na_Op_"$anatlab".nii.gz
 			#to avoid the double-step, maybe cat_matvec the two aff12.1Ds which might avoid the need to intervene with a fixobliquity
 			#-ainterp linear (or maybe NN is intellectually neatest, though ugly) avoid slice boundary artefacts during 3dMean below
-			3dNwarpApply -nwarp $workdir/"$anatlab"AaQw_WARP.nii.gz $workdir/"$anatlab"BmBeAl.aff12.1D -source "$func"_slice_"$(printf "%04d\n" $q)"_Na_Op_"$anatlab".nii.gz -master $template -ainterp linear -prefix "$func"_slice_"$(printf "%04d\n" $q)"_NaNa.nii.gz		
+			3dNwarpApply -nwarp $workdir/"$origanatlab"AaQw_WARP.nii.gz $workdir/"$origanatlab"BmBeAl.aff12.1D $suppanatwarp -source "$func"_slice_"$(printf "%04d\n" $q)"_Na_Op_"$anatlab".nii.gz -master $template -ainterp linear -prefix "$func"_slice_"$(printf "%04d\n" $q)"_NaNa.nii.gz		
 		fi
 		
 	done
