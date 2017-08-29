@@ -17,11 +17,13 @@ named anat.nii.gz. No other files or subdirectories should be present.
 The directory and data within it are usually made by a conversion script
 specific to the project; data sources differ so much from project to project
 that making a universal script would be a lot of hard effort. Assuming it worked
-correctly, each anat.nii.gz will be the same for the following (reasonable)
-criteria: field-of-view, matrix, approximate orientation (large amounts of tilt
-are tolerated, but S-I/D-V, A-P/R-C and L-R axes all need to be the same), plus
-the head being reasonably centered and dominant in the image. The template
-scripts will likely fail if the conversion script does not achieve this.
+correctly, each anat.nii.gz will be the same for the following reasonable
+criteria: field-of-view, matrix (which will be isotropic, via upsampling if
+necessary, in order to aid 3dQwarp), approximate orientation (large amounts of
+tilt are tolerated, but S-I/D-V, A-P/R-C and L-R axes all need to be
+consistent across images), plus the head being reasonably centered and dominant
+in the image. The template scripts will likely fail if the conversion script
+does not achieve these requirements.
 
 Initially, registration is of extracted brains. Once these are reasonably
 aligned, whole heads are registered, weighted by masks that, if parameters are
