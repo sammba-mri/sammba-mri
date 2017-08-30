@@ -9,3 +9,4 @@ User guide: table of contents
 
    introduction.rst
    registration.rst
+   template.rst

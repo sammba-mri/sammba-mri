@@ -14,6 +14,7 @@ Contents:
    user_guide.rst
    auto_examples/index.rst
    reference.rst
+   scripts.rst
 
 
 .. raw:: html
