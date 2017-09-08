@@ -105,7 +105,7 @@ of BOLD-weighted data.
 PVEnDCMtoNIfTI.py
 
 DICOM to NIfTI conversion for Bruker ParaVision enhanced multiframe DICOM files.
-
+Also outputs a text file of useful metadata.
 
 IDsequencetypes.bash
 
