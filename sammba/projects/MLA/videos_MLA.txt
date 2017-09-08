@@ -82,3 +82,31 @@ open("Y:\\Tvx-Manips-MD_\\MD_1701-Microcebe-Creation-Atlas\\processed_20170411\\
 run("Enhance Contrast", "saturated=0.35");
 run("AVI... ", "compression=JPEG frame=4 save=Y:\\Tvx-Manips-MD_\\MD_1701-Microcebe-Creation-Atlas\\Final-Images-For-Atlas\\20170823\\Qw4_videohead_z140.avi");
 close();
+open("Y:\\Tvx-Manips-MD_\\MD_1701-Microcebe-Creation-Atlas\\processed_20170411\\raw_video_x128.nii");
+open("Y:\\Tvx-Manips-MD_\\MD_1701-Microcebe-Creation-Atlas\\processed_20170411\\raw_video_y80.nii");
+open("Y:\\Tvx-Manips-MD_\\MD_1701-Microcebe-Creation-Atlas\\processed_20170411\\raw_video_z128.nii");
+run("Combine...", "stack1=raw_video_x128.nii stack2=raw_video_y80.nii");
+run("Combine...", "stack1=[Combined Stacks] stack2=raw_video_z128.nii");
+run("Multiply...", "value=3.500 stack");
+run("Enhance Contrast", "saturated=0.35");
+rename("Combined Stacks raw");
+open("Y:\\Tvx-Manips-MD_\\MD_1701-Microcebe-Creation-Atlas\\processed_20170411\\Qw4_videohead_x128.nii");
+open("Y:\\Tvx-Manips-MD_\\MD_1701-Microcebe-Creation-Atlas\\processed_20170411\\Qw4_videohead_y125.nii");
+open("Y:\\Tvx-Manips-MD_\\MD_1701-Microcebe-Creation-Atlas\\processed_20170411\\Qw4_videohead_z140.nii");
+run("Combine...", "stack1=Qw4_videohead_x128.nii stack2=Qw4_videohead_y125.nii");
+run("Combine...", "stack1=[Combined Stacks] stack2=Qw4_videohead_z140.nii");
+run("Enhance Contrast", "saturated=0.35");
+run("Combine...", "stack1=[Combined Stacks raw] stack2=[Combined Stacks] combine");
+setFont("SansSerif", 20); setColor("white");
+for (i=1; i<=34; i++) {
+	setSlice(i);
+	setJustification("left"); drawString("Before registration", 10, 30); drawString("After registration", 10, 286);
+	setJustification("right"); drawString(i+"/34", 758, 30);
+	setLineWidth(2); drawLine(0,256,768,256);
+}
+run("Duplicate...", "duplicate"); rename("duplicate1");
+for (i=2; i<=9; i++) {
+	selectWindow("Combined Stacks"); run("Duplicate...", "duplicate"); rename("duplicate"+i);
+}
+run("Concatenate...", "  title=[Concatenated Stacks] image1=[Combined Stacks] image2=[duplicate1] image3=[duplicate2] image4=[duplicate3] image5=[duplicate4] image6=[duplicate5] image7=[duplicate6] image8=[duplicate7] image9=[duplicate8] image10=[duplicate9]");
+run("AVI... ", "compression=JPEG frame=5 save=Y:\\Tvx-Manips-MD_\\MD_1701-Microcebe-Creation-Atlas\\Final-Images-For-Atlas\\20170516\\rawQw4flat.avi");

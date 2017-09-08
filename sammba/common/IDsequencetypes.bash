@@ -28,13 +28,15 @@ echo "1 NIfTIdir" $NIfTIdir
 #GE_EPI_sat_TR1000_15min_GOP_TR1000_12slices	1 February 2017 test
 #MSME_MIRCen_allbrain							March DCLK3 study
 
+#using .nii.gz ensures there is only one file for each .nii.gz .txt pair
+#use tail -n1 for some sequences as only want one; occasionally more than one
+#was acquired. where so, take the final one, which presumably was the best.
 a_B0map=$(find $NIfTIdir \( -name "*B0Map-ADJ_B0MAP*.nii.gz" \) | sort | tail -n1)
 a_anat=$(find $NIfTIdir \( -name "*T1_FLASH_3D*.nii.gz" -o -name "*MSME*.nii.gz" \) | sort | tail -n1)
 a_FcFLASH=$(find $NIfTIdir \( -name "*FcFLASH*.nii.gz" \) | sort | tail -n1)
 a_scoutpilot=$(find $NIfTIdir \( -name "*T1_FLASH*.nii.gz" \) | grep -v 3D | sort | tail -n1)
 a_T1T2map=$(find $NIfTIdir \( -name "*T1_T2map_RARE*.nii.gz" \) | sort | tail -n1)
 a_perfFAIREPI=$(find $NIfTIdir \( -name "*Perfusion_FAIR_EPI*.nii.gz" \) | sort)
-a_perfFAIREPI_TIs=$(find $NIfTIdir \( -name "*Perfusion_FAIR_EPI*.txt" \) | sort)
 a_rs=$(find $NIfTIdir \( -name "*T2star_FID_EPI_sat*.nii.gz" -o -name "*SE_EPI_sat*.nii.gz" -o -name "*GE_EPI_sat*.nii.gz" \) | sort)
 
 a_protocols=(a_B0map a_anat a_FcFLASH a_scoutpilot a_T1T2map a_perfFAIREPI a_rs)
@@ -44,25 +46,10 @@ for a_protocol in ${a_protocols[@]}; do
 	read -r -a niinames <<< "$niinames" #turn back into an array
 	if [ -r "${niinames[0]}" ]; then
 		for n in ${!niinames[@]}; do #putting the if inside the for loop allows the n to be generated (used below) regardless of dointernaloverwrite (which we actually got rid of :-D)
-			echo "replacing ${niinames[$n]} with ${a_protocol:2}_n$n..."
-			mv ${niinames[$n]} $(dirname ${niinames[$n]})/${a_protocol:2}_n$n.nii.gz || true #|| true is because if conversion failed, there is no file to have its name modified. The earlier if statement only checks the first acquisition in the array
-			echo "$(basename ${niinames[$n]}) changed to ${a_protocol:2}_n$n.nii.gz" >> $NIfTIdir/namechanges.txt
-		done
-	else
-		echo "no ${a_protocol:2}"
-	fi
-done
-
-#same loop as above but for associated text files
-a_protocols=(a_perfFAIREPI_TIs)
-for a_protocol in ${a_protocols[@]}; do
-	niinames=$(eval "echo \${$a_protocol[@]}")
-	read -r -a niinames <<< "$niinames"
-	if [ -r "${niinames[0]}" ]; then
-		for n in ${!niinames[@]}; do
-			echo "suffixing ${niinames[$n]} with ${a_protocol:2}_n$n..."
-			mv ${niinames[$n]} $(dirname ${niinames[$n]})/${a_protocol:2}_n$n.txt || true
-			echo "$(basename ${niinames[$n]}) changed to ${a_protocol:2}_n$n.txt" >> $NIfTIdir/namechanges.txt
+			p=$(basename -s .nii.gz ${niinames[$n]})
+			mv $NIfTIdir/$p.nii.gz $NIfTIdir/${a_protocol:2}_n$n.nii.gz || true #|| true is because if conversion failed, there is no file to have its name modified. The earlier if statement only checks the first acquisition in the array
+			mv $NIfTIdir/"$p"_ptbl.txt $NIfTIdir/${a_protocol:2}_n"$n"_ptbl.txt || true 
+			echo "$p changed to ${a_protocol:2}_n$n for both .nii.gz and _ptbl.txt" >> $NIfTIdir/namechanges.txt
 		done
 	else
 		echo "no ${a_protocol:2}"

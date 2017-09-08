@@ -24,16 +24,11 @@ readarray -t a_perfs <<< "$perfs"
 
 if [ -r "${a_perfs[0]}" ]; then
 	counter=0
-	for file in ${a_perfs[@]}; do
-		p=$(dirname $file)/$(basename -s .nii.gz $file)
-		pnum=$(basename $p | sed s/perfFAIREPI_n//g)
-		TIsfile=$(dirname $file)/perfFAIREPI_TIs_n$pnum.txt
-		TIs=$(cat $TIsfile)
+	for perffile in ${a_perfs[@]}; do
+		p=$procdir/$(basename -s .nii.gz $perffile)
 		counter=$(expr $counter + 1); echo "processing $counter of ${#a_perfs[@]}"
-		echo "file $file"
-		echo "TIsfile $TIsfile"
-		echo "TIs $TIs"
-		perfFAIREPItoNIfTI.R "$p".nii.gz $T1blood $lambda $TIs $multiplier $T1guess $mccores "$p"_calc
+		echo "perffile $perffile"
+		perfFAIREPItoNIfTI.R $perffile $T1blood $lambda $multiplier $T1guess $mccores "$p"_calc
 		#R script does not produce a good header
 		3dcalc -a "$p".nii.gz[0-13] -expr 'a' -prefix "$p"_0-13.nii.gz
 		fsl5.0-fslcpgeom "$p"_0-13.nii.gz "$p"_calc.nii.gz

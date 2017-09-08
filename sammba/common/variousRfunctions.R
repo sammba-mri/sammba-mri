@@ -193,18 +193,32 @@ perfFAIREPIcalcparamextract = function(perfFAIREPIcalc, selornonsel, param,
 }
 
 
-perfFAIREPItoNIfTI = function(NIfTI, T1blood, lambda, TIs, multiplier, T1guess,
+perfFAIREPIreadptbl = function(perffname) {
+  perfnum = strsplit(gsub("perfFAIREPI_n", "", basename(perffname)), c("[_.]"))[[1]][1]
+  ptbl = paste(dirname(perffname), "/", "perfFAIREPI_n", perfnum, "_ptbl.txt", sep = "")
+  miniptbl = subset(read.table(ptbl, header = T, sep = '\t'), slice == 1)
+  TIs = subset(miniptbl, FC == "Selective Inversion")$TI
+  selselector = which(miniptbl$FC %in% "Selective Inversion")
+  nonselselector = which(miniptbl$FC %in% "Non-selective Inversion")
+  longTIs = miniptbl$TI
+  FC = miniptbl$FC
+  list(TIs = TIs, selselector =  selselector, nonselselector = nonselselector,
+       longTIs = longTIs, FC = FC)
+}
+
+
+perfFAIREPItoNIfTI = function(NIfTI, T1blood, lambda, multiplier, T1guess,
                               mc.cores) {
   
-  NIfTI = NIfTIreader(NIfTI)
+  ptblparams = perfFAIREPIreadptbl(NIfTI)
+  NIfTI = NIfTIreader(NIfTI) #note reuse of NIfTI here
   coordlist = coordlistgen(NIfTI)
-  
-  selselector = seq(1, dim(NIfTI)[4], 2)
-  nonselselector = seq(2, dim(NIfTI)[4], 2)
     
-  perfcalc = mclapply(coordlist, perfFAIREPIvoxel, selselector = selselector,
-                      nonselselector = nonselselector, perfFAIREPINIfTI = NIfTI,
-                      T1blood = T1blood, lambda = lambda, TIs = TIs,
+  perfcalc = mclapply(coordlist, perfFAIREPIvoxel,
+                      selselector = ptblparams$selselector,
+                      nonselselector = ptblparams$nonselselector,
+                      perfFAIREPINIfTI = NIfTI, T1blood = T1blood,
+                      lambda = lambda, TIs = ptblparams$TIs,
                       multiplier = multiplier, T1guess = T1guess,
                       mc.cores = mc.cores)
 
@@ -230,10 +244,10 @@ perfFAIREPItoNIfTI = function(NIfTI, T1blood, lambda, TIs, multiplier, T1guess,
 }
 
 
-perfFAIREPIROI = function(perfFAIREPIdata, selS0sselector, nonselS0sselector,
-                          T1blood, lambda, TIs, multiplier, T1guess) {
-  selS0s = perfFAIREPIdata[selS0sselector, ]$NZMean
-  nonselS0s = perfFAIREPIdata[nonselS0sselector, ]$NZMean
+perfFAIREPIROI = function(perfFAIREPIdata, T1blood, lambda, multiplier, T1guess) {
+  selS0s = subset(perfFAIREPIdata, FC == "Selective Inversion")$NZMean
+  nonselS0s = subset(perfFAIREPIdata, FC == "Non-selective Inversion")$NZMean
+  TIs = subset(perfFAIREPIdata, FC == "Selective Inversion")$TI
   perfFAIREPIfitter(T1blood, lambda, TIs, multiplier, T1guess, selS0s, nonselS0s)
 }
 
@@ -251,7 +265,10 @@ readRBMdata = function(RBMfname) {
 }
 
 
-#using nz does not cause any bias, just excludes noisy data
+#using nz does not cause any bias, just excludes noisy data. in any future
+#modification, make sure 3dROIstats output column names do not clash with
+#anything from ptblparams, and modify c("File", "Sub.brick", "FC", "TI") in the
+#perfdataproc function as necessary (and then this comment too!)
 readperfdata = function(perffname, mask) {
   if (mask == "no")
     mask = paste(dirname(perffname),
@@ -261,9 +278,13 @@ readperfdata = function(perffname, mask) {
                            replacement = "_M0_N3.nii.gz"), 
                       replacement = "atlas_Na1_Op_perfFAIREPI"), 
                  sep = "/")
-  read.delim(text = system(paste("/usr/lib/afni/bin/3dROIstats -mask", mask,
-                                 "-nzmean -nzvoxels", perffname),
-                           intern = TRUE, ignore.stderr = TRUE))
+  afnitbl = read.delim(text = system(paste("/usr/lib/afni/bin/3dROIstats -mask",
+                                           mask, "-nzmean -nzvoxels", perffname),
+                                     intern = TRUE, ignore.stderr = TRUE))
+  ptblparams = perfFAIREPIreadptbl(perffname)
+  afnitbl$FC = ptblparams$FC
+  afnitbl$TI = ptblparams$longTIs
+  afnitbl
 }
 
 
@@ -357,8 +378,8 @@ RBMdataproc = function(MRIsessionspath, filepattern, regions, RefTable) {
 
 
 perfdataproc = function(MRIsessionspath, filepattern, mask, averageacross,
-                        regions, RefTable, T1blood, lambda, TIs, multiplier,
-                        T1guess, fTotalexcludedregions) {
+                        regions, RefTable, T1blood, lambda, multiplier, T1guess,
+                        fTotalexcludedregions) {
   
   perffnames = list.files(path = MRIsessionspath, pattern = filepattern,
                           recursive = T, full.names = T)
@@ -366,16 +387,14 @@ perfdataproc = function(MRIsessionspath, filepattern, mask, averageacross,
   
   perfdata = do.call(rbind.fill, perfdata)
   
-  perfdata = reshape(perfdata, varying = 3:ncol(perfdata), timevar = "label",
+  perfdata = reshape(perfdata, varying = which(!(names(perfdata) %in% 
+                     c("File", "Sub.brick", "FC", "TI"))), timevar = "label",
                      direction = "long", sep = "_")
   perfdata$id = NULL
   perfdata = split(perfdata, list(perfdata$File, perfdata$label))
   
-  selS0sselector = seq(1, 2 * length(TIs), 2)
-  nonselS0sselector = seq(2, 2 * length(TIs), 2)
-  
-  perfcalc = llply(perfdata, perfFAIREPIROI, selS0sselector, nonselS0sselector,
-                   T1blood, lambda, TIs, multiplier, T1guess, .progress = "text") #parallel does not work yet
+  perfcalc = llply(perfdata, perfFAIREPIROI, T1blood, lambda, multiplier,
+                   T1guess, .progress = "text") #parallel does not work yet
   
   #this is disgusting, need a better way to extract this data
   CBF = as.numeric(sapply(perfcalc, function(x) 
