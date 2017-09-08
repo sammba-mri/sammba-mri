@@ -18,6 +18,9 @@ gunzip raw_video_y80.nii.gz
 fsl5.0-fslroi raw_video.nii.gz raw_video_z140.nii.gz 0 -1 0 -1 140 1 0 -1
 gunzip raw_video_z140.nii.gz
 
+fsl5.0-fslroi raw_video.nii.gz raw_video_z128.nii.gz 0 -1 0 -1 128 1 0 -1
+gunzip raw_video_z128.nii.gz
+
 #UnBmBe
 fsl5.0-fslroi UnBmBe_video.nii.gz UnBmBe_video_z140.nii.gz 0 -1 0 -1 140 1 0 -1
 gunzip UnBmBe_video_z140.nii.gz
@@ -85,5 +88,17 @@ fsl5.0-fslroi Qw3_videohead.nii.gz Qw3_videohead_z140.nii.gz 0 -1 0 -1 140 1 0 -
 gunzip Qw3_videohead_z140.nii.gz
 
 #Qw4
+fsl5.0-fslroi Qw4_videohead.nii.gz Qw4_videohead_x128.nii.gz 128 1 0 -1 0 -1 0 -1
+fsl5.0-fslswapdim Qw4_videohead_x128.nii.gz -z y x Qw4_videohead_x128.nii.gz
+gunzip Qw4_videohead_x128.nii.gz
+
+fsl5.0-fslroi Qw4_videohead.nii.gz Qw4_videohead_y80.nii.gz 0 -1 80 1 0 -1 0 -1
+fsl5.0-fslswapdim Qw4_videohead_y80.nii.gz x -z y Qw4_videohead_y80.nii.gz
+gunzip Qw4_videohead_y80.nii.gz
+
+fsl5.0-fslroi Qw4_videohead.nii.gz Qw4_videohead_y125.nii.gz 0 -1 125 1 0 -1 0 -1
+fsl5.0-fslswapdim Qw4_videohead_y125.nii.gz x -z y Qw4_videohead_y125.nii.gz
+gunzip Qw4_videohead_y125.nii.gz
+
 fsl5.0-fslroi Qw4_videohead.nii.gz Qw4_videohead_z140.nii.gz 0 -1 0 -1 140 1 0 -1
 gunzip Qw4_videohead_z140.nii.gz

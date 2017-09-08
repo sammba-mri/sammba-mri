@@ -6,12 +6,12 @@
 #recursively searches a given folder for EnIm*.dcm files. for each EnIm*.dcm,
 #saves a .nii (named using several .dcm tag values) to a(nother) given folder.
 
-#for .dcm files of the FAIR_EPI sequence, also extracts TIs and saves them as a
-#.txt with same name as the .nii. will eventually do the same for some other
-#sequences (such as T1/T2 mapping).
+#also exports to .txt text files some meta-data useful to the processing of
+#certain protocols such as perfusion, T1/T2 mapping and diffusion
 
 #only tested on PV6 .dcm files and a limited number of sequences. little or no
-#error-checking.
+#error-checking. there are a lot of circumstances where this converter will
+#fail or be sub-optimal
 
 #depends on the presence of a compiled version of dcmdump (part of OFFIS dcmtk;
 #http://dcmtk.org/dcmtk.php.en and http://support.dcmtk.org/docs/dcmdump.html)
@@ -95,33 +95,7 @@ def EnDCM_to_NII(dcmdump_path, EnDCM, save_directory, SIAPfix, valstart, splt1, 
 
     #read EnDCM header/metadata using dcmdump
     #+L ensures long tags are fully printed
-    #+P searches for a specific tag
-    fields = subprocess.check_output([dcmdump_path, EnDCM, '+L',
-        '+P', '0008,0021',   # SeriesDate
-        '+P', '0008,0031',   # SeriesTime
-        '+P', '0010,0020',   # PatientID
-        '+P', '0018,0023',   # MRAcquisitionType
-        '+P', '0018,0050',   # SliceThickness
-        '+P', '0018,0080',   # RepetitionTime
-        '+P', '0018,1030',   # ProtocolName
-        '+P', '0018,5100',   # PatientPosition
-        '+P', '0018,9005',   # PulseSequenceName
-        '+P', '0018,9079',   # InversionTimes
-        '+P', '0020,0032',   # ImagePositionPatient
-        '+P', '0020,0037',   # ImageOrientationPatient
-        '+P', '0020,9057',   # InStackPositionNumber
-        '+P', '0020,9128',   # TemporalPositionIndex
-        '+P', '0020,9158',   # FrameComments
-        '+P', '0028,0008',   # NumberOfFrames
-        '+P', '0028,0010',   # Rows
-        '+P', '0028,0011',   # Columns
-        '+P', '0028,0030'])  # PixelSpacing
-    
-    #might be useful in the future
-    #(0028,0100)  # BitsAllocated
-    #(0028,0101)  # BitsStored
-    #(0028,0102)  # HighBit
-    #(0028,0103)  # PixelRepresentation
+    dcmdump_output = subprocess.check_output([dcmdump_path, EnDCM, '+L'])
 
 #%%
 
@@ -130,11 +104,20 @@ def EnDCM_to_NII(dcmdump_path, EnDCM, save_directory, SIAPfix, valstart, splt1, 
     TR = []  # is not always in DICOM
     protocol = []  # cos of DKI
     bruker_sequence = []  # cos of DKI
+    diffdir = []
     TIs = []
-    frame_comments = []
-    repno = []
+    bval = []
+    bvalXX = []
+    bvalXY = []
+    bvalXZ = []
+    bvalYY = []
+    bvalYZ = []
+    bvalZZ = []
     IPPs = []
     ISPnums = []
+    repno = []
+    DIVs = []
+    frame_comments = []
     
     #via subprocess, dcmdump produces numerous lines of string output.
     #for some parameters such as SeriesDate, there should hopefully be only one
@@ -152,71 +135,95 @@ def EnDCM_to_NII(dcmdump_path, EnDCM, save_directory, SIAPfix, valstart, splt1, 
 
 #%%
 
-    for line in fields.splitlines():
+    for line in dcmdump_output.splitlines():
     
-        #I am guessing that a consequence of the DICOM spec and/or dcmdump mean 
-        #that the field value ALWAYS starts at the same position (valstart)
-        valsfieldsep = '#  '
-        splitline = line[valstart:].split(valsfieldsep)
-        if len(splitline) != 2:
-            print('assumed delimiter "' + valsfieldsep + '" not present or ' +
-                  'present more than once in ' + line)
-        vals, field = splitline
-        vals = vals.rstrip()
+        #pline = processed line. some lines have leading whitespace
+        pline = line.lstrip()
         
-        #remove [] that dcmdump delimits strings with
-        if vals[0] == '[':
-            vals = vals[1:-1]
+        if len(pline) >= 11:
         
-        vals = vals.split(splt1)
-        
-        #turn single value lists into single values
-        if type(vals) == list:
-            if len(vals) == 1:
-                vals = vals[0]
-    
-        #assign output to variable names
-        if 'SeriesDate' in field:  #                                  0008,0021
-            acqdate = vals
-        if 'SeriesTime' in field:  #                                  0008,0031
-            acqtime= vals
-        if 'PatientID' in field:  #                                   0010,0020
-            patID = vals
-        if 'MRAcquisitionType' in field:  #                           0018,0023
-            acqdims = vals
-        if 'SliceThickness' in field:  #                              0018,0050
-            thk = float(vals)
-        if 'RepetitionTime' in field:  #                              0018,0080
-            TR = float(vals)
-        if 'ProtocolName' in field:  #                                0018,1030
-            protocol = vals
-        if 'PatientPosition' in field:  #                             0018,5100
-            patpos = vals
-        if 'PulseSequenceName' in field:  #                           0018,9005
-            bruker_sequence = vals        
-        if 'InversionTimes' in field:  #                              0018,9079
-            TIs.append(float(vals))
-        if 'FrameComments' in field:  #                               0018,9158
-            frame_comments.append(vals)
-        if 'ImagePositionPatient' in field:  #                        0020,0032
-            IPPs.append([float(val) for val in vals])
-        if 'ImageOrientationPatient' in field:  #                     0020,0037
-            cosines = [float(val) for val in vals]
-        if 'InStackPositionNumber' in field:  #                       0020,9057
-            ISPnums.append(int(vals))
-        if 'TemporalPositionIndex' in field:  #                       0020,9128
-            repno.append(int(vals))
-        if 'NumberOfFrames' in field:  #                              0028,0008
-            frames = int(vals)
-        if 'Rows' in field:  #                                        0028,0010
-            rows = int(vals)
-        if 'Columns' in field:  #                                     0028,0011
-            cols = int(vals)
-        if 'PixelSpacing' in field:  #                                0028,0030
-            pixspac = [float(val) for val in vals]
+            if  pline[0] == '(' and pline[5] == ',' and pline[10] == ')':
 
-#%%
-    
+                tag = pline[0:11]
+                val = pline[:pline.rfind('#')].rstrip()[valstart:]
+                
+                #remove [] that dcmdump delimits strings with
+                if val[0] == '[':
+                    val = val[1:-1]
+                
+                vals = val.split(splt1)
+                
+                #turn single value lists into single values
+                if type(vals) == list:
+                    if len(vals) == 1:
+                        vals = vals[0]
+            
+                #assign output to variable names
+                if tag == '(0008,0021)':  #Series Date
+                    acqdate = vals
+                if tag == '(0008,0031)':  #Series Time
+                    acqtime = vals
+                if tag == '(0010,0020)':  #Patient ID​
+                    patID = vals
+                if tag == '(0018,0023)':  #MR Acquisition Type
+                    acqdims = vals
+                if tag == '(0018,0050)':  #Slice Thickness​
+                    thk = float(vals)
+                if tag == '(0018,0080)':  #Repetition Time
+                    TR = float(vals)
+                if tag == '(0018,1030)':  #Protocol Name
+                    protocol = vals
+                if tag == '(0018,5100)':  #Patient Position
+                    patpos = vals
+                if tag == '(0018,9005)':  #Pulse Sequence Name
+                    bruker_sequence = vals
+                if tag == '(0018,9075)':  #Diffusion Directionality​
+                    diffdir.append(vals)
+                if tag == '(0018,9079)':  #Inversion Times
+                    TIs.append(float(vals))
+                if tag == '(0018,9087)':  #Diffusion b-value
+                    bval.append(float(vals))
+                if tag == '(0018,9602)':  #Diffusion b-value XX
+                    bvalXX.append(float(vals))
+                if tag == '(0018,9603)':  #Diffusion b-value XY​
+                    bvalXY.append(float(vals))
+                if tag == '(0018,9604)':  #Diffusion b-value XZ
+                    bvalXZ.append(float(vals))
+                if tag == '(0018,9605)':  #Diffusion b-value YY
+                    bvalYY.append(float(vals))
+                if tag == '(0018,9606)':  #Diffusion b-value YZ
+                    bvalYZ.append(float(vals))
+                if tag == '(0018,9607)':  #Diffusion b-value Z
+                    bvalZZ.append(float(vals))
+                if tag == '(0020,0032)':  #Image Position (Patient)
+                    IPPs.append([float(i) for i in vals])
+                if tag == '(0020,0037)':  #Image Orientation (Patient)
+                    cosines = [float(i) for i in vals]
+                if tag == '(0020,9057)':  #In-Stack Position Number
+                    ISPnums.append(int(vals))
+                if tag == '(0020,9128)':  #Temporal Position Index​
+                    repno.append(int(vals))
+                if tag == '(0020,9157)':  #Dimension Index Values
+                    DIVs.append([int(i) for i in vals])
+                if tag == '(0020,9158)':  #Frame Comments
+                    frame_comments.append(vals)                
+                if tag == '(0028,0008)':  #Number of Frames
+                    frames = int(vals)
+                if tag == '(0028,0010)':  #Rows
+                    rows = int(vals)
+                if tag == '(0028,0011)':  #Columns
+                    cols = int(vals)
+                if tag == '(0028,0030)':  #Pixel Spacing
+                    pixspac = [float(i) for i in vals]
+
+                #might be useful in the future
+                #(0028,0100)  # Bits Allocated
+                #(0028,0101)  # Bits Stored
+                #(0028,0102)  # High Bit
+                #(0028,0103)  # Pixel Representation
+
+#%%    
+
     #next a table of certain frame parameters is generated that can be sorted
     #by pandas. once correctly ordered, the vector describing the original
     #positions within the DICOM image matrix is later used to extract and
@@ -225,32 +232,45 @@ def EnDCM_to_NII(dcmdump_path, EnDCM, save_directory, SIAPfix, valstart, splt1, 
     #if they have length zero (or just unequal to ISPnums, though no idea how
     #that could be possible), populate vectors that will be included in ptbl
     #(parameter table). there must be a more efficient way
+    if len(diffdir) != len(ISPnums):
+        diffdir = list(itertools.repeat('NA', len(ISPnums)))
     if len(TIs) != len(ISPnums):
-        TIs = list(itertools.repeat(0, len(ISPnums)))
-    if len(frame_comments) != len(ISPnums):
-        frame_comments = list(itertools.repeat(0, len(ISPnums)))
+        TIs = list(itertools.repeat('NA', len(ISPnums)))
+    if len(bval) != len(ISPnums):
+        bval = list(itertools.repeat('NA', len(ISPnums)))
+    if len(bvalXX) != len(ISPnums):
+        bvalXX = list(itertools.repeat('NA', len(ISPnums)))
+    if len(bvalXY) != len(ISPnums):
+        bvalXY = list(itertools.repeat('NA', len(ISPnums)))
+    if len(bvalXZ) != len(ISPnums):
+        bvalXZ = list(itertools.repeat('NA', len(ISPnums)))
+    if len(bvalYY) != len(ISPnums):
+        bvalYY = list(itertools.repeat('NA', len(ISPnums)))
+    if len(bvalYZ) != len(ISPnums):
+        bvalYZ = list(itertools.repeat('NA', len(ISPnums)))
+    if len(bvalZZ) != len(ISPnums):
+        bvalZZ = list(itertools.repeat('NA', len(ISPnums)))
     if len(repno) != len(ISPnums):
-        repno = list(itertools.repeat(0, len(ISPnums)))
+        repno = list(itertools.repeat('NA', len(ISPnums)))
+    if len(frame_comments) != len(ISPnums):
+        frame_comments = list(itertools.repeat('NA', len(ISPnums)))
     
     #ptbl = parameter table
-    ptbl = pandas.DataFrame(data = {
-        'TI': TIs, 'FC': frame_comments, 'slice': ISPnums, 'slicepos': IPPs,
-        'repno': repno
-                                    }
-                            )
-    ptbl['FC'] = ptbl['FC'].astype('category')
+    ptbl = pandas.DataFrame(data = {'repno': repno, 'slice': ISPnums,
+        'diffdir': diffdir, 'TI': TIs, 'bval': bval, 'bvalXX': bvalXX,
+        'bvalXY': bvalXY, 'bvalXZ': bvalXZ, 'bvalYY': bvalYY, 'bvalYZ': bvalYZ,
+        'bvalZZ': bvalZZ, 'slicepos': IPPs, 'FC': frame_comments})
+
+    DIVsdf = pandas.DataFrame({'DIVs': DIVs})
+    DIVsdf = pandas.DataFrame([x[0] for x in DIVsdf.values])
+    DIVsdf = DIVsdf.rename(columns = lambda x: 'DIV' + str(x))
+
+    dfs = [DIVsdf, ptbl]
+    ptbl = pandas.concat(dfs, axis = 1)
+
 
 #%%
-    
-    if bruker_sequence == 'Bruker:FAIR_EPI':
-        ptbl['FC'].cat.reorder_categories(
-            ['Selective Inversion', 'Non-selective Inversion'], inplace = True)
 
-#%%
-    
-    ptbl = ptbl.sort_values(list(['repno', 'TI', 'FC', 'slice']))
-
-#%%
     slices = max(ISPnums) #maybe a bit dangerous
     
     #use check_output rather than call to avoid stdout filling up the terminal
@@ -263,16 +283,13 @@ def EnDCM_to_NII(dcmdump_path, EnDCM, save_directory, SIAPfix, valstart, splt1, 
     
     #rawarray is actually just a vector, need to reshape into a run of frames
     rawarray = np.reshape(rawarray, (frames, rows, cols))
-    rawarray = rawarray[ptbl.index.values] # reorder frames using table
-    #make into 4D file. some acquisitions (such as simultaneous T1 and T2
-    #mapping) are >4D, and the NIFTI-1 standard can handle up to 7?, but I do
-    #not know any visualization software that can, so stick to 4D with a
-    #sensible use of temporal order for supplementary dimensions
     rawarray = np.reshape(rawarray, (int(frames / slices), slices, rows, cols))
     rawarray = np.transpose(rawarray, (3,2,1,0))
 
 
-#%% #fsp = first slice position, lsp = last slice position
+#%%
+
+    #fsp = first slice position, lsp = last slice position
     fsp = np.array(ptbl.slicepos[ptbl.slice == 1].tolist()[0])
     lsp = np.array(ptbl.slicepos[ptbl.slice == slices].tolist()[0])
     
@@ -320,13 +337,13 @@ def EnDCM_to_NII(dcmdump_path, EnDCM, save_directory, SIAPfix, valstart, splt1, 
             print('SIAPfix is neither yes nor no, assuming no')
 
 #%%
-    
+
     header = nibabel.Nifti1Header()
     header.set_xyzt_units('mm', 'msec')
     header.set_data_dtype(np.int16)
     if type(TR) != list:
         header['pixdim'][4] = TR    
-    img = nibabel.Nifti1Image(rawarray, affine, header=header)
+    img = nibabel.Nifti1Image(rawarray, affine, header = header)
 
     bf = 'bf' + EnDCM.split(splt2)[-5]  # Paravision experiment folder number
     if SIAPfix == 'yes':
@@ -344,11 +361,12 @@ def EnDCM_to_NII(dcmdump_path, EnDCM, save_directory, SIAPfix, valstart, splt1, 
 
     img.to_filename(os.path.join(save_directory, NIIname))
 
-    #need to find a better way to extract TIs
-    if bruker_sequence == 'Bruker:FAIR_EPI': 
-        f = open(os.path.join(save_directory, NIIname[:-7] + '_TIs.txt'), 'w')        
-        f.write(str(ptbl.TI[ptbl.slice == 1][ptbl.FC == 'Selective Inversion'].tolist())[1:-1].replace(' ',''))
-        f.close()
+#%%
+
+    ptbl.to_csv(path_or_buf = os.path.join(save_directory, NIIname[:-7] +
+                                           '_ptbl.txt'),
+                sep = '\t', index = 0)
+    
 
 #%%
 
@@ -374,10 +392,5 @@ for root, dirs, files in os.walk(sessdir):
     for file in files:
         if file.startswith('EnIm'):
             if file.endswith('.dcm'):
-                EnDCM_to_NII(dcmdump_path,
-                             os.path.join(root, file),
-                             save_directory,
-                             SIAPfix,
-                             valstart,
-                             splt1,
-                             splt2)
+                EnDCM_to_NII(dcmdump_path, os.path.join(root, file),
+                             save_directory, SIAPfix, valstart, splt1, splt2)
