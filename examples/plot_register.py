@@ -49,25 +49,46 @@ allineate = memory.cache(afni.Allineate)
 out_allineate = allineate(in_file=out_apply_mask.outputs.out_file,
                           reference=template_file,
                           master=template_file,
-                          out_matrix=basename + '_UnBmBeAl',
+                          out_matrix=basename + '_UnBmBeAl3',
                           cost='nmi',
                           convergence=.05,
                           two_pass=True,
                           two_blur=6.,
                           center_of_mass='',
                           maxrot=90,
-                          out_file=basename + '_UnBmBeAl.nii.gz')
+                          out_file=basename + '_UnBmBeAl3.nii.gz')
 
 save_inverted_affine(out_allineate.outputs.matrix,
-                     basename + '_UnBmBeAl_INV.aff12.1D')
+                     basename + '_UnBmBeAl3_INV.aff12.1D')
 
 # Application to the whole head image. can also be used for a good
 # demonstration of linear vs. non-linear registration quality
 out_allineate2 = allineate(in_file=out_unifize.outputs.out_file,
                            master=head_file,
                            in_matrix=out_allineate.outputs.matrix,
-                           out_file=basename + '_UnAa.nii.gz')
+                           out_file=basename + '_UnAa3.nii.gz')
 
+# Skipping all video related commands
+out_allineate3 = allineate(in_file=out_allineate2.outputs.out_file,
+                           master=head_file,
+                           out_matrix=basename + '_UnAa4',
+                           convergence=5,
+                           two_pass=True,
+                           two_blur=6.,
+#                          weight=,  # Fix nipype bug: weight can be a str, not only an existing file
+                           out_file=basename + '_UnAa4.nii.gz')
+
+cat_mat_vec = memory.cache(afni.CatMatvec)
+out_cat = cat_mat_vec(in_file=[(out_allineate.outputs.matrix,
+                                out_allineate3.outputs.matrix)],
+                      oneline=True,
+                      out_file=basename + 'UnBmBeAl3UnCCAl4.aff12.1D',
+                      fourxfour=False)
+
+
+	cat_matvec -ONELINE $dir/UnBmBeCCAl"$n1".aff12.1D $dir/UnCCAl"$n2".aff12.1D > $dir/UnBmBeCCAl"$n1"UnCCAl"$n2".aff12.1D
+	3dAllineate -input $dir/UnCC.nii.gz -master $template -prefix $dir/UnCCAa"$n2".nii.gz -1Dmatrix_apply $dir/UnBmBeCCAl"$n1"UnCCAl"$n2".aff12.1D
+	3dAllineate -input $dir/UnBmBeCC.nii.gz -master $template -prefix $dir/UnBmBeCCAa"$n2".nii.gz -1Dmatrix_apply $dir/UnBmBeCCAl"$n1"UnCCAl"$n2".aff12.1D
 
 # Non-linear registration of affine pre-registered whole head image to template
 # Don't initiate straight from the original with an iniwarp due to weird errors
