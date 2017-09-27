@@ -10,10 +10,11 @@ virtualenv:
 
 before_install:
     - bash <(wget -q -O- http://neuro.debian.net/_files/neurodebian-travis.sh)
-    - sudo apt-get install -qq python-scipy python-nose python-nibabel python-networkx python-nipype python-pandas
-    - sudo apt-get install -qq python-pip
+    - sudo apt-get install -qq python-pip python-numpy libatlas3gf-base libatlas-dev
+    - pip install "scipy>=0.13.3"    
     - pip install "scikit-learn>=0.15"
     - pip install "nilearn>=0.1.3"
+    - sudo apt-get install -qq python-nose python-nibabel python-networkx python-nipype python-pandas
     - pip install coverage coveralls
 
 install:

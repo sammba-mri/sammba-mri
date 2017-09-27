@@ -8,3 +8,5 @@ User guide: table of contents
    :numbered:
 
    introduction.rst
+   registration.rst
+   template.rst
