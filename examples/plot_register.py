@@ -14,7 +14,6 @@ def save_inverted_affine(oned_matrix_file, inverted_matrix_file):
                np.hstack((u_new[0], v_new[:1], u_new[1], v_new[1:2],
                           u_new[2], v_new[2:])))
 
-
 memory = Memory('/tmp')
 basename = '/tmp/test_anat/anat'
 template_file = '/usr/share/fsl/5.0/data/standard/MNI152_T1_2mm_brain.nii.gz'
@@ -41,6 +40,23 @@ apply_mask = memory.cache(fsl.ApplyMask)
 out_apply_mask = apply_mask(in_file=out_unifize.outputs.out_file,
                             mask_file=out_bet.outputs.out_file,
                             out_file=basename + '_UnBmBe.nii.gz')
+
+import nibabel
+from nilearn.image.resampling import coord_transform
+from scipy.ndimage import center_of_mass
+
+out_apply_mask_img = nibabel.load(out_apply_mask.outputs.out_file)
+i, j, k = center_of_mass(out_apply_mask_img.get_data() > 0)
+x, y, z = np.array(coord_transform(i, j, k, out_apply_mask_img.affine)).T
+
+
+ambmc_data = left_ambmc_img.get_data()
+roi_label = ambmc_atlas.labels.id[ambmc_atlas.labels.name == region_name][0]
+roi_mask_array = ambmc_data == ambmc_atlas.labels.id[roi_label]
+roi_mask_img = image.new_img_like(left_ambmc_img, roi_mask_array)
+i, j, k = center_of_mass(roi_mask_array)
+x, y, z = np.array(coord_transform(i, j, k, left_ambmc_img.affine)).T
+
 
 # The actual T1anat to template registration using the brain extracted image
 # could do in one 3dQwarp step using allineate flags but will separate as
