@@ -1,0 +1,92 @@
+open("R:\\2014-ROMANE\\5_Experimental-Plan-Experiments-Results\\mouse\\MIRCen_sammba-mri_mouse\\analysis20170926\\raw_anat_video_x46.nii");
+open("R:\\2014-ROMANE\\5_Experimental-Plan-Experiments-Results\\mouse\\MIRCen_sammba-mri_mouse\\analysis20170926\\raw_anat_video_y98.nii");
+open("R:\\2014-ROMANE\\5_Experimental-Plan-Experiments-Results\\mouse\\MIRCen_sammba-mri_mouse\\analysis20170926\\raw_anat_video_z40.nii");
+selectWindow("raw_anat_video_x46.nii");
+run("Rotate 90 Degrees Left");
+run("Size...", "width=200 height=100 depth=24 interpolation=None");
+run("Canvas Size...", "width=200 height=200 position=Center zero");
+selectWindow("raw_anat_video_y98.nii");
+run("Size...", "width=150 height=100 depth=24 interpolation=None");
+run("Canvas Size...", "width=150 height=200 position=Center zero");
+selectWindow("raw_anat_video_z40.nii");
+run("Size...", "width=150 height=200 depth=24 interpolation=None");
+run("Combine...", "stack1=raw_anat_video_x46.nii stack2=raw_anat_video_z40.nii");
+run("Combine...", "stack1=[Combined Stacks] stack2=raw_anat_video_y98.nii");
+rename("Combined Stacks raw");
+run("32-bit");
+run("Duplicate...", "title=[Combined Stacks raw dup] duplicate");
+run("Square", "stack");
+run("Square Root", "stack");
+imageCalculator("Add create 32-bit stack", "Combined Stacks raw","Combined Stacks raw dup");
+run("Divide...", "value=2 stack");
+selectWindow("Combined Stacks raw dup");
+run("Close");
+selectWindow("Combined Stacks raw");
+run("Close");
+rename("Combined Stacks raw");
+open("R:\\2014-ROMANE\\5_Experimental-Plan-Experiments-Results\\mouse\\MIRCen_sammba-mri_mouse\\analysis20170926\\Qw_anat_video_x75.nii");
+open("R:\\2014-ROMANE\\5_Experimental-Plan-Experiments-Results\\mouse\\MIRCen_sammba-mri_mouse\\analysis20170926\\Qw_anat_video_y93.nii");
+open("R:\\2014-ROMANE\\5_Experimental-Plan-Experiments-Results\\mouse\\MIRCen_sammba-mri_mouse\\analysis20170926\\Qw_anat_video_z51.nii");
+selectWindow("Qw_anat_video_x75.nii");
+run("Rotate 90 Degrees Left");
+run("Canvas Size...", "width=200 height=200 position=Center zero");
+selectWindow("Qw_anat_video_y93.nii");
+run("Canvas Size...", "width=150 height=200 position=Center zero");
+selectWindow("Qw_anat_video_z51.nii");
+run("Combine...", "stack1=Qw_anat_video_x75.nii stack2=Qw_anat_video_z51.nii");
+run("Combine...", "stack1=[Combined Stacks] stack2=Qw_anat_video_y93.nii");
+run("Multiply...", "value=8 stack");
+run("Combine...", "stack1=[Combined Stacks raw] stack2=[Combined Stacks] combine");
+setFont("SansSerif", 20); setColor("white");
+for (i=1; i<=24; i++) {
+	setSlice(i);
+	setJustification("left"); drawString("Before registration", 10, 30); drawString("After registration", 10, 230);
+	setJustification("right"); drawString(i+"/24", 490, 30);
+	setLineWidth(2); drawLine(0,200,500,200);
+}
+run("Duplicate...", "duplicate"); rename("duplicate1");
+for (i=2; i<=9; i++) {
+	selectWindow("Combined Stacks"); run("Duplicate...", "duplicate"); rename("duplicate"+i);
+}
+run("Concatenate...", "  title=[Concatenated Stacks] image1=[Combined Stacks] image2=[duplicate1] image3=[duplicate2] image4=[duplicate3] image5=[duplicate4] image6=[duplicate5] image7=[duplicate6] image8=[duplicate7] image9=[duplicate8] image10=[duplicate9]");
+setMinAndMax(0, 15000);
+run("AVI... ", "compression=JPEG frame=5 save=R:\\2014-ROMANE\\5_Experimental-Plan-Experiments-Results\\mouse\\MIRCen_sammba-mri_mouse\\analysis20170926\\rawQwanatflat.avi");
+open("R:\\2014-ROMANE\\5_Experimental-Plan-Experiments-Results\\mouse\\MIRCen_sammba-mri_mouse\\analysis20170926\\raw_func_video_x48.nii");
+open("R:\\2014-ROMANE\\5_Experimental-Plan-Experiments-Results\\mouse\\MIRCen_sammba-mri_mouse\\analysis20170926\\raw_func_video_y23.nii");
+open("R:\\2014-ROMANE\\5_Experimental-Plan-Experiments-Results\\mouse\\MIRCen_sammba-mri_mouse\\analysis20170926\\raw_func_video_z5.nii");
+selectWindow("raw_func_video_x48.nii");
+run("Size...", "width=38 height=70 depth=24 interpolation=None");
+selectWindow("raw_func_video_y23.nii");
+run("Size...", "width=102 height=38 depth=24 interpolation=None");
+run("Canvas Size...", "width=102 height=70 position=Center zero");
+selectWindow("raw_func_video_z5.nii");
+run("Size...", "width=102 height=70 depth=24 interpolation=None");
+run("Combine...", "stack1=raw_func_video_x48.nii stack2=raw_func_video_y23.nii");
+run("Combine...", "stack1=[Combined Stacks] stack2=raw_func_video_z5.nii");
+run("Size...", "width=500 height=145 depth=24 constrain interpolation=None");
+rename("Combined Stacks raw");
+open("R:\\2014-ROMANE\\5_Experimental-Plan-Experiments-Results\\mouse\\MIRCen_sammba-mri_mouse\\analysis20170926\\Qw_func_video_x75.nii");
+open("R:\\2014-ROMANE\\5_Experimental-Plan-Experiments-Results\\mouse\\MIRCen_sammba-mri_mouse\\analysis20170926\\Qw_func_video_y93.nii");
+open("R:\\2014-ROMANE\\5_Experimental-Plan-Experiments-Results\\mouse\\MIRCen_sammba-mri_mouse\\analysis20170926\\Qw_func_video_z51.nii");
+selectWindow("Qw_func_video_x75.nii");
+run("Rotate 90 Degrees Left");
+run("Canvas Size...", "width=200 height=200 position=Center zero");
+selectWindow("Qw_func_video_y93.nii");
+run("Canvas Size...", "width=150 height=200 position=Center zero");
+selectWindow("Qw_func_video_z51.nii");
+run("Combine...", "stack1=Qw_func_video_x75.nii stack2=Qw_func_video_z51.nii");
+run("Combine...", "stack1=[Combined Stacks] stack2=Qw_func_video_y93.nii");
+run("Combine...", "stack1=[Combined Stacks raw] stack2=[Combined Stacks] combine");
+setFont("SansSerif", 20); setColor("white");
+for (i=1; i<=24; i++) {
+	setSlice(i);
+	setJustification("left"); drawString("Before registration", 10, 30); drawString("After registration", 10, 175);
+	setJustification("right"); drawString(i+"/24", 490, 30);
+	setLineWidth(2); drawLine(0,145,500,145);
+}
+run("Duplicate...", "duplicate"); rename("duplicate1");
+for (i=2; i<=9; i++) {
+	selectWindow("Combined Stacks"); run("Duplicate...", "duplicate"); rename("duplicate"+i);
+}
+run("Concatenate...", "  title=[Concatenated Stacks] image1=[Combined Stacks] image2=[duplicate1] image3=[duplicate2] image4=[duplicate3] image5=[duplicate4] image6=[duplicate5] image7=[duplicate6] image8=[duplicate7] image9=[duplicate8] image10=[duplicate9]");
+run("AVI... ", "compression=JPEG frame=5 save=R:\\2014-ROMANE\\5_Experimental-Plan-Experiments-Results\\mouse\\MIRCen_sammba-mri_mouse\\analysis20170926\\rawQwfuncflat.avi");

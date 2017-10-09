@@ -13,18 +13,17 @@ pipeline=pipeline_XNAT_CSD_MRI_MOUSE_testretest.bash #1
 projectdir=/home/Promane/2014-ROMANE/5_Experimental-Plan-Experiments-Results/mouse/XNAT_CSD_MRI_MOUSE_testretest
 MRIsessionslist1=$projectdir/baselinesessions.txt #2
 MRIsessionslist2=$projectdir/postsessions.txt #2
-analysisdir=$projectdir/analysis20170825
+analysisdir=$projectdir/analysis20170926
 analysisdir1=$analysisdir/baseline #3
 analysisdir2=$analysisdir/post #3
 mkdir $analysisdir $analysisdir1 $analysisdir2
-MIC40C57=/home/Promane/2014-ROMANE/5_Experimental-Plan-Experiments-Results/mouse/MRIatlases/MIC40C57/20170223
-brain=$MIC40C57/brain100.nii.gz #4
-atlas=$MIC40C57/labels100.nii.gz #5
-mask=$MIC40C57/mask100.nii.gz #6
-head=$MIC40C57/head100.nii.gz #7
-3dmask_tool -dilate_inputs 7 -inputs $mask -prefix $analysisdir/maskdil7.nii.gz
-headweight=$analysisdir/maskdil7.nii.gz #8
-basetype=brain #9
+templatedir=$projectdir/20170925_goodposttemplate
+brain=$templatedir/dorrbrainAlQw.nii.gz #4
+atlas=$templatedir/dorratlasAlQw.nii.gz #5
+mask=$templatedir/dorratlasAlQw.nii.gz #6
+head=$templatedir/Qw4_meanhead.nii.gz #7
+headweight=$templatedir/aff3_unionmaskdil4.nii.gz #8
+basetype=head #9
 dofolderoverwrite=no #10
 tmpdir=/volatile #11
 registerfunctional=yes #12
