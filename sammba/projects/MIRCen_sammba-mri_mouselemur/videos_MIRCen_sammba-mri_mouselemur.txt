@@ -1,0 +1,94 @@
+open("R:\\2014-ROMANE\\5_Experimental-Plan-Experiments-Results\\mouselemur\\MIRCen_sammba-mri_mouselemur\\analysis20170928\\raw_anat_video_x79.nii");
+open("R:\\2014-ROMANE\\5_Experimental-Plan-Experiments-Results\\mouselemur\\MIRCen_sammba-mri_mouselemur\\analysis20170928\\raw_anat_video_y80.nii");
+open("R:\\2014-ROMANE\\5_Experimental-Plan-Experiments-Results\\mouselemur\\MIRCen_sammba-mri_mouselemur\\analysis20170928\\raw_anat_video_z37.nii");
+selectWindow("raw_anat_video_x79.nii");
+run("Rotate 90 Degrees Right");
+run("Flip Horizontally", "stack");
+run("Canvas Size...", "width=160 height=160 position=Center zero");
+selectWindow("raw_anat_video_y80.nii");
+run("Canvas Size...", "width=160 height=160 position=Center zero");
+run("Combine...", "stack1=raw_anat_video_x79.nii stack2=raw_anat_video_z37.nii");
+run("Combine...", "stack1=[Combined Stacks] stack2=raw_anat_video_y80.nii");
+rename("Combined Stacks raw");
+run("32-bit");
+run("Duplicate...", "title=[Combined Stacks raw dup] duplicate");
+run("Square", "stack");
+run("Square Root", "stack");
+imageCalculator("Add create 32-bit stack", "Combined Stacks raw","Combined Stacks raw dup");
+run("Divide...", "value=2 stack");
+selectWindow("Combined Stacks raw dup");
+run("Close");
+selectWindow("Combined Stacks raw");
+run("Close");
+rename("Combined Stacks raw");
+open("R:\\2014-ROMANE\\5_Experimental-Plan-Experiments-Results\\mouselemur\\MIRCen_sammba-mri_mouselemur\\analysis20170928\\Qw_anat_video_x79.nii");
+open("R:\\2014-ROMANE\\5_Experimental-Plan-Experiments-Results\\mouselemur\\MIRCen_sammba-mri_mouselemur\\analysis20170928\\Qw_anat_video_y76.nii");
+open("R:\\2014-ROMANE\\5_Experimental-Plan-Experiments-Results\\mouselemur\\MIRCen_sammba-mri_mouselemur\\analysis20170928\\Qw_anat_video_z47.nii");
+selectWindow("Qw_anat_video_x79.nii");
+run("Rotate 90 Degrees Right");
+run("Flip Horizontally", "stack");
+run("Canvas Size...", "width=160 height=160 position=Center zero");
+selectWindow("Qw_anat_video_y76.nii");
+run("Rotate 90 Degrees Right");
+run("Rotate 90 Degrees Right");
+run("Canvas Size...", "width=160 height=160 position=Center zero");
+run("Combine...", "stack1=Qw_anat_video_x79.nii stack2=Qw_anat_video_z47.nii");
+run("Combine...", "stack1=[Combined Stacks] stack2=Qw_anat_video_y76.nii");
+run("Multiply...", "value=8 stack");
+run("Combine...", "stack1=[Combined Stacks raw] stack2=[Combined Stacks] combine");
+setFont("SansSerif", 20); setColor("white");
+for (i=1; i<=6; i++) {
+	setSlice(i);
+	setJustification("left"); drawString("Before registration", 10, 30); drawString("After registration", 10, 190);
+	setJustification("right"); drawString(i+"/6", 470, 30);
+	setLineWidth(2); drawLine(0,160,480,160);
+}
+run("Duplicate...", "duplicate"); rename("duplicate1");
+for (i=2; i<=9; i++) {
+	selectWindow("Combined Stacks"); run("Duplicate...", "duplicate"); rename("duplicate"+i);
+}
+run("Concatenate...", "  title=[Concatenated Stacks] image1=[Combined Stacks] image2=[duplicate1] image3=[duplicate2] image4=[duplicate3] image5=[duplicate4] image6=[duplicate5] image7=[duplicate6] image8=[duplicate7] image9=[duplicate8] image10=[duplicate9]");
+setMinAndMax(0, 15000);
+run("AVI... ", "compression=JPEG frame=5 save=R:\\2014-ROMANE\\5_Experimental-Plan-Experiments-Results\\mouselemur\\MIRCen_sammba-mri_mouselemur\\analysis20170928\\rawQwanatflat.avi");
+open("R:\\2014-ROMANE\\5_Experimental-Plan-Experiments-Results\\mouselemur\\MIRCen_sammba-mri_mouselemur\\analysis20170928\\raw_func_video_x45.nii");
+open("R:\\2014-ROMANE\\5_Experimental-Plan-Experiments-Results\\mouselemur\\MIRCen_sammba-mri_mouselemur\\analysis20170928\\raw_func_video_y38.nii");
+open("R:\\2014-ROMANE\\5_Experimental-Plan-Experiments-Results\\mouselemur\\MIRCen_sammba-mri_mouselemur\\analysis20170928\\raw_func_video_z14.nii");
+selectWindow("raw_func_video_x45.nii");
+run("Flip Horizontally", "stack");
+run("Size...", "width=86 height=96 depth=6 interpolation=None");
+selectWindow("raw_func_video_y38.nii");
+run("Size...", "width=144 height=86 depth=6 interpolation=None");
+run("Canvas Size...", "width=144 height=96 position=Center zero");
+selectWindow("raw_func_video_z14.nii");
+run("Size...", "width=144 height=96 depth=6 interpolation=None");
+run("Combine...", "stack1=raw_func_video_x45.nii stack2=raw_func_video_y38.nii");
+run("Combine...", "stack1=[Combined Stacks] stack2=raw_func_video_z14.nii");
+run("Size...", "width=480 height=123 depth=6 constrain interpolation=None");
+rename("Combined Stacks raw");
+open("R:\\2014-ROMANE\\5_Experimental-Plan-Experiments-Results\\mouselemur\\MIRCen_sammba-mri_mouselemur\\analysis20170928\\Qw_func_video_x79.nii");
+open("R:\\2014-ROMANE\\5_Experimental-Plan-Experiments-Results\\mouselemur\\MIRCen_sammba-mri_mouselemur\\analysis20170928\\Qw_func_video_y76.nii");
+open("R:\\2014-ROMANE\\5_Experimental-Plan-Experiments-Results\\mouselemur\\MIRCen_sammba-mri_mouselemur\\analysis20170928\\Qw_func_video_z47.nii");
+selectWindow("Qw_func_video_x79.nii");
+run("Rotate 90 Degrees Right");
+run("Flip Horizontally", "stack");
+run("Canvas Size...", "width=160 height=160 position=Center zero");
+selectWindow("Qw_func_video_y76.nii");
+run("Rotate 90 Degrees Right");
+run("Rotate 90 Degrees Right");
+run("Canvas Size...", "width=160 height=160 position=Center zero");
+run("Combine...", "stack1=Qw_func_video_x79.nii stack2=Qw_func_video_z47.nii");
+run("Combine...", "stack1=[Combined Stacks] stack2=Qw_func_video_y76.nii");
+run("Combine...", "stack1=[Combined Stacks raw] stack2=[Combined Stacks] combine");
+setFont("SansSerif", 20); setColor("white");
+for (i=1; i<=6; i++) {
+	setSlice(i);
+	setJustification("left"); drawString("Before registration", 10, 30); drawString("After registration", 10, 153);
+	setJustification("right"); drawString(i+"/6", 470, 30);
+	setLineWidth(2); drawLine(0,123,480,123);
+}
+run("Duplicate...", "duplicate"); rename("duplicate1");
+for (i=2; i<=9; i++) {
+	selectWindow("Combined Stacks"); run("Duplicate...", "duplicate"); rename("duplicate"+i);
+}
+run("Concatenate...", "  title=[Concatenated Stacks] image1=[Combined Stacks] image2=[duplicate1] image3=[duplicate2] image4=[duplicate3] image5=[duplicate4] image6=[duplicate5] image7=[duplicate6] image8=[duplicate7] image9=[duplicate8] image10=[duplicate9]");
+run("AVI... ", "compression=JPEG frame=5 save=R:\\2014-ROMANE\\5_Experimental-Plan-Experiments-Results\\mouselemur\\MIRCen_sammba-mri_mouselemur\\analysis20170928\\rawQwfuncflat.avi");
