@@ -3,6 +3,19 @@
 #convert Bruker Paravision enhanced multiframe DICOM files into the NIfTI-1
 #format.
 
+#depends on the presence of a compiled version of dcmdump (part of OFFIS dcmtk;
+#http://dcmtk.org/dcmtk.php.en and http://support.dcmtk.org/docs/dcmdump.html)
+#which does the initial parsing: extraction of the header/metadata as text and
+#the image data as a raw vector
+
+#so this is effectively a python wrapper to dcmdump, processing and passing
+#its output to nibabel and a text file
+
+#useful documents include DICOM spec C.7.6.2.1.1 and 10.7.1.3
+#common.py of dicom2nifiti by Arne Brys, icometrix saved me when it comes to
+#specifiying the affine for nibabel! see http://dicom2nifti.readthedocs.io.
+#he effectively did the hard part, interpreting nibabel's DICOM tutorial for me
+
 #recursively searches a given folder for EnIm*.dcm files. for each EnIm*.dcm,
 #saves a .nii (named using several .dcm tag values) to a(nother) given folder.
 
@@ -12,11 +25,6 @@
 #only tested on PV6 .dcm files and a limited number of sequences. little or no
 #error-checking. there are a lot of circumstances where this converter will
 #fail or be sub-optimal
-
-#depends on the presence of a compiled version of dcmdump (part of OFFIS dcmtk;
-#http://dcmtk.org/dcmtk.php.en and http://support.dcmtk.org/docs/dcmdump.html)
-#which does the initial parsing: extraction of the header/metadata as text and
-#the image data as a raw vector
 
 #library uses:
 #numpy: affine and image matrix manipulation
@@ -223,11 +231,6 @@ def EnDCM_to_NII(dcmdump_path, EnDCM, save_directory, SIAPfix, valstart, splt1, 
                 #(0028,0103)  # Pixel Representation
 
 #%%    
-
-    #next a table of certain frame parameters is generated that can be sorted
-    #by pandas. once correctly ordered, the vector describing the original
-    #positions within the DICOM image matrix is later used to extract and
-    #reorder the frames correctly
     
     #if they have length zero (or just unequal to ISPnums, though no idea how
     #that could be possible), populate vectors that will be included in ptbl
@@ -298,13 +301,7 @@ def EnDCM_to_NII(dcmdump_path, EnDCM, save_directory, SIAPfix, valstart, splt1, 
     flspdiff = fsp - lsp
     eucliddist = (flspdiff[0]**2 + flspdiff[1]**2 + flspdiff[2]**2)**0.5
     slicegap = eucliddist / (slices -1)
-    
-    #Documentation
-    #C.7.6.2.1.1
-    #10.7.1.3 (no letter beforehand!!)
-    #common.py of dicom2nifiti by Arne Brys, icometrix
-    #http://dicom2nifti.readthedocs.io
-    
+   
     if slices == 1:  # single slice
         step = [0, 0, -1]
     else:
@@ -316,12 +313,9 @@ def EnDCM_to_NII(dcmdump_path, EnDCM, save_directory, SIAPfix, valstart, splt1, 
      [ cosines[2]*pixspac[1],  cosines[5]*pixspac[0],  step[2],  fsp[2]],
      [                     0,                      0,        0,      1]])
     
-    affineident = np.matrix(
-    [[1, 0, 0, 0],
-     [0, 1, 0, 0],
-     [0, 0, 1, 0],
-     [0, 0, 0, 1]])
+    affineident = np.eye(4, dtype=int)
     
+    #not sure if any of these patpos specs is really correct
     if patpos == 'HFS':
         ppaff = rotate_affine(180, 'y')
     #not sure this is correct: a reflection may be necessary too
