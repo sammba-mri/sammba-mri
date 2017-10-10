@@ -1,6 +1,11 @@
+"""
+Template creation
+=================
+
+Here we show how to create a template from multiple anatomical scans.
+"""
 import numpy as np
 from nipype.interfaces import afni, fsl, ants
-from nipype.interfaces.utility import Function
 from nipype.caching import Memory
 from nipype.utils.filemanip import fname_presuffix
 
@@ -46,6 +51,8 @@ def save_composed_affines(in_files, out_file):
                                     composed_affine[2])))
     return out_file
 
+##############################################################################
+# Retrieve the data
 memory = Memory('/tmp')
 template_file = '/usr/share/fsl/5.0/data/standard/MNI152_T1_2mm_brain.nii.gz'
 head_file = '/usr/share/fsl/5.0/data/standard/MNI152_T1_2mm.nii.gz'
@@ -151,6 +158,7 @@ out_tcat = tcat(in_files=masked_files, out_file='UnBmBeCC_video.nii.gz')
 out_tstat = tstat(in_file=out_tcat.outputs.out_file,
                   out_file='UnBmBeCC_mean.nii.gz')
 
+##############################################################################
 # Shift rotation
 allineate = memory.cache(afni.Allineate)
 masked_allineated_files = []
@@ -188,6 +196,7 @@ mask_tool = memory.cache(afni.MaskTool)
 out_mask_tool = mask_tool(in_file=out_tcat.outputs.out_file, count=True,
                           out_file='shr3_count.nii.gz')
 
+##############################################################################
 # Affine
 masked_aa4 = []
 unifized_aa4 = []
@@ -234,6 +243,7 @@ out_tstat = tstat(in_file=out_tcat2.outputs.out_file,
 out_mask_tool = mask_tool(in_file=out_tcat.outputs.out_file, count=True,
                           out_file='aff4_count.nii.gz')
 
+##############################################################################
 # Warp
 nwarp_cat = memory.cache(afni.NwarpCat)
 qwarp = memory.cache(afni.Qwarp)
@@ -283,6 +293,7 @@ out_tcat = tcat(in_files=warped_files, out_file='Qw8_videohead.nii.gz')
 out_tstat = tstat(in_file=out_tcat.outputs.out_file,
                   out_file='Qw8_meanhead.nii.gz')
 
+##############################################################################
 # Apply warp to anat and atlas
 warp_apply = memory.cache(afni.NwarpApply)
 for resampled_file, warp_file in zip(resampled_files, warp_files):
