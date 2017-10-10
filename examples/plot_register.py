@@ -290,7 +290,7 @@ for resampled_file, warp_file in zip(resampled_files, warp_files):
                                 warp=warp_file,
                                 master=out_tstat.outputs.out_file,
                                 out_file='Na.nii.gz')
-    out_nwarp_cat = nwarp_cat(in_files=[('INV', out_qwarp.outputs.outwarp),
+    out_nwarp_cat = nwarp_cat(in_files=[('INV', warp_file),
                                         atlas_warp_file],  # check with Nad
                               out_file='atlas_WARPINV.nii.gz')
     out_warp_apply = warp_apply(in_file=resampled_file,
@@ -298,74 +298,3 @@ for resampled_file, warp_file in zip(resampled_files, warp_files):
                                 master=out_tstat.outputs.out_file,
                                 ainterp='NN',
                                 out_file='atlas_Na.nii.gz')
-
-
-stop
-
-
-# Application to the whole head image. can also be used for a good
-# demonstration of linear vs. non-linear registration quality
-out_allineate2 = allineate(in_file=out_unifize.outputs.out_file,
-                           master=head_file,
-                           in_matrix=out_allineate.outputs.matrix,
-                           out_file=basename + '_UnAa3.nii.gz')
-
-
-
-
-# The actual T1anat to template registration using the brain extracted image
-# could do in one 3dQwarp step using allineate flags but will separate as
-# 3dAllineate performs well on brain image, and 3dQwarp well on whole head
-allineate = memory.cache(afni.Allineate)
-out_allineate = allineate(in_file=out_apply_mask.outputs.out_file,
-                          reference=template_file,
-                          master=template_file,
-                          out_matrix=basename + '_UnBmBeAl3',
-                          cost='nmi',
-                          convergence=.05,
-                          two_pass=True,
-                          two_blur=6.,
-                          center_of_mass='',
-                          maxrot=90,
-                          out_file=basename + '_UnBmBeAl3.nii.gz')
-
-save_inverted_affine(out_allineate.outputs.matrix,
-                     basename + '_UnBmBeAl3_INV.aff12.1D')
-
-# Application to the whole head image. can also be used for a good
-# demonstration of linear vs. non-linear registration quality
-out_allineate2 = allineate(in_file=out_unifize.outputs.out_file,
-                           master=head_file,
-                           in_matrix=out_allineate.outputs.matrix,
-                           out_file=basename + '_UnAa3.nii.gz')
-
-# Skipping all video related commands
-out_allineate3 = allineate(in_file=out_allineate2.outputs.out_file,
-                           master=head_file,
-                           out_matrix=basename + '_UnAa4',
-                           convergence=5,
-                           two_pass=True,
-                           two_blur=6.,
-#                          weight=,  # Fix nipype bug: weight can be a str, not only an existing file
-                           out_file=basename + '_UnAa4.nii.gz')
-
-cat_mat_vec = memory.cache(afni.CatMatvec)
-out_cat = cat_mat_vec(in_file=[(out_allineate.outputs.matrix,
-                                out_allineate3.outputs.matrix)],
-                      oneline=True,
-                      out_file=basename + 'UnBmBeAl3UnCCAl4.aff12.1D',
-                      fourxfour=False)
-
-
-
-# Non-linear registration of affine pre-registered whole head image to template
-# Don't initiate straight from the original with an iniwarp due to weird errors
-# (like it creating an Allin it then can't find)
-qwarp = memory.cache(afni.Qwarp)
-out_qwarp = qwarp(in_file=out_allineate2.outputs.out_file,
-                  base_file=template_file,
-                  nmi=True,
-                  noneg=True,
-                  iwarp=True,
-                  blur=[0],
-                  out_file=basename + '_UnAaQw.nii.gz')
