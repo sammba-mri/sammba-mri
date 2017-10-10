@@ -53,6 +53,22 @@ def save_composed_affines(in_files, out_file):
 
 ##############################################################################
 # Retrieve the data
+projectdir=/home/Promane/2014-ROMANE/5_Experimental-Plan-Experiments-Results/mouse/XNAT_CSD_MRI_MOUSE_testretest
+savedir1=$projectdir/20170925_goodbaselinetemplate; mkdir -p $savedir1
+savedir2=$projectdir/20170925_allgoodtemplate; mkdir -p $savedir2
+savedir3=$projectdir/20170925_allbaselinetemplate; mkdir -p $savedir3
+savedir4=$projectdir/20170925_goodposttemplate; mkdir -p $savedir4
+
+find $projectdir/dl/baseline -maxdepth 1 -mindepth 1 -type d > $projectdir/allbaseline.txt
+
+conv=0.005
+twoblur=1
+brainvol=400
+#-rbt values might be improveable
+Urad=18.3
+b=70
+t=80
+
 memory = Memory('/tmp')
 template_file = '/usr/share/fsl/5.0/data/standard/MNI152_T1_2mm_brain.nii.gz'
 head_file = '/usr/share/fsl/5.0/data/standard/MNI152_T1_2mm.nii.gz'
@@ -64,6 +80,14 @@ anat_files = [b + '.nii.gz' for b in basenames]
 unifized_files = []
 masked_files = []
 brain_mask_files = []
+
+
+bash MRIT2_extrcen.bash $savedir $brainvol $Urad $b $t
+R=$3
+b=$4
+t=$5
+3dUnifize -prefix $dir/Un.nii.gz -input $dir/anat.nii.gz -rbt $R $b $t
+
 # Loop on subjects
 bias_correct = memory.cache(ants.N4BiasFieldCorrection)
 unifize = memory.cache(afni.Unifize)
@@ -72,14 +96,13 @@ clip_level = memory.cache(afni.ClipLevel)
 bet = memory.cache(fsl.BET)
 center_mass = memory.cache(afni.CenterMass)
 refit = memory.cache(afni.Refit)
-for basename in basenames:
-    out_bias_correct = bias_correct(input_image=basename + '.nii.gz',
-                                    output_image=basename + '_N4.nii.gz')
+from sammba import data_fetchers
 
-    out_unifize = unifize(in_file=out_bias_correct.outputs.output_image,
-                          urad=18.3,
-                          out_file=basename + '_Un.nii.gz')
-
+retest = data_fetchers.fetch_zurich_test_retest(subjects=range(3))
+for anat_filename in retest.anat:
+    out_unifize = unifize(in_file=anat_filename,
+                          rbt=(18.3, 70, 80))#,
+#                          out_file=basename + '_Un.nii.gz')
     out_clip_level = clip_level(in_file=out_unifize.outputs.out_file)
 
     out_bet = bet(in_file=out_unifize.outputs.out_file,
