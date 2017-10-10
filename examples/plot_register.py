@@ -86,6 +86,7 @@ refit = memory.cache(afni.Refit)
 
 unifized_files = []
 masked_files = []
+##############################################################################
 # Loop through anatomical scans
 for anat_filename in retest.anat:
     # Bias-correction. Note that rbt values might be improveable
@@ -124,16 +125,10 @@ out_undump = undump(in_file=out_tstat.outputs.out_file,
 out_refit = refit(in_file=out_undump.outputs.out_file,
                   xorigin='cen', yorigin='cen', zorigin='cen')
 
+##############################################################################
 #The head is then shifted within the image to place the CoM at the image center.
 
 resample = memory.cache(afni.Resample)
-resampled_files = []
-for anat_file in retest.anat:
-    out_resample = resample(in_file=anat_file,
-                            master=out_refit.outputs.out_file,
-                            out_file=fname_presuffix(anat_file, suffix='CC'))
-    resampled_files.append(out_resample.outputs.out_file)
-
 unifized_resampled_files = []
 for unifized_file in unifized_files:
     out_resample = resample(in_file=unifized_file,
@@ -142,16 +137,6 @@ for unifized_file in unifized_files:
                                                      suffix='CC'))
     unifized_resampled_files.append(out_resample.outputs.out_file)
 
-for brain_mask_file in brain_mask_files:
-    out_resample = resample(in_file=brain_mask_file,
-                            master=out_refit.outputs.out_file,
-                            out_file=fname_presuffix(brain_mask_file,
-                                                     suffix='CC'))
-for brain_mask_file in brain_mask_files:
-    out_resample = resample(in_file=brain_mask_file,
-                            master=out_refit.outputs.out_file,
-                            out_file=fname_presuffix(brain_mask_file,
-                                                     suffix='CC'))
 masked_resampled_files = []
 for masked_file in masked_files:
     out_resample = resample(in_file=masked_file,
@@ -166,6 +151,7 @@ out_tcat = tcat(in_files=masked_files, out_file='UnBmBeCC_video.nii.gz')
 out_tstat = tstat(in_file=out_tcat.outputs.out_file,
                   out_file='UnBmBeCC_mean.nii.gz')
 
+##############################################################################
 # At this point, we achieved a translation-only registration of the raw
 # anatomical images to each other's brain's (as defined by the brain extractor)
 # CoMs.
