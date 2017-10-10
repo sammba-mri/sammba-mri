@@ -51,15 +51,15 @@ def save_composed_affines(in_files, out_file):
                                     composed_affine[2])))
     return out_file
 
-##############################################################################
 # Retrieve the data
-projectdir=/home/Promane/2014-ROMANE/5_Experimental-Plan-Experiments-Results/mouse/XNAT_CSD_MRI_MOUSE_testretest
-savedir1=$projectdir/20170925_goodbaselinetemplate; mkdir -p $savedir1
-savedir2=$projectdir/20170925_allgoodtemplate; mkdir -p $savedir2
-savedir3=$projectdir/20170925_allbaselinetemplate; mkdir -p $savedir3
-savedir4=$projectdir/20170925_goodposttemplate; mkdir -p $savedir4
+from sammba import data_fetchers
 
-find $projectdir/dl/baseline -maxdepth 1 -mindepth 1 -type d > $projectdir/allbaseline.txt
+retest = data_fetchers.fetch_zurich_test_retest(subjects=range(3))
+
+##############################################################################
+# Register using center of mass
+# -----------------------------
+# An initial coarse registration is done using brain centre of mass (CoM).
 
 conv=0.005
 twoblur=1
@@ -75,65 +75,48 @@ head_file = '/usr/share/fsl/5.0/data/standard/MNI152_T1_2mm.nii.gz'
 weight_file = '/usr/share/fsl/5.0/data/standard/MNI152_T1_2mm_brain_mask_dil.nii.gz'
 atlas_warp_file = '/usr/share/fsl/5.0/data/standard/MNI152_T1_2mm_brain.nii.gz'
 
-basenames = ['/tmp/test_anat/anat']
-anat_files = [b + '.nii.gz' for b in basenames]
-unifized_files = []
-masked_files = []
-brain_mask_files = []
 
-
-bash MRIT2_extrcen.bash $savedir $brainvol $Urad $b $t
-R=$3
-b=$4
-t=$5
-3dUnifize -prefix $dir/Un.nii.gz -input $dir/anat.nii.gz -rbt $R $b $t
-
-# Loop on subjects
-bias_correct = memory.cache(ants.N4BiasFieldCorrection)
 unifize = memory.cache(afni.Unifize)
 clip_level = memory.cache(afni.ClipLevel)
 #RATS_MM "$anat"_"$Bc".nii.gz "$anat"_"$Bc"Bm.nii.gz -v $brainvol -t $thresh
 bet = memory.cache(fsl.BET)
+apply_mask = memory.cache(fsl.ApplyMask)
 center_mass = memory.cache(afni.CenterMass)
 refit = memory.cache(afni.Refit)
-from sammba import data_fetchers
 
-retest = data_fetchers.fetch_zurich_test_retest(subjects=range(3))
+unifized_files = []
+masked_files = []
+# Loop through anatomical scans
 for anat_filename in retest.anat:
+    # Bias-correction. Note that rbt values might be improveable
     out_unifize = unifize(in_file=anat_filename,
-                          rbt=(18.3, 70, 80))#,
-#                          out_file=basename + '_Un.nii.gz')
+                          rbt=(18.3, 70, 80),
+                          out_file=fname_presuffix(anat_filename, suffix='Un'))
+
+    # Brain extraction, aided by an approximate guessed brain volume
     out_clip_level = clip_level(in_file=out_unifize.outputs.out_file)
-
-    out_bet = bet(in_file=out_unifize.outputs.out_file,
-                  out_file=basename + '_UnBm.nii.gz')
-
-    apply_mask = memory.cache(fsl.ApplyMask)
+    out_bet = bet(in_file=out_unifize.outputs.out_file)
     out_apply_mask = apply_mask(in_file=out_unifize.outputs.out_file,
-                                mask_file=out_bet.outputs.out_file,
-                                out_file=basename + '_UnBmBe.nii.gz')
+                                mask_file=out_bet.outputs.out_file)
 
+    # Set the NIfTI image centre (as defined in the header) to the CoM
+    # of the extracted brain
     out_center_mass = center_mass(in_file=out_apply_mask.outputs.out_file,
                                   cm_file='/tmp/cm.txt',
                                   set_cm=(0, 0, 0))
-
-    out_refit = refit(in_file=basename + '.nii.gz',
+    masked_files.append(out_center_mass.outputs.out_file)
+    out_refit = refit(in_file=out_unifize.outputs.out_file,
                       duporigin_file=out_center_mass.outputs.out_file)
     unifized_files.append(out_refit.outputs.out_file)
-    out_refit = refit(in_file=basename + '_Un.nii.gz',
-                      duporigin_file=basename + '_UnBmBe.nii.gz')
-    brain_mask_files.append(out_refit.outputs.out_file)
-    out_refit = refit(in_file=basename + '_UnBm.nii.gz',
-                      duporigin_file=basename + '_UnBmBe.nii.gz')
-    masked_files.append(out_refit.outputs.out_file)
 
+# Quality check videos
 tcat = memory.cache(afni.TCat)
-out_tcat = tcat(in_files=unifized_files, out_file='Un_video.nii.gz')
 tstat = memory.cache(afni.TStat)
+out_tcat = tcat(in_files=unifized_files, out_file='Un_video.nii.gz')
 out_tstat = tstat(in_file=out_tcat.outputs.out_file, out_file='Un_mean.nii.gz')
-out_tcat = tcat(in_files=masked_files, out_file='UnBmBe_video.nii.gz')
+out_tcat = tcat(in_files=masked_files, out_file='Un_masked_video.nii.gz')
 out_tstat = tstat(in_file=out_tcat.outputs.out_file,
-                  out_file='UnBmBe_mean.nii.gz')
+                  out_file='Un_masked_mean.nii.gz')
 
 undump = memory.cache(afni.Undump)
 out_undump = undump(in_file=out_tstat.outputs.out_file,
@@ -141,9 +124,11 @@ out_undump = undump(in_file=out_tstat.outputs.out_file,
 out_refit = refit(in_file=out_undump.outputs.out_file,
                   xorigin='cen', yorigin='cen', zorigin='cen')
 
+#The head is then shifted within the image to place the CoM at the image center.
+
 resample = memory.cache(afni.Resample)
 resampled_files = []
-for anat_file in anat_files:
+for anat_file in retest.anat:
     out_resample = resample(in_file=anat_file,
                             master=out_refit.outputs.out_file,
                             out_file=fname_presuffix(anat_file, suffix='CC'))
@@ -180,6 +165,10 @@ out_tstat = tstat(in_file=out_tcat.outputs.out_file,
 out_tcat = tcat(in_files=masked_files, out_file='UnBmBeCC_video.nii.gz')
 out_tstat = tstat(in_file=out_tcat.outputs.out_file,
                   out_file='UnBmBeCC_mean.nii.gz')
+
+# At this point, we achieved a translation-only registration of the raw
+# anatomical images to each other's brain's (as defined by the brain extractor)
+# CoMs.
 
 ##############################################################################
 # Shift rotation
