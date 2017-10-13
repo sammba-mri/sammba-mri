@@ -27,8 +27,6 @@ memory = Memory('/tmp')
 # Register using center of mass
 # -----------------------------
 # An initial coarse registration is done using brain centre of mass (CoM).
-
-
 unifize = memory.cache(afni.Unifize)
 clip_level = memory.cache(afni.ClipLevel)
 #RATS_MM "$anat"_"$Bc".nii.gz "$anat"_"$Bc"Bm.nii.gz -v $brainvol -t $thresh
@@ -37,8 +35,8 @@ apply_mask = memory.cache(fsl.ApplyMask)
 center_mass = memory.cache(afni.CenterMass)
 refit = memory.cache(afni.Refit)
 
-unifized_files = []
-unifized_masked_files = []
+head_files = []
+brain_files = []
 
 ##############################################################################
 # Loop through anatomical scans
@@ -59,18 +57,18 @@ for anat_filename in retest.anat:
     out_center_mass = center_mass(in_file=out_apply_mask.outputs.out_file,
                                   cm_file='/tmp/cm.txt',
                                   set_cm=(0, 0, 0))
-    unifized_masked_files.append(out_center_mass.outputs.out_file)
+    brain_files.append(out_center_mass.outputs.out_file)
     out_refit = refit(in_file=out_unifize.outputs.out_file,
                       duporigin_file=out_center_mass.outputs.out_file)
-    unifized_files.append(out_refit.outputs.out_file)
+    head_files.append(out_refit.outputs.out_file)
 
 ##############################################################################
 # Quality check videos and template
 tcat = memory.cache(afni.TCat)
 tstat = memory.cache(afni.TStat)
-out_tcat = tcat(in_files=unifized_files, out_file='Un_video.nii.gz')
+out_tcat = tcat(in_files=head_files, out_file='Un_video.nii.gz')
 _ = tstat(in_file=out_tcat.outputs.out_file, out_file='Un_mean.nii.gz')
-out_tcat = tcat(in_files=unifized_masked_files, out_file='UnBmBe_video.nii.gz')
+out_tcat = tcat(in_files=brain_files, out_file='UnBmBe_video.nii.gz')
 out_tstat = tstat(in_file=out_tcat.outputs.out_file,
                   out_file='UnBmBe_mean.nii.gz')
 
@@ -86,25 +84,25 @@ out_refit = refit(in_file=out_undump.outputs.out_file,
 # The head is then shifted within the image to place the CoM at the image
 # center.
 resample = memory.cache(afni.Resample)
-resampled_files = []
-for unifized_file in unifized_files:
-    out_resample = resample(in_file=unifized_file,
+shifted_head_files = []
+for head_file in head_files:
+    out_resample = resample(in_file=head_file,
                             master=out_refit.outputs.out_file,
                             out_file='UnCC.nii.gz')
-    resampled_files.append(out_resample.outputs.out_file)
+    shifted_head_files.append(out_resample.outputs.out_file)
 
-masked_resampled_files = []
-for masked_file in unifized_masked_files:
-    out_resample = resample(in_file=masked_file,
+shifted_brain_files = []
+for brain_file in brain_files:
+    out_resample = resample(in_file=brain_file,
                             master=out_refit.outputs.out_file,
                             out_file='UnBmBeCC.nii.gz')
-    masked_resampled_files.append(out_resample.outputs.out_file)
+    shifted_brain_files.append(out_resample.outputs.out_file)
 
 ##############################################################################
 # Quality check videos and template
-out_tcat = tcat(in_files=resampled_files, out_file='UnCC_video.nii.gz')
+out_tcat = tcat(in_files=brain_files, out_file='UnCC_video.nii.gz')
 _ = tstat(in_file=out_tcat.outputs.out_file, out_file='UnCC_mean.nii.gz')
-out_tcat = tcat(in_files=masked_resampled_files, out_file='UnBmBeCC_video.nii.gz')
+out_tcat = tcat(in_files=shifted_brain_files, out_file='UnBmBeCC_video.nii.gz')
 out_tstat_bm = tstat(in_file=out_tcat.outputs.out_file,
                      out_file='UnBmBeCC_mean.nii.gz')
 
@@ -123,39 +121,41 @@ out_tstat_bm = tstat(in_file=out_tcat.outputs.out_file,
 # biased, a nicely-aligned individual.
 
 allineate = memory.cache(afni.Allineate)
-masked_allineated_files = []
-transform_matrices = []
-for masked_resampled_file in masked_resampled_files:
-    out_allineate = allineate(in_file=masked_resampled_file,
+shift_rotated_brain_files = []
+rigid_transform_files = []
+for shifted_brain_file in shifted_brain_files:
+    out_allineate = allineate(in_file=shifted_brain_file,
                               reference=out_tstat_bm.outputs.out_file,
                               out_matrix='UnBmBeCCAl3.aff12.1D',
                               convergence=0.005,
                               two_blur=1,
                               warp_type='shift_rotate',
                               out_file='UnBmBeCCAl3.nii.gz')
-    transform_matrices.append(out_allineate.outputs.out_matrix)
-    masked_allineated_files.append(out_allineate.outputs.out_file)
+    rigid_transform_files.append(out_allineate.outputs.out_matrix)
+    shift_rotated_brain_files.append(out_allineate.outputs.out_file)
 
 ##############################################################################
 # Application to the whole head image. can also be used for a good
 # demonstration of linear vs. non-linear registration quality
-allineated_files = []
-for resampled_file, transform_matrix in zip(resampled_files,
-                                            transform_matrices):
-    out_allineate = allineate(in_file=resampled_file,
+shift_rotated_head_files = []
+for shifted_head_file, transform_matrix in zip(shifted_head_files,
+                                               rigid_transform_files):
+    out_allineate = allineate(in_file=shifted_head_file,
                               master=out_tstat_bm.outputs.out_file,
                               in_matrix=transform_matrix,
                               out_file='UnBmBeCCAa3.nii.gz')
-    allineated_files.append(out_allineate.outputs.out_file)
+    shift_rotated_head_files.append(out_allineate.outputs.out_file)
 
 ##############################################################################
 # Quality check videos and template
-out_tcat = tcat(in_files=masked_allineated_files, out_file='shr_video.nii.gz')
+out_tcat = tcat(in_files=shift_rotated_brain_files,
+                out_file='shr_video.nii.gz')
 _ = tstat(in_file=out_tcat.outputs.out_file, out_file='shr_mean.nii.gz')
 
 ##############################################################################
 # Note that this rigid body registration may need to be run more than once.
-out_tcat = tcat(in_files=allineated_files, out_file='shr_videohead.nii.gz')
+out_tcat = tcat(in_files=shift_rotated_head_files,
+                out_file='shr_videohead.nii.gz')
 out_tstat_shr = tstat(in_file=out_tcat.outputs.out_file,
                       out_file='shr_meanhead.nii.gz')
 mask_tool = memory.cache(afni.MaskTool)
@@ -193,11 +193,11 @@ out_mask_tool = mask_tool(in_file=out_tcat.outputs.out_file, count=True,
 
 # We begin by achieving an affine registration on aligned heads.
 # A weighting mask is used to ...
-composed_affine_files = []
+affine_transform_files = []
 allineated_head_files = []
 catmatvec = memory.cache(afni.CatMatvec)
-for allineated_file, transform_matrix in zip(allineated_files,
-                                             transform_matrices):
+for allineated_file, rigid_transform_file in zip(shift_rotated_head_files,
+                                                 rigid_transform_files):
     out_allineate = allineate(in_file=allineated_file,
                               reference=out_tstat_shr.outputs.out_file,
                               out_matrix='UnBmBeAl4.aff12.1D',
@@ -207,44 +207,45 @@ for allineated_file, transform_matrix in zip(allineated_files,
                               weight=out_mask_tool.outputs.out_file,
                               out_file='UnCCAl4.nii.gz')
     allineated_head_files.append(out_allineate.outputs.out_file)
-    catmatvec_out_file = os.path.join(os.path.dirname(transform_matrix),
+    catmatvec_out_file = os.path.join(os.path.dirname(rigid_transform_file),
                                       'UnBmBeCCAl3UnCCAl4.aff12.1D')
-    out_catmatvec = catmatvec(in_file=[(transform_matrix, 'ONELINE'),
+    out_catmatvec = catmatvec(in_file=[(rigid_transform_file, 'ONELINE'),
                                        (out_allineate.outputs.out_matrix,
                                         'ONELINE')],
                               out_file=catmatvec_out_file)
-    composed_affine_files.append(catmatvec_out_file)
+    affine_transform_files.append(catmatvec_out_file)
 
 ##############################################################################
 # Each resulting registration matrix is concatenated to the corresponding
 # rigid bory registration matrix then directly applied to the CoM brain
 # and head, reducing reslice errors in the final result.
-masked_aa4 = []
-for masked_allineated_file, composed_affine_file in zip(
-        masked_allineated_files, composed_affine_files):
-    out_allineate = allineate(in_file=masked_allineated_file,
+allineated_brain_files = []
+for shifted_rotated_brain_file, affine_transform_file in zip(
+        shift_rotated_brain_files, affine_transform_files):
+    out_allineate = allineate(in_file=shift_rotated_brain_files,
                               master=out_tstat_shr.outputs.out_file,
-                              in_matrix=composed_affine_file,
+                              in_matrix=affine_transform_file,
                               out_file='UnBmBeCCAa4.nii.gz')
-    masked_aa4.append(out_allineate.outputs.out_file)
+    allineated_brain_files.append(out_allineate.outputs.out_file)
 
 ##############################################################################
 # The application to the whole head image can also be used for a good
 # demonstration of linear vs. non-linear registration quality.
-unifized_aa4 = []
-for allineated_head_file, composed_affine_file in zip(allineated_head_files,
-                                                      composed_affine_files):
+allineated_head_files = []
+for allineated_head_file, affine_transform_file in zip(allineated_head_files,
+                                                       affine_transform_files):
     out_allineate = allineate(in_file=allineated_head_file,
                               master=out_tstat_shr.outputs.out_file,
-                              in_matrix=composed_affine_file,
+                              in_matrix=affine_transform_file,
                               out_file='UnCCAa.nii.gz')
-    unifized_aa4.append(out_allineate.outputs.out_file)
+    allineated_head_files.append(out_allineate.outputs.out_file)
 
 ##############################################################################
 # Quality check videos and template
-out_tcat = tcat(in_files=masked_aa4, out_file='aff4_video.nii.gz')
+out_tcat = tcat(in_files=allineated_brain_files, out_file='aff4_video.nii.gz')
 _ = tstat(in_file=out_tcat.outputs.out_file, out_file='aff4_mean.nii.gz')
-out_tcat_head = tcat(in_files=unifized_aa4, out_file='aff4_videohead.nii.gz')
+out_tcat_head = tcat(in_files=allineated_head_files,
+                     out_file='aff4_videohead.nii.gz')
 out_tstat_affine_head = tstat(in_file=out_tcat_head.outputs.out_file,
                               out_file='aff4_meanhead.nii.gz')
 
@@ -268,14 +269,15 @@ nwarp_cat = memory.cache(afni.NwarpCat)
 qwarp = memory.cache(afni.Qwarp)
 warped_files = []
 warp_files = []
-for composed_affine_file, aa4 in zip(composed_affine_files, unifized_aa4):
-    out_qwarp = qwarp(in_file=aa4,
+for affine_transform_file, allineated_head_file in zip(affine_transform_files,
+                                                       allineated_head_files):
+    out_qwarp = qwarp(in_file=allineated_head_file,
                       base_file=out_tstat_affine_head.outputs.out_file,
                       nmi=True,
                       noneg=True,
                       iwarp=True,
                       weight=out_mask_tool.outputs.out_file,
-                      iniwarp=[composed_affine_file],
+                      iniwarp=[affine_transform_file],
                       inilev=0,
                       maxlev=4,
                       out_file='UnCCQw1.nii.gz')
@@ -294,11 +296,11 @@ out_tstat_warp_head = tstat(in_file=out_tcat.outputs.out_file,
 # initially; I forget why, I think it is to avoid some weird bug.
 warped_files2 = []
 warp_files2 = []
-for warp_file, aa4_file in zip(warp_files, unifized_aa4):
+for warp_file, allineated_head_file in zip(warp_files, allineated_head_files):
     out_nwarp_cat = nwarp_cat(
         in_files=[('IDENT', out_tstat_warp_head.outputs.out_file),
                   warp_file], out_file='iniwarp.nii.gz')
-    out_qwarp = qwarp(in_file=aa4_file,
+    out_qwarp = qwarp(in_file=allineated_head_file,
                       base_file=out_tstat_warp_head.outputs.out_file,
                       nmi=True,
                       noneg=True,
@@ -320,8 +322,8 @@ out_tstat_warp_head2 = tstat(in_file=out_tcat.outputs.out_file,
 # Warp with mini-patch
 warped_files3 = []
 warp_files3 = []
-for warp_file, aa4_file in zip(warp_files2, unifized_aa4):
-    out_qwarp = qwarp(in_file=aa4_file,
+for warp_file, allineated_head_file in zip(warp_files2, allineated_head_files):
+    out_qwarp = qwarp(in_file=allineated_head_file,
                       base_file=out_tstat_warp_head2.outputs.out_file,
                       nmi=True,
                       noneg=True,
@@ -340,8 +342,8 @@ out_tstat_warp_head3 = tstat(in_file=out_tcat.outputs.out_file,
 
 # Final warp
 warped_files4 = []
-for warp_file, aa4_file in zip(warp_files3, unifized_aa4):
-    out_qwarp = qwarp(in_file=aa4_file,
+for warp_file, allineated_head_file in zip(warp_files3, allineated_head_files):
+    out_qwarp = qwarp(in_file=allineated_head_file,
                       base_file=out_tstat_warp_head3.outputs.out_file,
                       nmi=True,
                       noneg=True,
@@ -356,15 +358,15 @@ for warp_file, aa4_file in zip(warp_files3, unifized_aa4):
 out_tcat = tcat(in_files=warped_files4, out_file='Qw4_videohead.nii.gz')
 out_tstat_warp_head4 = tstat(in_file=out_tcat.outputs.out_file,
                              out_file='Qw4_meanhead.nii.gz')
-
+stop
 ##############################################################################
 # Registration to template
 # ------------------------
 # Apply warp to anat and atlas
 # Apply non-linear registration results to uncorrected images
 warp_apply = memory.cache(afni.NwarpApply)
-for resampled_file, warp_file in zip(resampled_files, warp_files):
-    out_warp_apply = warp_apply(in_file=resampled_file,
+for head_file, warp_file in zip(head_files, warp_files):
+    out_warp_apply = warp_apply(in_file=head_file,
                                 warp=warp_file,
                                 master=out_tstat.outputs.out_file,
                                 out_file='Na.nii.gz')
