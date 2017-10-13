@@ -173,11 +173,11 @@ out_mask_tool = mask_tool(in_file=out_tcat.outputs.out_file, count=True,
 import os
 
 affine_transform_files = []
-allineated_head_files = []
+allineated_head_files1 = []
 catmatvec = memory.cache(afni.CatMatvec)
-for allineated_file, rigid_transform_file in zip(shift_rotated_head_files,
-                                                 rigid_transform_files):
-    out_allineate = allineate(in_file=allineated_file,
+for shift_rotated_head_file, rigid_transform_file in zip(shift_rotated_head_files,
+                                                         rigid_transform_files):
+    out_allineate = allineate(in_file=shift_rotated_head_file,
                               reference=out_tstat_shr.outputs.out_file,
                               out_matrix='UnBmBeAl4.aff12.1D',
                               convergence=0.005,
@@ -185,7 +185,7 @@ for allineated_file, rigid_transform_file in zip(shift_rotated_head_files,
                               one_pass=True,
                               weight=out_mask_tool.outputs.out_file,
                               out_file='UnCCAl4.nii.gz')
-    allineated_head_files.append(out_allineate.outputs.out_file)
+    allineated_head_files1.append(out_allineate.outputs.out_file)
     catmatvec_out_file = os.path.join(os.path.dirname(rigid_transform_file),
                                       'UnBmBeCCAl3UnCCAl4.aff12.1D')
     out_catmatvec = catmatvec(in_file=[(rigid_transform_file, 'ONELINE'),
@@ -210,20 +210,20 @@ for shift_rotated_brain_file, affine_transform_file in zip(
 ##############################################################################
 # The application to the whole head image can also be used for a good
 # demonstration of linear vs. non-linear registration quality.
-allineated_head_files2 = []
-for allineated_head_file, affine_transform_file in zip(allineated_head_files,
+allineated_head_files = []
+for allineated_head_file, affine_transform_file in zip(allineated_head_files1,
                                                        affine_transform_files):
     out_allineate = allineate(in_file=allineated_head_file,
                               master=out_tstat_shr.outputs.out_file,
                               in_matrix=affine_transform_file,
                               out_file='UnCCAa.nii.gz')
-    allineated_head_files2.append(out_allineate.outputs.out_file)
+    allineated_head_files.append(out_allineate.outputs.out_file)
 
 ##############################################################################
 # Quality check videos and template
 out_tcat = tcat(in_files=allineated_brain_files, out_file='aff4_video.nii.gz')
 _ = tstat(in_file=out_tcat.outputs.out_file, out_file='aff4_mean.nii.gz')
-out_tcat_head = tcat(in_files=allineated_head_files2,
+out_tcat_head = tcat(in_files=allineated_head_files,
                      out_file='aff4_videohead.nii.gz')
 out_tstat_allineated_head = tstat(in_file=out_tcat_head.outputs.out_file,
                                   out_file='aff4_meanhead.nii.gz')
@@ -248,9 +248,9 @@ nwarp_cat = memory.cache(afni.NwarpCat)
 qwarp = memory.cache(afni.Qwarp)
 warped_files = []
 warp_files = []
-for affine_transform_file, allineated_head_file in zip(affine_transform_files,
-                                                       allineated_head_files):
-    out_qwarp = qwarp(in_file=allineated_head_file,
+for affine_transform_file, shifted_head_file in zip(affine_transform_files,
+                                                    shifted_head_files):
+    out_qwarp = qwarp(in_file=shifted_head_file,
                       base_file=out_tstat_allineated_head.outputs.out_file,
                       nmi=True,
                       noneg=True,
@@ -275,11 +275,11 @@ out_tstat_warp_head = tstat(in_file=out_tcat.outputs.out_file,
 # initially; I forget why, I think it is to avoid some weird bug.
 warped_files2 = []
 warp_files2 = []
-for warp_file, allineated_head_file in zip(warp_files, allineated_head_files):
+for warp_file, shifted_head_file in zip(warp_files, shifted_head_files):
     out_nwarp_cat = nwarp_cat(
         in_files=[('IDENT', out_tstat_warp_head.outputs.out_file),
                   warp_file], out_file='iniwarp.nii.gz')
-    out_qwarp = qwarp(in_file=allineated_head_file,
+    out_qwarp = qwarp(in_file=shifted_head_file,
                       base_file=out_tstat_warp_head.outputs.out_file,
                       nmi=True,
                       noneg=True,
@@ -301,8 +301,8 @@ out_tstat_warp_head2 = tstat(in_file=out_tcat.outputs.out_file,
 # Warp with mini-patch
 warped_files3 = []
 warp_files3 = []
-for warp_file, allineated_head_file in zip(warp_files2, allineated_head_files):
-    out_qwarp = qwarp(in_file=allineated_head_file,
+for warp_file, shifted_head_file in zip(warp_files2, shifted_head_files):
+    out_qwarp = qwarp(in_file=shifted_head_file,
                       base_file=out_tstat_warp_head2.outputs.out_file,
                       nmi=True,
                       noneg=True,
@@ -322,8 +322,8 @@ out_tstat_warp_head3 = tstat(in_file=out_tcat.outputs.out_file,
 ##############################################################################
 # Final warp
 warped_files4 = []
-for warp_file, allineated_head_file in zip(warp_files3, allineated_head_files):
-    out_qwarp = qwarp(in_file=allineated_head_file,
+for warp_file, shifted_head_file in zip(warp_files3, shifted_head_files):
+    out_qwarp = qwarp(in_file=shifted_head_file,
                       base_file=out_tstat_warp_head3.outputs.out_file,
                       nmi=True,
                       noneg=True,
