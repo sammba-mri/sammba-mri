@@ -14,7 +14,7 @@ variable head tissue.
 # Retrieve the data
 from sammba import data_fetchers
 
-retest = data_fetchers.fetch_zurich_test_retest(subjects=range(3))
+retest = data_fetchers.fetch_zurich_test_retest(subjects=range(2))
 
 ##############################################################################
 # and define the caching repository
@@ -36,35 +36,41 @@ apply_mask = memory.cache(fsl.ApplyMask)
 center_mass = memory.cache(afni.CenterMass)
 refit = memory.cache(afni.Refit)
 
-head_files = []
-brain_files = []
-
 ##############################################################################
-# Loop through anatomical scans
+# First we loop through anatomical scans and correct intensities for bias.
+unifized_files = []
 for anat_filename in retest.anat:
-    # Bias-correction. Note that rbt values might be improveable
+    # rbt values might be improveable
     out_unifize = unifize(in_file=anat_filename, rbt=(18.3, 70, 80),
                           out_file='Un.nii.gz')
+    unifized_files.append(out_unifize.outputs.out_file)
 
-    # Brain extraction, aided by an approximate guessed brain volume
-    out_clip_level = clip_level(in_file=out_unifize.outputs.out_file)
+##############################################################################
+# Second extract brains, aided by an approximate guessed brain volume,
+# and set the NIfTI image centre (as defined in the header) to the CoM
+# of the extracted brain.
+brain_files = []
+for unifized_file in unifized_files:
+    out_clip_level = clip_level(in_file=unifized_file)
     out_bet = bet(in_file=out_unifize.outputs.out_file)
-    out_apply_mask = apply_mask(in_file=out_unifize.outputs.out_file,
+    out_apply_mask = apply_mask(in_file=unifized_file,
                                 mask_file=out_bet.outputs.out_file,
                                 out_file='UnBmBe.nii.gz')
 
-    # Set the NIfTI image centre (as defined in the header) to the CoM
-    # of the extracted brain
     out_center_mass = center_mass(in_file=out_apply_mask.outputs.out_file,
                                   cm_file='/tmp/cm.txt',
                                   set_cm=(0, 0, 0))
     brain_files.append(out_center_mass.outputs.out_file)
-    out_refit = refit(in_file=out_unifize.outputs.out_file,
-                      duporigin_file=out_center_mass.outputs.out_file)
+
+##############################################################################
+# Same header change, for head files.
+head_files = []
+for brain_file in brain_files:
+    out_refit = refit(in_file=unifized_file, duporigin_file=brain_file)
     head_files.append(out_refit.outputs.out_file)
 
 ##############################################################################
-# Quality check videos and template
+# Quality check videos and average head and brain.
 tcat = memory.cache(afni.TCat)
 tstat = memory.cache(afni.TStat)
 out_tcat = tcat(in_files=head_files, out_file='Un_video.nii.gz')
@@ -82,8 +88,8 @@ out_refit = refit(in_file=out_undump.outputs.out_file,
                   xorigin='cen', yorigin='cen', zorigin='cen')
 
 ##############################################################################
-# The head is then shifted within the image to place the CoM at the image
-# center.
+# Finally, shift heads and brains within the images to place the CoM at the
+# image center.
 resample = memory.cache(afni.Resample)
 shifted_head_files = []
 for head_file in head_files:
@@ -297,7 +303,8 @@ out_tstat_warp_head2 = tstat(in_file=out_tcat.outputs.out_file,
                              out_file='Qw2_meanhead.nii.gz')
 
 ##############################################################################
-# Such possibilities can be exploited to avoid building up reslice errors. XXX check with Nad
+# Using previous files and concatenated transforms can be exploited to avoid
+# building up reslice errors.
 # Warp with mini-patch
 warped_files3 = []
 warp_files3 = []
@@ -318,6 +325,9 @@ for warp_file, shifted_head_file in zip(warp_files2, shifted_head_files):
 out_tcat = tcat(in_files=warped_files3, out_file='Qw3_videohead.nii.gz')
 out_tstat_warp_head3 = tstat(in_file=out_tcat.outputs.out_file,
                              out_file='Qw3_meanhead.nii.gz')
+
+##############################################################################
+# In this particular case, minpathc=13 corresponds to a level of 10
 
 ##############################################################################
 # Final warp
