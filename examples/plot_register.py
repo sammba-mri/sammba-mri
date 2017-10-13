@@ -4,65 +4,18 @@ Template creation
 
 Here we show how to create a template from multiple anatomical scans.
 """
-import numpy as np
-from nipype.interfaces import afni, fsl, ants
-from nipype.caching import Memory
-from nipype.utils.filemanip import fname_presuffix
-
-
-def save_inverted_affine(oned_matrix_file, inverted_matrix_file):
-    u11, u12, u13, v1, u21, u22, u23, v2, u31, u32, u33, v3 = np.loadtxt(
-        oned_matrix_file)
-    u = np.array([[u11, u12, u13], [u21, u22, u23], [u31, u32, u33]])
-    v = np.array([v1, v2, v3])
-    u_new = np.linalg.inv(u)
-    v_new = -u_new.dot(v)
-    np.savetxt(inverted_matrix_file,
-               np.hstack((u_new[0], v_new[:1], u_new[1], v_new[1:2],
-                          u_new[2], v_new[2:])))
-
-
-def _compose_affines(in_affines):
-    if len(in_affines) > 1:
-        composed_affine = np.zeros((3, 4))
-        previous_composed_affine = _compose_affines(in_affines[:-1])
-        composed_affine[:, :3] = in_affines[1][:, :3].dot(
-            previous_composed_affine[:, :3])
-        composed_affine[:, 3] = in_affines[1][:, 3] +\
-            in_affines[1][:, :3].dot(previous_composed_affine[:, 3])
-        return composed_affine
-    elif len(in_affines) == 1:
-        return in_affines[0]
-    else:
-        raise ValueError('Can not compose empty list of affines')
-
 import os
+import numpy as np
+from nipype.interfaces import afni, fsl
+from nipype.caching import Memory
 
-
-def save_composed_affines(in_files, out_file):
-    in_affines = []
-    for in_affine_file in in_files:
-        u11, u12, u13, v1, u21, u22, u23, v2, u31, u32, u33, v3 = np.loadtxt(
-            in_affine_file)
-        u = np.array([[u11, u12, u13], [u21, u22, u23], [u31, u32, u33]])
-        v = np.array([[v1], [v2], [v3]])
-        in_affines.append(np.hstack((u, v)))
-
-    composed_affine = _compose_affines(in_affines)
-    out_file = os.path.abspath(out_file)
-    np.savetxt(out_file, np.hstack((composed_affine[0], composed_affine[1],
-                                    composed_affine[2])))
-    return out_file
-
-
-def save_stacked_volumes(volumes):
-    """ Computes a video of stacked volumes, as well as their average.
-    """
 
 # Retrieve the data
 from sammba import data_fetchers
 
 retest = data_fetchers.fetch_zurich_test_retest(subjects=range(3))
+memory = Memory('/tmp')
+
 # Initially, registration is of extracted brains. Once these are reasonably
 # aligned, whole heads are registered, weighted by masks that, if parameters
 # are chosen well, include some scalp. The amount of scalp is hopefully enough
@@ -75,11 +28,6 @@ retest = data_fetchers.fetch_zurich_test_retest(subjects=range(3))
 # -----------------------------
 # An initial coarse registration is done using brain centre of mass (CoM).
 
-conv=0.005
-twoblur=1
-brainvol=400
-
-memory = Memory('/tmp')
 
 unifize = memory.cache(afni.Unifize)
 clip_level = memory.cache(afni.ClipLevel)
