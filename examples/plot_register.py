@@ -333,6 +333,7 @@ out_tstat_warp_head3 = tstat(in_file=out_tcat.outputs.out_file,
 ##############################################################################
 # Final warp
 warped_files4 = []
+warp_files4 = []
 for warp_file, shifted_head_file in zip(warp_files3, shifted_head_files):
     out_qwarp = qwarp(in_file=shifted_head_file,
                       base_file=out_tstat_warp_head3.outputs.out_file,
@@ -345,31 +346,28 @@ for warp_file, shifted_head_file in zip(warp_files3, shifted_head_files):
                       minpatch=9,
                       out_file='UnCCQw4.nii.gz')
     warped_files4.append(out_qwarp.outputs.warped_source)
+    warp_files4.append(out_qwarp.outputs.source_warp)
 
 out_tcat = tcat(in_files=warped_files4, out_file='Qw4_videohead.nii.gz')
 out_tstat_warp_head4 = tstat(in_file=out_tcat.outputs.out_file,
                              out_file='Qw4_meanhead.nii.gz')
-stop
+
 ##############################################################################
 # Registration to template
 # ------------------------
-# Apply warp to anat and atlas
 # Apply non-linear registration results to uncorrected images
 warp_apply = memory.cache(afni.NwarpApply)
-for head_file, warp_file in zip(head_files, warp_files):
+for head_file, warp_file in zip(head_files, warp_files4):
     out_warp_apply = warp_apply(in_file=head_file,
                                 warp=warp_file,
-                                master=out_tstat.outputs.out_file,
+                                master=out_tstat_warp_head4.outputs.out_file,
                                 out_file='Na.nii.gz')
 
-# Transform the atlas from template space to individual spaces
-# This can then be useful for morphological measurements in each individual.
-for resampled_file, warp_file in zip(resampled_files, warp_files):
-    out_nwarp_cat = nwarp_cat(in_files=[('INV', warp_file),
-                                        atlas_warp_file],  # check with Nad
-                              out_file='atlas_WARPINV.nii.gz')
-    out_warp_apply = warp_apply(in_file=resampled_file,
-                                warp=warp_file,
-                                master=out_tstat.outputs.out_file,
-                                ainterp='NN',
-                                out_file='atlas_Na.nii.gz')
+##############################################################################
+# Visualize one individual anat on top of template
+from nilearn import plotting
+
+display = plotting.plot_anat(out_warp_apply.outputs.out_file)
+display.add_edges(out_tstat_warp_head4.outputs.out_file)
+
+plotting.show()
