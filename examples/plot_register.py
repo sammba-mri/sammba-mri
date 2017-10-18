@@ -29,12 +29,6 @@ memory = Memory('/tmp')
 from nipype.interfaces import afni, fsl
 
 unifize = memory.cache(afni.Unifize)
-clip_level = memory.cache(afni.ClipLevel)
-#RATS_MM "$anat"_"$Bc".nii.gz "$anat"_"$Bc"Bm.nii.gz -v $brainvol -t $thresh
-bet = memory.cache(fsl.BET)
-apply_mask = memory.cache(fsl.ApplyMask)
-center_mass = memory.cache(afni.CenterMass)
-refit = memory.cache(afni.Refit)
 
 ##############################################################################
 # First we loop through anatomical scans and correct intensities for bias.
@@ -49,14 +43,22 @@ for anat_filename in retest.anat:
 # Second extract brains, aided by an approximate guessed brain volume,
 # and set the NIfTI image centre (as defined in the header) to the CoM
 # of the extracted brain.
+from sammba.interfaces import RatsMM
+
+clip_level = memory.cache(afni.ClipLevel)
+rats = memory.cache(RatsMM)
+apply_mask = memory.cache(fsl.ApplyMask)
+center_mass = memory.cache(afni.CenterMass)
 brain_files = []
 for unifized_file in unifized_files:
     out_clip_level = clip_level(in_file=unifized_file)
-    out_bet = bet(in_file=out_unifize.outputs.out_file)
+    out_rats = rats(in_file=unifized_file,
+                    out_file='UnBm.nii.gz',
+                    volume_threshold=400,
+                    intensity_threshold=int(out_clip_level.outputs.clip_val))
     out_apply_mask = apply_mask(in_file=unifized_file,
-                                mask_file=out_bet.outputs.out_file,
+                                mask_file=out_rats.outputs.out_file,
                                 out_file='UnBmBe.nii.gz')
-
     out_center_mass = center_mass(in_file=out_apply_mask.outputs.out_file,
                                   cm_file='/tmp/cm.txt',
                                   set_cm=(0, 0, 0))
@@ -64,6 +66,7 @@ for unifized_file in unifized_files:
 
 ##############################################################################
 # Same header change, for head files.
+refit = memory.cache(afni.Refit)
 head_files = []
 for brain_file in brain_files:
     out_refit = refit(in_file=unifized_file, duporigin_file=brain_file)
@@ -179,7 +182,6 @@ out_mask_tool = mask_tool(in_file=out_tcat.outputs.out_file, count=True,
 import os
 
 affine_transform_files = []
-allineated_head_files1 = []
 catmatvec = memory.cache(afni.CatMatvec)
 for shift_rotated_head_file, rigid_transform_file in zip(shift_rotated_head_files,
                                                          rigid_transform_files):
@@ -191,7 +193,6 @@ for shift_rotated_head_file, rigid_transform_file in zip(shift_rotated_head_file
                               one_pass=True,
                               weight=out_mask_tool.outputs.out_file,
                               out_file='UnCCAl4.nii.gz')
-    allineated_head_files1.append(out_allineate.outputs.out_file)
     catmatvec_out_file = os.path.join(os.path.dirname(rigid_transform_file),
                                       'UnBmBeCCAl3UnCCAl4.aff12.1D')
     out_catmatvec = catmatvec(in_file=[(rigid_transform_file, 'ONELINE'),
@@ -205,9 +206,9 @@ for shift_rotated_head_file, rigid_transform_file in zip(shift_rotated_head_file
 # rigid bory registration matrix then directly applied to the CoM brain
 # and head, reducing reslice errors in the final result.
 allineated_brain_files = []
-for shift_rotated_brain_file, affine_transform_file in zip(
-        shift_rotated_brain_files, affine_transform_files):
-    out_allineate = allineate(in_file=shift_rotated_brain_file,
+for shifted_brain_file, affine_transform_file in zip(
+        shifted_brain_files, affine_transform_files):
+    out_allineate = allineate(in_file=shifted_brain_file,
                               master=out_tstat_shr.outputs.out_file,
                               in_matrix=affine_transform_file,
                               out_file='UnBmBeCCAa4.nii.gz')
@@ -217,9 +218,9 @@ for shift_rotated_brain_file, affine_transform_file in zip(
 # The application to the whole head image can also be used for a good
 # demonstration of linear vs. non-linear registration quality.
 allineated_head_files = []
-for allineated_head_file, affine_transform_file in zip(allineated_head_files1,
-                                                       affine_transform_files):
-    out_allineate = allineate(in_file=allineated_head_file,
+for shifted_head_file, affine_transform_file in zip(shifted_brain_files,
+                                                    affine_transform_files):
+    out_allineate = allineate(in_file=shifted_head_file,
                               master=out_tstat_shr.outputs.out_file,
                               in_matrix=affine_transform_file,
                               out_file='UnCCAa.nii.gz')
