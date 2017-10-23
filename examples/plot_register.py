@@ -249,7 +249,7 @@ for affine_transform_file, shifted_head_file in zip(affine_transform_files,
                       weight=out_mask_tool.outputs.out_file,
                       iniwarp=[affine_transform_file],
                       inilev=0,
-                      maxlev=4,
+                      maxlev=2,
                       outputtype='NIFTI_GZ')
     warp_files.append(out_qwarp.outputs.source_warp)
     warped_files.append(out_qwarp.outputs.warped_source)
@@ -277,8 +277,8 @@ for warp_file, shifted_head_file in zip(warp_files, shifted_head_files):
                       iwarp=True,
                       weight=out_mask_tool.outputs.out_file,
                       iniwarp=[out_nwarp_cat.outputs.out_file],
-                      inilev=5,
-                      maxlev=7,
+                      inilev=3,
+                      maxlev=4,
                       outputtype='NIFTI_GZ')
     warp_files2.append(out_qwarp.outputs.source_warp)
     warped_files2.append(out_qwarp.outputs.warped_source)
@@ -301,8 +301,8 @@ for warp_file, shifted_head_file in zip(warp_files2, shifted_head_files):
                       iwarp=True,
                       weight=out_mask_tool.outputs.out_file,
                       iniwarp=[warp_file],
-                      inilev=8,
-                      minpatch=13,
+                      inilev=5,
+                      minpatch=6,
                       out_file='UnCCQw3.nii.gz')
     warped_files3.append(out_qwarp.outputs.warped_source)
     warp_files3.append(out_qwarp.outputs.source_warp)
