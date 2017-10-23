@@ -14,7 +14,7 @@ variable head tissue.
 # Retrieve the data
 from sammba import data_fetchers
 
-retest = data_fetchers.fetch_zurich_test_retest(subjects=range(2))
+retest = data_fetchers.fetch_zurich_test_retest(subjects=range(6))
 
 ##############################################################################
 # and define the caching repository
@@ -35,7 +35,7 @@ unifize = memory.cache(afni.Unifize)
 unifized_files = []
 for anat_filename in retest.anat:
     # rbt values might be improveable
-    out_unifize = unifize(in_file=anat_filename, rbt=(18.3, 70, 80),
+    out_unifize = unifize(in_file=anat_filename, #rbt=(18.3, 70, 80),
                           out_file='Un.nii.gz')
     unifized_files.append(out_unifize.outputs.out_file)
 
@@ -367,7 +367,7 @@ for head_file, warp_file in zip(head_files, warp_files4):
 # Visualize one individual anat on top of template
 from nilearn import plotting
 
-display = plotting.plot_anat(out_warp_apply.outputs.out_file)
+display = plotting.plot_anat(out_warp_apply.outputs.out_file, dim=-1.7)
 display.add_edges(out_tstat_warp_head4.outputs.out_file)
 
 plotting.show()
