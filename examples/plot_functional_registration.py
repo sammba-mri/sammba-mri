@@ -41,9 +41,9 @@ func_filename = retest.func[0]
 t_r = 1.
 tpattern_filename = fname_presuffix(func_filename, suffix='_tpattern.txt',
                                     use_ext=False)
+img = nibabel.load(func_filename)
+n_slices = img.header.get_data_shape()[2]
 if not os.path.isfile(tpattern_filename):
-    img = nibabel.load(func_filename)
-    n_slices = img.header.get_data_shape()[2]
     interslicetime = t_r / n_slices
     evenslices = np.arange(0, n_slices - 1, 2) * interslicetime
     oddslices = np.arange(1, n_slices, 2) * interslicetime
@@ -114,7 +114,7 @@ bias_corrected_filename = out_bias_correct.outputs.out_file
 # transform anatomical and atlas to functional space. atlas is already in
 # anatomical space, so only need to record matrix once, from the anatomical
 # XXX atlas not done
-anat_filename = fname_presuffix(retest.anat[0], suffix='Un')
+anat_filename = retest.anat[0]
 warp = memory.cache(afni.Warp)
 catmatvec = memory.cache(afni.CatMatvec)
 out_warp = warp(in_file=anat_filename,
@@ -167,12 +167,12 @@ out_refit = refit(in_file=out_copy.outputs.out_file,
 out_copy = copy(in_file=out_refit.outputs.out_file,
                 environ={'AFNI_DECONFLICT': 'OVERWRITE'},
                 out_file=allineated_anat_filename)
-shutil.rmtree(tmp_folder)
+#shutil.rmtree(tmp_folder)
 
 # slice functional and  anatomical
-slicer = memory.cache(fsl.Slicer)
-out_slicer = slicer(in_file=out_copy.outputs.out_file,
-                    label_slices=False,
-                    out_file=fname_presuffix(out_copy.outputs.out_file,
-                                             suffix='Sl',
-                                             use_ext=False))
+slicer = memory.cache(afni.ZCutUp)
+for slice_n in range(n_slices):
+    out_slicer = slicer(in_file=out_copy.outputs.out_file,
+                        keep='{0} {1}'.format(slice_n, slice_n),
+                        out_file=fname_presuffix(out_copy.outputs.out_file,
+                                                 suffix='Sl'.format(slice_n)))
