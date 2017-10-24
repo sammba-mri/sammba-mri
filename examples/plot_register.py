@@ -14,7 +14,7 @@ variable head tissue.
 # Retrieve the data
 from sammba import data_fetchers
 
-retest = data_fetchers.fetch_zurich_test_retest(subjects=range(6))
+retest = data_fetchers.fetch_zurich_test_retest(subjects=range(4))
 
 ##############################################################################
 # and define the caching directory
@@ -73,21 +73,25 @@ for brain_file in brain_files:
     head_files.append(out_refit.outputs.out_file)
 
 ##############################################################################
-# Quality check brain videos and average.
+# The brain files with new image center are concatenated to produce
+# a quality check video
 tcat = memory.cache(afni.TCat)
-tstat = memory.cache(afni.TStat)
 out_tcat = tcat(in_files=brain_files, outputtype='NIFTI_GZ')
+
+##############################################################################
+# and averaged
+tstat = memory.cache(afni.TStat)
 out_tstat = tstat(in_file=out_tcat.outputs.out_file, outputtype='NIFTI_GZ')
 
 ##############################################################################
-# Create an empty template, with origin placed at CoM
+# to create an empty template, with origin placed at CoM
 undump = memory.cache(afni.Undump)
 out_undump = undump(in_file=out_tstat.outputs.out_file, outputtype='NIFTI_GZ')
 out_refit = refit(in_file=out_undump.outputs.out_file,
                   xorigin='cen', yorigin='cen', zorigin='cen')
 
 ##############################################################################
-# Finally, shift heads and brains within the images to place the CoM at the
+# Finally, we shift heads and brains within the images to place the CoM at the
 # image center.
 resample = memory.cache(afni.Resample)
 shifted_head_files = []
@@ -105,7 +109,7 @@ for brain_file in brain_files:
     shifted_brain_files.append(out_resample.outputs.out_file)
 
 ##############################################################################
-# Quality check videos and template
+# Quality check videos and average brain
 out_tcat = tcat(in_files=shifted_brain_files, outputtype='NIFTI_GZ')
 out_tstat_shifted_brain = tstat(in_file=out_tcat.outputs.out_file,
                                 outputtype='NIFTI_GZ')
@@ -175,7 +179,7 @@ for shift_rotated_head_file, rigid_transform_file in zip(shift_rotated_head_file
     out_allineate = allineate(in_file=shift_rotated_head_file,
                               reference=out_tstat_shr.outputs.out_file,
                               out_matrix='UnBmBeAl4.aff12.1D',
-                              convergence=0.005,
+                              convergence=0.1,
                               two_blur=1,
                               one_pass=True,
                               weight=out_mask_tool.outputs.out_file,
@@ -187,6 +191,10 @@ for shift_rotated_head_file, rigid_transform_file in zip(shift_rotated_head_file
                                         'ONELINE')],
                               out_file=catmatvec_out_file)
     affine_transform_files.append(catmatvec_out_file)
+
+##############################################################################
+# Typically, convergence should be set to 0.005 but we increase it for speed
+# reason.
 
 ##############################################################################
 # Each resulting registration matrix is concatenated to the corresponding
@@ -235,7 +243,9 @@ out_mask_tool = mask_tool(in_file=out_mask_tool.outputs.out_file,
 ##############################################################################
 # The input source images are initially transformed prior to registration,
 # to ensure that they are already quite well-aligned to the template.
-nwarp_cat = memory.cache(afni.NwarpCat)
+# To save time, we only achieve one refinement level per step
+from nipype.utils.filemanip import fname_presuffix
+
 qwarp = memory.cache(afni.Qwarp)
 warped_files = []
 warp_files = []
@@ -249,8 +259,8 @@ for affine_transform_file, shifted_head_file in zip(affine_transform_files,
                       weight=out_mask_tool.outputs.out_file,
                       iniwarp=[affine_transform_file],
                       inilev=0,
-                      maxlev=2,
-                      outputtype='NIFTI_GZ')
+                      maxlev=1,
+                      out_file=fname_presuffix(shifted_head_file, suffix='Qw1'))
     warp_files.append(out_qwarp.outputs.source_warp)
     warped_files.append(out_qwarp.outputs.warped_source)
 
@@ -264,12 +274,13 @@ out_tstat_warp_head = tstat(in_file=out_tcat.outputs.out_file,
 # help for further detail).
 # The input transform is the former warp and needs to be concatenated to IDENT
 # initially; I forget why, I think it is to avoid some weird bug.
+nwarp_cat = memory.cache(afni.NwarpCat)
 warped_files2 = []
 warp_files2 = []
 for warp_file, shifted_head_file in zip(warp_files, shifted_head_files):
     out_nwarp_cat = nwarp_cat(
         in_files=[('IDENT', out_tstat_warp_head.outputs.out_file),
-                  warp_file], outputtype='NIFTI_GZ')#out_file='iniwarp.nii.gz')
+                  warp_file], out_file='iniwarp.nii.gz')
     out_qwarp = qwarp(in_file=shifted_head_file,
                       base_file=out_tstat_warp_head.outputs.out_file,
                       nmi=True,
@@ -277,9 +288,9 @@ for warp_file, shifted_head_file in zip(warp_files, shifted_head_files):
                       iwarp=True,
                       weight=out_mask_tool.outputs.out_file,
                       iniwarp=[out_nwarp_cat.outputs.out_file],
-                      inilev=3,
-                      maxlev=4,
-                      outputtype='NIFTI_GZ')
+                      inilev=2,
+                      maxlev=3,
+                      out_file=fname_presuffix(shifted_head_file, suffix='Qw2'))
     warp_files2.append(out_qwarp.outputs.source_warp)
     warped_files2.append(out_qwarp.outputs.warped_source)
 
@@ -291,6 +302,7 @@ out_tstat_warp_head2 = tstat(in_file=out_tcat.outputs.out_file,
 # Using previous files and concatenated transforms can be exploited to avoid
 # building up reslice errors.
 # Warp with mini-patch
+# In this particular case, minpathc=5 corresponds to a level of 10
 warped_files3 = []
 warp_files3 = []
 for warp_file, shifted_head_file in zip(warp_files2, shifted_head_files):
@@ -301,9 +313,9 @@ for warp_file, shifted_head_file in zip(warp_files2, shifted_head_files):
                       iwarp=True,
                       weight=out_mask_tool.outputs.out_file,
                       iniwarp=[warp_file],
-                      inilev=5,
-                      minpatch=6,
-                      out_file='UnCCQw3.nii.gz')
+                      inilev=3,
+                      minpatch=5,
+                      out_file='/tmp/UnCCQw3.nii.gz')
     warped_files3.append(out_qwarp.outputs.warped_source)
     warp_files3.append(out_qwarp.outputs.source_warp)
 
@@ -312,39 +324,17 @@ out_tstat_warp_head3 = tstat(in_file=out_tcat.outputs.out_file,
                              out_file='Qw3_meanhead.nii.gz')
 
 ##############################################################################
-# In this particular case, minpathc=13 corresponds to a level of 10
-
-##############################################################################
-# Final warp
-warped_files4 = []
-warp_files4 = []
-for warp_file, shifted_head_file in zip(warp_files3, shifted_head_files):
-    out_qwarp = qwarp(in_file=shifted_head_file,
-                      base_file=out_tstat_warp_head3.outputs.out_file,
-                      nmi=True,
-                      noneg=True,
-                      iwarp=True,
-                      weight=out_mask_tool.outputs.out_file,
-                      iniwarp=[warp_file],
-                      inilev=11,
-                      minpatch=9,
-                      out_file='UnCCQw4.nii.gz')
-    warped_files4.append(out_qwarp.outputs.warped_source)
-    warp_files4.append(out_qwarp.outputs.source_warp)
-
-out_tcat = tcat(in_files=warped_files4, out_file='Qw4_videohead.nii.gz')
-out_tstat_warp_head4 = tstat(in_file=out_tcat.outputs.out_file,
-                             out_file='Qw4_meanhead.nii.gz')
+# We can loop using this strategy until we are satisfied with the template
 
 ##############################################################################
 # Registr to template
 # -------------------
 # Apply non-linear registration results to uncorrected images
 warp_apply = memory.cache(afni.NwarpApply)
-for head_file, warp_file in zip(head_files, warp_files4):
+for head_file, warp_file in zip(head_files, warp_files3):
     out_warp_apply = warp_apply(in_file=head_file,
                                 warp=warp_file,
-                                master=out_tstat_warp_head4.outputs.out_file,
+                                master=out_tstat_warp_head3.outputs.out_file,
                                 out_file='Na.nii.gz')
 
 ##############################################################################
@@ -352,7 +342,7 @@ for head_file, warp_file in zip(head_files, warp_files4):
 from nilearn import plotting
 
 display = plotting.plot_anat(out_warp_apply.outputs.out_file, dim=-1.7)
-display.add_edges(out_tstat_warp_head4.outputs.out_file)
+display.add_edges(out_tstat_warp_head3.outputs.out_file)
 
 plotting.show()
 
