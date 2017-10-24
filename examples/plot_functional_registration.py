@@ -167,44 +167,81 @@ out_refit = refit(in_file=out_copy.outputs.out_file,
 out_copy = copy(in_file=out_refit.outputs.out_file,
                 environ={'AFNI_DECONFLICT': 'OVERWRITE'},
                 out_file=allineated_anat_filename)
-#shutil.rmtree(tmp_folder) # XXX to do later on
+# shutil.rmtree(tmp_folder) # XXX to do later on
 
 # slice anatomical
-anat_img = nibabel.load(anat_filename)
+anat_img = nibabel.load(allineated_anat_filename)
 anat_n_slices = anat_img.header.get_data_shape()[2]
 slicer = memory.cache(afni.ZCutUp)
-sliced_anat_filenames = []
+sliced_allineated_anat_filenames = []
 for slice_n in range(anat_n_slices):
-    out_slicer = slicer(in_file=out_copy.outputs.out_file,
+    out_slicer = slicer(in_file=allineated_anat_filename,
                         keep='{0} {1}'.format(slice_n, slice_n),
                         out_file=fname_presuffix(out_copy.outputs.out_file,
-                                                 suffix='Sl'.format(slice_n)))
-    sliced_anat_filenames.append(out_slicer.outputs.out_file)
+                                                 suffix='Sl%d' % slice_n))
+    sliced_allineated_anat_filenames.append(out_slicer.outputs.out_file)
 
+sliced_bias_corrected_filenames = []
 for slice_n in range(n_slices):
     out_slicer = slicer(in_file=bias_corrected_filename,
                         keep='{0} {1}'.format(slice_n, slice_n),
-                        out_file=fname_presuffix(func_filename,
-                                                 suffix='Sl'.format(slice_n)))
+                        out_file=fname_presuffix(bias_corrected_filename,
+                                                 suffix='Sl%d' % slice_n))
+    sliced_bias_corrected_filenames.append(out_slicer.outputs.out_file)
 
 # XXX have the impression that you register to the average file
 
+
+# Below line is to deal with slices where there is no signal (for example
+# rostral end of some anatomicals)
+empty_slices = []
+for n, sliced_bias_corrected_filename in enumerate(
+        sliced_bias_corrected_filenames):
+    out_clip_anat = clip_level(in_file=sliced_allineated_anat_filenames[n])
+    out_clip_func = clip_level(in_file=sliced_bias_corrected_filename)
+    if out_clip_anat.outputs.clip_val == 0 or out_clip_func.outputs.clip_val == 0:
+        sliced_bias_corrected_filenames.pop(n)
+        sliced_allineated_anat_filenames.pop(n)
+        empty_slices.append(sliced_bias_corrected_filenames) 
+		
 # Single slice non-linear functional to anatomical registration; the iwarp
 # frequently fails. Resampling can help it work better
 
 # Read voxel size along third dimension
-voxel_size = img.header.get_zooms()[2]
+voxel_size_z = anat_img.header.get_zooms()[2]
 resample = memory.cache(afni.Resample)
-for sliced_anat_filename in sliced_anat_filenames:
-out_resample = resample(in_file=sliced_anat_filename,
-                        xyz=(,,voxel_size),
-                        outputtype='NIFTI_GZ')
-				3dresample -dxyz $resampleres $resampleres $(3dinfo -adk "$anatlab"_Op_"$func"_slice_"$(printf "%04d\n" $q)".nii.gz) -prefix "$anatlab"_Op_"$func"_slice_"$(printf "%04d\n" $q)"_res.nii.gz -inset "$anatlab"_Op_"$func"_slice_"$(printf "%04d\n" $q)".nii.gz
-				3dresample -dxyz $resampleres $resampleres $(3dinfo -adk "$func"_slice_"$(printf "%04d\n" $q)".nii.gz) -prefix "$func"_slice_"$(printf "%04d\n" $q)"_res.nii.gz -inset "$func"_slice_"$(printf "%04d\n" $q)".nii.gz
-				3dQwarp -base "$anatlab"_Op_"$func"_slice_"$(printf "%04d\n" $q)"_res.nii.gz -source "$func"_slice_"$(printf "%04d\n" $q)"_res.nii.gz -prefix "$func"_slice_"$(printf "%04d\n" $q)"_Na.nii.gz -iwarp -noneg -blur 0 -nmi -noXdis -allineate -allineate_opts '-parfix 1 0 -parfix 2 0 -parfix 3 0 -parfix 4 0 -parfix 5 0 -parfix 6 0 -parfix 7 0 -parfix 9 0 -parfix 10 0 -parfix 12 0'
-				3dresample -dxyz $(3dinfo -ad3 "$func"_slice_"$(printf "%04d\n" $q)".nii.gz) -prefix "$func"_slice_"$(printf "%04d\n" $q)"_Na.nii.gz -inset "$func"_slice_"$(printf "%04d\n" $q)"_Na.nii.gz
-				rm -f "$anatlab"_Op_"$func"_slice_"$(printf "%04d\n" $q)"_res.nii.gz
-				rm -f "$func"_slice_"$(printf "%04d\n" $q)"_res.nii.gz
-				fixobliquity.bash "$anatlab"_Op_"$func"_slice_"$(printf "%04d\n" $q)".nii.gz "$func"_slice_"$(printf "%04d\n" $q)"_Na.nii.gz #3dQwarp removes obliquity, readd
+resampled_allineated_anat_filenames = []
+for sliced_allineated_anat_filename in sliced_allineated_anat_filenames:
+    out_resample = resample(in_file=sliced_allineated_anat_filename,
+                            voxel_size=(.1, .1, voxel_size_z),
+                            outputtype='NIFTI_GZ')
+    resampled_allineated_anat_filenames.append(out_resample.outputs.out_file)
 
+resampled_bias_corrected_filenames = []
+for sliced_bias_corrected_filename in sliced_bias_corrected_filenames:
+    out_resample = resample(in_file=sliced_bias_corrected_filename,
+                            voxel_size=(.1, .1, voxel_size_z),
+                            outputtype='NIFTI_GZ')
+    resampled_bias_corrected_filenames.append(out_resample.outputs.out_file)
 
+qwarp = memory.cache(afni.Qwarp)
+for (resampled_bias_corrected_filename,
+     resampled_allineated_anat_filename) in zip(
+    resampled_bias_corrected_filenames, resampled_allineated_anat_filenames):
+    out_qwarp = qwarp(in_file=resampled_bias_corrected_filename,
+                      base_file=resampled_allineated_anat_filename,
+                      iwarp=True,
+                      noneg=True,
+                      blur=[0],
+                      nmi=True,
+                      noXdis=True,
+                      allineate=True,
+                      allineate_opts='-parfix 1 0 -parfix 2 0 -parfix 3 0 '
+                                     '-parfix 4 0 -parfix 5 0 -parfix 6 0 -parfix '
+                                      '7 0 -parfix 9 0 -parfix 10 0 -parfix 12 0',
+                      out_file=warped_slice)
+    voxel_size = nibabel(warped_slice).header.get_zooms()[:3]
+    out_resample = resample(in_file=sliced_bias_corrected_filename,
+                            voxel_size=voxel_size_z,
+                            out_file=sliced_bias_corrected_filename,
+                            environ={'AFNI_DECONFLICT': 'OVERWRITE'})
