@@ -167,12 +167,44 @@ out_refit = refit(in_file=out_copy.outputs.out_file,
 out_copy = copy(in_file=out_refit.outputs.out_file,
                 environ={'AFNI_DECONFLICT': 'OVERWRITE'},
                 out_file=allineated_anat_filename)
-#shutil.rmtree(tmp_folder)
+#shutil.rmtree(tmp_folder) # XXX to do later on
 
-# slice functional and  anatomical
+# slice anatomical
+anat_img = nibabel.load(anat_filename)
+anat_n_slices = anat_img.header.get_data_shape()[2]
 slicer = memory.cache(afni.ZCutUp)
-for slice_n in range(n_slices):
+sliced_anat_filenames = []
+for slice_n in range(anat_n_slices):
     out_slicer = slicer(in_file=out_copy.outputs.out_file,
                         keep='{0} {1}'.format(slice_n, slice_n),
                         out_file=fname_presuffix(out_copy.outputs.out_file,
                                                  suffix='Sl'.format(slice_n)))
+    sliced_anat_filenames.append(out_slicer.outputs.out_file)
+
+for slice_n in range(n_slices):
+    out_slicer = slicer(in_file=bias_corrected_filename,
+                        keep='{0} {1}'.format(slice_n, slice_n),
+                        out_file=fname_presuffix(func_filename,
+                                                 suffix='Sl'.format(slice_n)))
+
+# XXX have the impression that you register to the average file
+
+# Single slice non-linear functional to anatomical registration; the iwarp
+# frequently fails. Resampling can help it work better
+
+# Read voxel size along third dimension
+voxel_size = img.header.get_zooms()[2]
+resample = memory.cache(afni.Resample)
+for sliced_anat_filename in sliced_anat_filenames:
+out_resample = resample(in_file=sliced_anat_filename,
+                        xyz=(,,voxel_size),
+                        outputtype='NIFTI_GZ')
+				3dresample -dxyz $resampleres $resampleres $(3dinfo -adk "$anatlab"_Op_"$func"_slice_"$(printf "%04d\n" $q)".nii.gz) -prefix "$anatlab"_Op_"$func"_slice_"$(printf "%04d\n" $q)"_res.nii.gz -inset "$anatlab"_Op_"$func"_slice_"$(printf "%04d\n" $q)".nii.gz
+				3dresample -dxyz $resampleres $resampleres $(3dinfo -adk "$func"_slice_"$(printf "%04d\n" $q)".nii.gz) -prefix "$func"_slice_"$(printf "%04d\n" $q)"_res.nii.gz -inset "$func"_slice_"$(printf "%04d\n" $q)".nii.gz
+				3dQwarp -base "$anatlab"_Op_"$func"_slice_"$(printf "%04d\n" $q)"_res.nii.gz -source "$func"_slice_"$(printf "%04d\n" $q)"_res.nii.gz -prefix "$func"_slice_"$(printf "%04d\n" $q)"_Na.nii.gz -iwarp -noneg -blur 0 -nmi -noXdis -allineate -allineate_opts '-parfix 1 0 -parfix 2 0 -parfix 3 0 -parfix 4 0 -parfix 5 0 -parfix 6 0 -parfix 7 0 -parfix 9 0 -parfix 10 0 -parfix 12 0'
+				3dresample -dxyz $(3dinfo -ad3 "$func"_slice_"$(printf "%04d\n" $q)".nii.gz) -prefix "$func"_slice_"$(printf "%04d\n" $q)"_Na.nii.gz -inset "$func"_slice_"$(printf "%04d\n" $q)"_Na.nii.gz
+				rm -f "$anatlab"_Op_"$func"_slice_"$(printf "%04d\n" $q)"_res.nii.gz
+				rm -f "$func"_slice_"$(printf "%04d\n" $q)"_res.nii.gz
+				fixobliquity.bash "$anatlab"_Op_"$func"_slice_"$(printf "%04d\n" $q)".nii.gz "$func"_slice_"$(printf "%04d\n" $q)"_Na.nii.gz #3dQwarp removes obliquity, readd
+
+
