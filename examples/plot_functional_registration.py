@@ -199,8 +199,8 @@ for n, sliced_bias_corrected_filename in enumerate(
         sliced_bias_corrected_filenames):
     out_clip_anat = clip_level(in_file=sliced_allineated_anat_filenames[n])
     out_clip_func = clip_level(in_file=sliced_bias_corrected_filename)
-    if out_clip_anat.outputs.clip_val == 0 or out_clip_func.outputs.clip_val == 0:
-        print(out_clip_func.outputs.clip_val)
+    print(out_clip_anat.outputs.clip_val)
+    if out_clip_anat.outputs.clip_val < 1e-7 or out_clip_func.outputs.clip_val < 1e-7:
         sliced_bias_corrected_filenames.pop(n)
         sliced_allineated_anat_filenames.pop(n)
         empty_slices.append(sliced_bias_corrected_filename)
@@ -216,6 +216,8 @@ for sliced_allineated_anat_filename in sliced_allineated_anat_filenames:
     out_resample = resample(in_file=sliced_allineated_anat_filename,
                             voxel_size=(.1, .1, voxel_size_z),
                             outputtype='NIFTI_GZ')
+    print(nibabel.load(sliced_allineated_anat_filename).get_data().max())
+    print(nibabel.load(out_resample.outputs.out_file).get_data().max())
     resampled_allineated_anat_filenames.append(out_resample.outputs.out_file)
 
 resampled_bias_corrected_filenames = []
@@ -223,6 +225,7 @@ for sliced_bias_corrected_filename in sliced_bias_corrected_filenames:
     out_resample = resample(in_file=sliced_bias_corrected_filename,
                             voxel_size=(.1, .1, voxel_size_z),
                             outputtype='NIFTI_GZ')
+    print(nibabel.load(out_resample.outputs.out_file).get_data().max())
     resampled_bias_corrected_filenames.append(out_resample.outputs.out_file)
 
 qwarp = memory.cache(afni.Qwarp)
@@ -230,6 +233,8 @@ warped_slices = []
 for (resampled_bias_corrected_filename,
      resampled_allineated_anat_filename) in zip(
     resampled_bias_corrected_filenames, resampled_allineated_anat_filenames):
+    print(nibabel.load(resampled_bias_corrected_filename).get_data().max())
+    print(nibabel.load(resampled_allineated_anat_filename).get_data().max())
     try:
         out_qwarp = qwarp(in_file=resampled_bias_corrected_filename,
                       base_file=resampled_allineated_anat_filename,
