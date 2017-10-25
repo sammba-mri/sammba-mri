@@ -114,7 +114,7 @@ bias_corrected_filename = out_bias_correct.outputs.out_file
 # transform anatomical and atlas to functional space. atlas is already in
 # anatomical space, so only need to record matrix once, from the anatomical
 # XXX atlas not done
-anat_filename = retest.anat[0]
+anat_filename = '/tmp/nipype_mem/nipype-interfaces-afni-utils-Unifize/233eaf63bfa13895e0b096ce188eb0a8/3DRARE_generated.nii.gz'
 warp = memory.cache(afni.Warp)
 catmatvec = memory.cache(afni.CatMatvec)
 out_warp = warp(in_file=anat_filename,
@@ -200,10 +200,11 @@ for n, sliced_bias_corrected_filename in enumerate(
     out_clip_anat = clip_level(in_file=sliced_allineated_anat_filenames[n])
     out_clip_func = clip_level(in_file=sliced_bias_corrected_filename)
     if out_clip_anat.outputs.clip_val == 0 or out_clip_func.outputs.clip_val == 0:
+        print(out_clip_func.outputs.clip_val)
         sliced_bias_corrected_filenames.pop(n)
         sliced_allineated_anat_filenames.pop(n)
-        empty_slices.append(sliced_bias_corrected_filenames) 
-		
+        empty_slices.append(sliced_bias_corrected_filename)
+
 # Single slice non-linear functional to anatomical registration; the iwarp
 # frequently fails. Resampling can help it work better
 
@@ -225,10 +226,12 @@ for sliced_bias_corrected_filename in sliced_bias_corrected_filenames:
     resampled_bias_corrected_filenames.append(out_resample.outputs.out_file)
 
 qwarp = memory.cache(afni.Qwarp)
+warped_slices = []
 for (resampled_bias_corrected_filename,
      resampled_allineated_anat_filename) in zip(
     resampled_bias_corrected_filenames, resampled_allineated_anat_filenames):
-    out_qwarp = qwarp(in_file=resampled_bias_corrected_filename,
+    try:
+        out_qwarp = qwarp(in_file=resampled_bias_corrected_filename,
                       base_file=resampled_allineated_anat_filename,
                       iwarp=True,
                       noneg=True,
@@ -240,8 +243,11 @@ for (resampled_bias_corrected_filename,
                                      '-parfix 4 0 -parfix 5 0 -parfix 6 0 -parfix '
                                       '7 0 -parfix 9 0 -parfix 10 0 -parfix 12 0',
                       out_file=warped_slice)
-    voxel_size = nibabel(warped_slice).header.get_zooms()[:3]
-    out_resample = resample(in_file=sliced_bias_corrected_filename,
-                            voxel_size=voxel_size_z,
-                            out_file=sliced_bias_corrected_filename,
-                            environ={'AFNI_DECONFLICT': 'OVERWRITE'})
+        warped_slices.append(out_qwarp.out_put.warped_source)
+    except RuntimeError:
+        pass
+voxel_size = nibabel(warped_slice).header.get_zooms()[:3]
+out_resample = resample(in_file=sliced_bias_corrected_filename,
+                        voxel_size=voxel_size_z,
+                        out_file=sliced_bias_corrected_filename,
+                        environ={'AFNI_DECONFLICT': 'OVERWRITE'})
