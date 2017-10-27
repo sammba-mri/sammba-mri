@@ -14,7 +14,7 @@ variable head tissue.
 # Retrieve the data
 from sammba import data_fetchers
 
-retest = data_fetchers.fetch_zurich_test_retest(subjects=range(4))
+retest = data_fetchers.fetch_zurich_test_retest(subjects=range(6))
 
 ##############################################################################
 # and define the caching directory
@@ -302,7 +302,7 @@ out_tstat_warp_head2 = tstat(in_file=out_tcat.outputs.out_file,
 # Using previous files and concatenated transforms can be exploited to avoid
 # building up reslice errors.
 # Warp with mini-patch
-# In this particular case, minpathc=5 corresponds to a level of 10
+# In this particular case, minpathc=75 corresponds to a level of 4
 warped_files3 = []
 warp_files3 = []
 for warp_file, shifted_head_file in zip(warp_files2, shifted_head_files):
@@ -314,8 +314,8 @@ for warp_file, shifted_head_file in zip(warp_files2, shifted_head_files):
                       weight=out_mask_tool.outputs.out_file,
                       iniwarp=[warp_file],
                       inilev=3,
-                      minpatch=5,
-                      out_file='/tmp/UnCCQw3.nii.gz')
+                      minpatch=75,
+                      out_file=fname_presuffix(shifted_head_file, suffix='Qw3'))
     warped_files3.append(out_qwarp.outputs.warped_source)
     warp_files3.append(out_qwarp.outputs.source_warp)
 
