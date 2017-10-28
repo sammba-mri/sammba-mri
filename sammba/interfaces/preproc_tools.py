@@ -40,8 +40,10 @@ class RatsMM(CommandLine):
     ========
 
     >>> from sammba.interfaces import RatsMM
+    >>> from sammba.data_fetchers import fetch_zurich_test_retest
+    >>> data = fetch_zurich_test_retest(subjects=[0])
     >>> rats_masker = RatsMM()
-    >>> rats_masker.inputs.in_file = 'anat.nii'
+    >>> rats_masker.inputs.in_file = data.anat[0]
     >>> rats_masker.inputs.intensity_threshold = 1000
     >>> rats_masker.inputs.out_file = 'masked.nii'
     >>> rats_masker.cmdline
