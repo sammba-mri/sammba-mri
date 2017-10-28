@@ -14,7 +14,7 @@ variable head tissue.
 # Retrieve the data
 from sammba import data_fetchers
 
-retest = data_fetchers.fetch_zurich_test_retest(subjects=range(6))
+retest = data_fetchers.fetch_zurich_test_retest(subjects=range(4))
 
 ##############################################################################
 # and define the caching directory
@@ -302,7 +302,7 @@ out_tstat_warp_head2 = tstat(in_file=out_tcat.outputs.out_file,
 # Using previous files and concatenated transforms can be exploited to avoid
 # building up reslice errors.
 # Warp with mini-patch
-# In this particular case, minpathc=75 corresponds to a level of 4
+# In this particular case, minpatch=75 corresponds to a level of 4
 warped_files3 = []
 warp_files3 = []
 for warp_file, shifted_head_file in zip(warp_files2, shifted_head_files):
@@ -324,7 +324,8 @@ out_tstat_warp_head3 = tstat(in_file=out_tcat.outputs.out_file,
                              out_file='Qw3_meanhead.nii.gz')
 
 ##############################################################################
-# We can loop using this strategy until we are satisfied with the template
+# We can repeat this very last warp while using the last average until we are
+# satisfied with the template quality
 
 ##############################################################################
 # Registr to template
