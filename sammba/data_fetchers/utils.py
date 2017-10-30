@@ -3,6 +3,7 @@ import os
 
 def _get_dataset_descr(ds_name):
     module_path = os.path.dirname(os.path.abspath(__file__))
+    print(module_path)
 
     fname = ds_name
 
