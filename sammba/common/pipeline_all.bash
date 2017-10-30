@@ -40,7 +40,7 @@ echo "17 multiplier" $multiplier
 echo "18 T1guess" $T1guess
 echo "19 mccores" $mccores
 
-python -m PVEnDCMtoNIfTI.py /usr/bin/dcmdump $rawimdir $NIfTIdir yes
+python -m PVEnDCMtoNIfTI_bashwrapper.py /usr/bin/dcmdump $rawimdir $NIfTIdir yes
 IDsequencetypes.bash $NIfTIdir
 anattotemplate.bash $NIfTIdir yes 3dUnifize $brainvol $scale $brain $atlas $mask $head $headweight $basetype $Urad
 perfFAIREPI.bash $NIfTIdir $T1blood $lambda $multiplier $T1guess $mccores
