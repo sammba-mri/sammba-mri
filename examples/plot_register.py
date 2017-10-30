@@ -33,8 +33,8 @@ from nipype.interfaces import afni
 
 unifize = memory.cache(afni.Unifize)
 unifized_files = []
-for anat_filename in retest.anat:
-    out_unifize = unifize(in_file=anat_filename, outputtype='NIFTI_GZ')
+for anat_file in retest.anat:
+    out_unifize = unifize(in_file=anat_file, outputtype='NIFTI_GZ')
     unifized_files.append(out_unifize.outputs.out_file)
 
 ##############################################################################
@@ -146,11 +146,11 @@ for shifted_brain_file in shifted_brain_files:
 # Application to the whole head image. can also be used for a good
 # demonstration of linear vs. non-linear registration quality
 shift_rotated_head_files = []
-for shifted_head_file, transform_matrix in zip(shifted_head_files,
-                                               rigid_transform_files):
+for shifted_head_file, rigid_transform_file in zip(shifted_head_files,
+                                                   rigid_transform_files):
     out_allineate = allineate(in_file=shifted_head_file,
                               master=out_tstat_shifted_brain.outputs.out_file,
-                              in_matrix=transform_matrix,
+                              in_matrix=rigid_transform_file,
                               out_file='UnBmBeCCAa3.nii.gz')
     shift_rotated_head_files.append(out_allineate.outputs.out_file)
 
@@ -174,8 +174,8 @@ out_mask_tool = mask_tool(in_file=out_tcat.outputs.out_file,
 # A weighting mask is used to ...
 affine_transform_files = []
 catmatvec = memory.cache(afni.CatMatvec)
-for shift_rotated_head_file, rigid_transform_file in zip(shift_rotated_head_files,
-                                                         rigid_transform_files):
+for shift_rotated_head_file, rigid_transform_file in zip(
+            shift_rotated_head_files, rigid_transform_files):
     out_allineate = allineate(in_file=shift_rotated_head_file,
                               reference=out_tstat_shr.outputs.out_file,
                               out_matrix='UnBmBeAl4.aff12.1D',
@@ -260,7 +260,7 @@ for affine_transform_file, shifted_head_file in zip(affine_transform_files,
                       iniwarp=[affine_transform_file],
                       inilev=0,
                       maxlev=1,
-                      out_file=fname_presuffix(shifted_head_file, suffix='Qw1'))
+                      out_file=fname_presuffix(shifted_head_file, suffix='w1'))
     warp_files.append(out_qwarp.outputs.source_warp)
     warped_files.append(out_qwarp.outputs.warped_source)
 
@@ -290,13 +290,13 @@ for warp_file, shifted_head_file in zip(warp_files, shifted_head_files):
                       iniwarp=[out_nwarp_cat.outputs.out_file],
                       inilev=2,
                       maxlev=3,
-                      out_file=fname_presuffix(shifted_head_file, suffix='Qw2'))
+                      out_file=fname_presuffix(shifted_head_file, suffix='w2'))
     warp_files2.append(out_qwarp.outputs.source_warp)
     warped_files2.append(out_qwarp.outputs.warped_source)
 
-out_tcat = tcat(in_files=warped_files2, out_file='Qw2_videohead.nii.gz')
+out_tcat = tcat(in_files=warped_files2, out_file='w2_videohead.nii.gz')
 out_tstat_warp_head2 = tstat(in_file=out_tcat.outputs.out_file,
-                             out_file='Qw2_meanhead.nii.gz')
+                             out_file='w2_meanhead.nii.gz')
 
 ##############################################################################
 # Using previous files and concatenated transforms can be exploited to avoid
@@ -315,13 +315,13 @@ for warp_file, shifted_head_file in zip(warp_files2, shifted_head_files):
                       iniwarp=[warp_file],
                       inilev=3,
                       minpatch=75,
-                      out_file=fname_presuffix(shifted_head_file, suffix='Qw3'))
+                      out_file=fname_presuffix(shifted_head_file, suffix='w3'))
     warped_files3.append(out_qwarp.outputs.warped_source)
     warp_files3.append(out_qwarp.outputs.source_warp)
 
-out_tcat = tcat(in_files=warped_files3, out_file='Qw3_videohead.nii.gz')
+out_tcat = tcat(in_files=warped_files3, out_file='w3_videohead.nii.gz')
 out_tstat_warp_head3 = tstat(in_file=out_tcat.outputs.out_file,
-                             out_file='Qw3_meanhead.nii.gz')
+                             out_file='w3_meanhead.nii.gz')
 
 ##############################################################################
 # We can repeat this very last warp while using the last average until we are
@@ -353,7 +353,6 @@ plotting.show()
 # If you want to go further, you can visualize the whole pipeline or a part of
 # it as a graph. For instance, we can draw the center of mass registration
 # steps.
-
 import nipype.pipeline.engine as pe
 
 workflow = pe.Workflow(name='CoM_registration')
@@ -396,4 +395,6 @@ workflow.connect(undump_node, 'out_file', refit_node2, 'in_file')
 workflow.connect(refit_node, 'out_file', resample_node, 'master')
 workflow.connect(refit_node2, 'out_file', resample_node, 'in_file')
 
-workflow.write_graph()
+##############################################################################
+# Generate the graph
+graph = workflow.write_graph()
