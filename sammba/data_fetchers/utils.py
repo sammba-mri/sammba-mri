@@ -1,10 +1,10 @@
 import os
-
+import glob
 
 def _get_dataset_descr(ds_name):
     module_path = os.path.dirname(os.path.abspath(__file__))
-    print(module_path)
 
+    print(glob.glob(os.path.join(module_path, 'description', '*')))
     fname = ds_name
 
     try:
