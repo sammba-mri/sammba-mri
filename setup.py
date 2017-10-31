@@ -172,6 +172,6 @@ if __name__ == "__main__":
           ],
           packages=find_packages(),
           package_data={#'sammba.tests': ['*.nii.gz', '*.npz'],
-                        'nilearn.datasets.description': ['*.rst'],
+                        'sammba.data_fetchers.description': ['*.rst'],
                         },
 install_requires=install_requires,)
