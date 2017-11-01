@@ -94,7 +94,8 @@ if [[ "$DISTRIB" == "neurodebian" ]]; then
     create_new_venv
     bash <(wget -q -O- http://neuro.debian.net/_files/neurodebian-travis.sh)
     sudo apt-get install -qq python-scipy python-nose python-nibabel\
-         python-sklearn python-pandas python-nilearn python-patsy python-networkx python-nipype
+         python-sklearn python-pandas python-nilearn python-patsy python-networkx python-nipype\
+	 python-doctest-ignore-unicode
 
 elif [[ "$DISTRIB" == "conda" ]]; then
     create_new_conda_env
@@ -110,6 +111,8 @@ elif [[ "$DISTRIB" == "conda" ]]; then
     pip install patsy
     # dependencies that are only available through pip
     pip install nipype
+    # Allow nose to ignore unicode in doctest
+    pip install doctest-ignore-unicode
 
 else
     echo "Unrecognized distribution ($DISTRIB); cannot setup travis environment."
