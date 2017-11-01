@@ -40,14 +40,12 @@ class RatsMM(CommandLine):
     ========
 
     >>> from sammba.interfaces import RatsMM
-    >>> from sammba.data_fetchers import fetch_zurich_test_retest
-    >>> data = fetch_zurich_test_retest(subjects=[0], verbose=0)
     >>> rats_masker = RatsMM()
-    >>> rats_masker.inputs.in_file = data.anat[0]
+    >>> rats_masker.inputs.in_file = 'sammba/interfaces/tests/data/structural.nii'
     >>> rats_masker.inputs.intensity_threshold = 1000
     >>> rats_masker.inputs.out_file = 'masked.nii'
     >>> rats_masker.cmdline  # doctest: +IGNORE_UNICODE
-    'RATS_MM /home/travis/nilearn_data/zurich_retest/baseline/1366/3DRARE.nii.gz masked.nii -t 1000'
+    u'RATS_MM sammba/interfaces/tests/data/structural.nii masked.nii -t 1000'
     >>> res = rats_masker.run()  # doctest: +SKIP
     """
     input_spec = RatsMMInputSpec
