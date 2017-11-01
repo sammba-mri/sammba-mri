@@ -46,7 +46,7 @@ class RatsMM(CommandLine):
     >>> rats_masker.inputs.in_file = data.anat[0]
     >>> rats_masker.inputs.intensity_threshold = 1000
     >>> rats_masker.inputs.out_file = 'masked.nii'
-    >>> rats_masker.cmdline
+    >>> rats_masker.cmdline  # doctest: +ALLOW_UNICODE
     'RATS_MM /home/travis/nilearn_data/zurich_retest/baseline/1366/3DRARE.nii.gz masked.nii -t 1000'
     >>> res = rats_masker.run()  # doctest: +SKIP
     """
