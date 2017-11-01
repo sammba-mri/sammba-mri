@@ -41,7 +41,7 @@ class RatsMM(CommandLine):
 
     >>> from sammba.interfaces import RatsMM
     >>> rats_masker = RatsMM()
-    >>> rats_masker.inputs.in_file = 'sammba/interfaces/tests/data/structural.nii'
+    >>> rats_masker.inputs.in_file = os.path.relpath(os.path.join(os.path.dirname(__file__), 'tests/data/structural.nii'))
     >>> rats_masker.inputs.intensity_threshold = 1000
     >>> rats_masker.inputs.out_file = 'masked.nii'
     >>> rats_masker.cmdline  # doctest: +IGNORE_UNICODE
