@@ -43,7 +43,7 @@ class RatsMM(CommandLine):
     >>> rats_masker = RatsMM()
     >>> rats_masker.inputs.in_file = os.path.join(os.path.dirname(__file__), 'tests/data/structural.nii')
     >>> import glob
-    >>> glob.glob(os.path.join(os.path.dirname(__file__), 'tests/*'))
+    >>> glob.glob(os.path.join(os.path.dirname(__file__), '*'))
     >>> rats_masker.inputs.intensity_threshold = 1000
     >>> rats_masker.inputs.out_file = 'masked.nii'
     >>> rats_masker.cmd  # doctest: +IGNORE_UNICODE
