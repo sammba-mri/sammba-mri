@@ -26,21 +26,13 @@ sammba-MRI API Reference
    fetch_zurich_test_retest
    fetch_zurich_anesthesiant
 
-
 .. _interfaces_ref:
 
-:mod:`sammba.interfaces`: Preprocessing interfaces
-=====================================================
+External tools wrapped in python
+================================
 
-.. automodule:: sammba.interfaces
-   :no-members:
-   :no-inherited-members:
+.. toctree::
+   :maxdepth: 2
 
-**Classes**:
+   interfaces/generated/sammba.interfaces.preproc_tools.rst
 
-.. currentmodule:: sammba.interfaces
-
-.. autosummary::
-   :toctree: interfaces/generated/
-
-   RatsMM
