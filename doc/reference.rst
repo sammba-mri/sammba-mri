@@ -25,3 +25,22 @@ sammba-MRI API Reference
 
    fetch_zurich_test_retest
    fetch_zurich_anesthesiant
+
+
+.. _interfaces_ref:
+
+:mod:`sammba.interfaces`: Preprocessing interfaces
+=====================================================
+
+.. automodule:: sammba.interfaces
+   :no-members:
+   :no-inherited-members:
+
+**Classes**:
+
+.. currentmodule:: sammba.interfaces
+
+.. autosummary::
+   :toctree: interfaces/generated/
+
+   RatsMM
