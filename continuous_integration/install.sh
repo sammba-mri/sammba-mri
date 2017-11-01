@@ -24,6 +24,7 @@ create_new_venv() {
     virtualenv --system-site-packages testvenv
     source testvenv/bin/activate
     pip install nose
+    pip install doctest-ignore-unicode
 }
 
 print_conda_requirements() {
@@ -94,8 +95,7 @@ if [[ "$DISTRIB" == "neurodebian" ]]; then
     create_new_venv
     bash <(wget -q -O- http://neuro.debian.net/_files/neurodebian-travis.sh)
     sudo apt-get install -qq python-scipy python-nose python-nibabel\
-         python-sklearn python-pandas python-nilearn python-patsy python-networkx python-nipype\
-	 python-doctest-ignore-unicode
+         python-sklearn python-pandas python-nilearn python-patsy python-networkx python-nipype
 
 elif [[ "$DISTRIB" == "conda" ]]; then
     create_new_conda_env

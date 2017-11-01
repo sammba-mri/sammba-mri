@@ -1,4 +1,4 @@
-from nipype.interfaces.base import (TraitedSpec, CommandLineInputSpec,    
+from nipype.interfaces.base import (TraitedSpec, CommandLineInputSpec,
                                     CommandLine, traits)
 import os
 
@@ -41,11 +41,11 @@ class RatsMM(CommandLine):
 
     >>> from sammba.interfaces import RatsMM
     >>> rats_masker = RatsMM()
-    >>> rats_masker.inputs.in_file = os.path.relpath(os.path.join(os.path.dirname(__file__), 'tests/data/structural.nii'))
+    >>> rats_masker.inputs.in_file = os.path.join(os.path.dirname(__file__), 'tests/data/structural.nii')
     >>> rats_masker.inputs.intensity_threshold = 1000
     >>> rats_masker.inputs.out_file = 'masked.nii'
-    >>> rats_masker.cmdline  # doctest: +IGNORE_UNICODE
-    u'RATS_MM sammba/interfaces/tests/data/structural.nii masked.nii -t 1000'
+    >>> rats_masker.cmd  # doctest: +IGNORE_UNICODE
+    'RATS_MM'
     >>> res = rats_masker.run()  # doctest: +SKIP
     """
     input_spec = RatsMMInputSpec
