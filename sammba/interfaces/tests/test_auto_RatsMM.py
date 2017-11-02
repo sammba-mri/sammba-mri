@@ -30,9 +30,9 @@ def test_RatsMM_inputs():
     inputs = RatsMM.input_spec()
 
     for key, metadata in list(input_map.items()):
-        for metakey, value in list(metadata.items()):
-            print(key, value, getattr(inputs.traits()[key], metakey))
-            assert getattr(inputs.traits()[key], metakey) == value
+        if key != 'terminal_output':
+            for metakey, value in list(metadata.items()):
+                assert getattr(inputs.traits()[key], metakey) == value
 
 
 def test_RatsMM_outputs():
