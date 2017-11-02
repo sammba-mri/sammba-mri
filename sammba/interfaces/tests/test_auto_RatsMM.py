@@ -31,7 +31,7 @@ def test_RatsMM_inputs():
 
     for key, metadata in list(input_map.items()):
         for metakey, value in list(metadata.items()):
-            print(key, value)
+            print(key, value, getattr(inputs.traits()[key], metakey))
             assert getattr(inputs.traits()[key], metakey) == value
 
 
