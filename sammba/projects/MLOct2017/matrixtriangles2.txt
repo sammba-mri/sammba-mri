@@ -1,0 +1,13 @@
+open("Y:\\Tvx-Manips-MD_\\MD_1704_RsLemurs\\Resultats\\matrice_sfn\\mean_young.png");
+open("Y:\\Tvx-Manips-MD_\\MD_1704_RsLemurs\\Resultats\\matrice_sfn\\mean_old_octobre.png");
+makeRectangle(493, 32, 826, 826);
+setBackgroundColor(0, 0, 0);
+run("Clear Outside");
+makePolygon(493,32,1319,32,1319,858);
+run("Fill", "slice");
+selectWindow("mean_young.png");
+makePolygon(493,32,1319,858,493,858);
+setForegroundColor(0, 0, 0);
+run("Fill", "slice");
+imageCalculator("Add create", "mean_old_octobre.png","mean_young.png");
+saveAs("PNG", "Y:\\Tvx-Manips-MD_\\MD_1704_RsLemurs\\Resultats\\matrice_sfn\\triangle_young_old.png");
