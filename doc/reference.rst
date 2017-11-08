@@ -25,3 +25,14 @@ sammba-MRI API Reference
 
    fetch_zurich_test_retest
    fetch_zurich_anesthesiant
+
+.. _interfaces_ref:
+
+External tools wrapped in python
+================================
+
+.. toctree::
+   :maxdepth: 2
+
+   interfaces/generated/sammba.interfaces.preproc_tools.rst
+

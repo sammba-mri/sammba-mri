@@ -24,6 +24,7 @@ create_new_venv() {
     virtualenv --system-site-packages testvenv
     source testvenv/bin/activate
     pip install nose
+    pip install doctest-ignore-unicode
 }
 
 print_conda_requirements() {
@@ -110,6 +111,8 @@ elif [[ "$DISTRIB" == "conda" ]]; then
     pip install patsy
     # dependencies that are only available through pip
     pip install nipype
+    # Allow nose to ignore unicode in doctest
+    pip install doctest-ignore-unicode
 
 else
     echo "Unrecognized distribution ($DISTRIB); cannot setup travis environment."
