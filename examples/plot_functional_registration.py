@@ -12,7 +12,7 @@ variable head tissue.
 """
 
 
-def _fix_obliquity(to_fix_filename, reference_filename, fixed_filename=None,
+def _fix_obliquity(to_fix_filename, reference_filename,
                    caching_dir=None, clear_memory=False, overwrite=False):
     if caching_dir is None:
         caching_dir = os.getcwd()
@@ -32,29 +32,29 @@ def _fix_obliquity(to_fix_filename, reference_filename, fixed_filename=None,
     orig_reference_filename = fname_presuffix(os.path.join(
         tmp_folder, reference_basename), suffix='+orig.BRIK',
         use_ext=False)
-    out_copy_oblique = copy(in_file=reference_filename,
-                            out_file=orig_reference_filename,
-                            environ=environ)
+    if not os.path.isfile(orig_reference_filename) or overwrite:
+        out_copy_oblique = copy(in_file=reference_filename,
+                                out_file=orig_reference_filename,
+                                environ=environ)
+        orig_reference_filename = out_copy_oblique.outputs.out_file
 
     to_fix_basename = os.path.basename(to_fix_filename)
     orig_to_fix_filename = fname_presuffix(os.path.join(
         tmp_folder, to_fix_basename), suffix='+orig.BRIK',
         use_ext=False)
-    out_copy = copy(in_file=to_fix_filename,
-                    out_file=orig_to_fix_filename,
-                    environ=environ)
+    if not os.path.isfile(orig_to_fix_filename) or overwrite:
+        out_copy = copy(in_file=to_fix_filename,
+                        out_file=orig_to_fix_filename,
+                        environ=environ)
+        orig_to_fix_filename = out_copy.outputs.out_file
 
-    out_refit = refit(in_file=out_copy.outputs.out_file,
-                      atrcopy=(out_copy_oblique.outputs.out_file,
+    out_refit = refit(in_file=orig_to_fix_filename,
+                      atrcopy=(orig_reference_filename,
                                'IJK_TO_DICOM_REAL'))
-    if fixed_filename:
-        out_copy = copy(in_file=out_refit.outputs.out_file,
-                        environ=environ,
-                        out_file=fixed_filename)
-    else:
-        out_copy = copy(in_file=out_refit.outputs.out_file,
-                        environ={'AFNI_DECONFLICT': 'OVERWRITE'},
-                        out_file=to_fix_filename)
+
+    out_copy = copy(in_file=out_refit.outputs.out_file,
+                    environ={'AFNI_DECONFLICT': 'OVERWRITE'},
+                    out_file=to_fix_filename)
 
     if clear_memory:
         shutil.rmtree(tmp_folder)  # XXX to do later on
@@ -65,7 +65,7 @@ def _fix_obliquity(to_fix_filename, reference_filename, fixed_filename=None,
 # Retrieve the data
 from sammba import data_fetchers
 
-retest = data_fetchers.fetch_zurich_test_retest(subjects=[1])
+retest = data_fetchers.fetch_zurich_test_retest(subjects=[0])
 
 ##############################################################################
 # and define the caching repository
@@ -271,11 +271,11 @@ out_catmatvec = catmatvec(in_file=[(mat_filename, 'ONELINE')],
 # 3dWarp doesn't put the obliquity in the header, so do it manually
 # This step generates one file per slice and per time point, so we are making
 # sure they are removed at the end
-stop
-a = _fix_obliquity(registered_anat_filename, unbiased_func_filename,
-               fixed_filename=fname_presuffix(registered_anat_filename,
-                                              suffix='_Ob'),
-               caching_dir=os.path.dirname(unbiased_func_filename))
+registered_anat_oblique_filename = _fix_obliquity(
+    registered_anat_filename, unbiased_func_filename,
+#    fixed_filename=fname_presuffix(registered_anat_filename, suffix='_Ob'),
+    caching_dir=os.path.dirname(unbiased_func_filename),
+    overwrite=False)
 
 ##############################################################################
 # Per-slice registration
@@ -284,17 +284,16 @@ a = _fix_obliquity(registered_anat_filename, unbiased_func_filename,
 # registration.
 #
 # Slice anatomical image
-anat_img = nibabel.load(registered_anat_filename)
+anat_img = nibabel.load(registered_anat_oblique_filename)
 anat_n_slices = anat_img.header.get_data_shape()[2]
 slicer = memory.cache(afni.ZCutUp)
 sliced_registered_anat_filenames = []
 for slice_n in range(anat_n_slices):
-    out_slicer = slicer(in_file=registered_anat_filename,
+    out_slicer = slicer(in_file=registered_anat_oblique_filename,
                         keep='{0} {1}'.format(slice_n, slice_n),
-                        out_file=fname_presuffix(registered_anat_filename,
+                        out_file=fname_presuffix(registered_anat_oblique_filename,
                                                  suffix='Sl%d' % slice_n))
     sliced_registered_anat_filenames.append(out_slicer.outputs.out_file)
-
 ##############################################################################
 # and mean functional
 sliced_bias_corrected_filenames = []
@@ -306,8 +305,6 @@ for slice_n in range(n_slices):
                         out_file=fname_presuffix(unbiased_func_filename,
                                                  suffix='Sl%d' % slice_n))
     sliced_bias_corrected_filenames.append(out_slicer.outputs.out_file)
-
-# XXX Fix caching of slicer
 
 ##############################################################################
 # Below line is to deal with slices where there is no signal (for example
@@ -360,22 +357,24 @@ for (resampled_bias_corrected_filename,
 ##############################################################################
 # Finally, resample the mean volume back to the initial resolution,
 voxel_size = nibabel.load(sliced_bias_corrected_filename).header.get_zooms()
+resampled_warped_slices = []
 for warped_slice in warped_slices:
     out_resample = resample(in_file=warped_slice,
                             voxel_size=voxel_size + (voxel_size[0],),
-                            out_file=warped_slice,
-                            environ={'AFNI_DECONFLICT': 'OVERWRITE'})
+                            outputtype='NIFTI_GZ')
+    resampled_warped_slices.append(out_resample.outputs.out_file)
 
 ##############################################################################
 # fix the obliquity,
-for (resampled_registered_anat_filename, warped_slice) in zip(
-        resampled_registered_anat_filenames, warped_slices):
-    _fix_obliquity(warped_slice, resampled_registered_anat_filename)
+for (resampled_registered_anat_filename, resampled_warped_slice) in zip(
+        resampled_registered_anat_filenames, resampled_warped_slices):
+    _ = _fix_obliquity(resampled_warped_slice,
+                       resampled_registered_anat_filename)
 
 ###############################################################################
 # and merge all slices !
 merge = memory.cache(fsl.Merge)
-out_merge = merge(in_files=warped_slices, dimension='z')
+out_merge = merge(in_files=resampled_warped_slices, dimension='z')
 
 ###############################################################################
 # Apply warp
@@ -426,8 +425,11 @@ out_merge_anat = merge(in_files=resampled_registered_anat_filenames,
 
 ###############################################################################
 # Check out the result
-from nilearn import plotting
+from nilearn import plotting, image
 
-display = plotting.plot_anat(out_merge_func.outputs.merged_file)
+plotting.plot_epi(image.mean_img(out_merge_func.outputs.merged_file),
+                  title='registered mean EPI')
+display = plotting.plot_epi(out_merge.outputs.merged_file,
+                            title='anat edges on top of bias corrected mean EPI')
 display.add_edges(out_merge_anat.outputs.merged_file)
 plotting.show()
