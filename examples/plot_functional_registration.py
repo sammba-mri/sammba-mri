@@ -12,10 +12,15 @@ variable head tissue.
 """
 
 
-def _fix_obliquity(to_fix_filename, reference_filename, caching_dir=None,
-                   clear_memory=False):
+def _fix_obliquity(to_fix_filename, reference_filename, fixed_filename=None,
+                   caching_dir=None, clear_memory=False, overwrite=False):
     if caching_dir is None:
         caching_dir = os.getcwd()
+
+    if overwrite:
+        environ = {'AFNI_DECONFLICT': 'OVERWRITE'}
+    else:
+        environ = {}
 
     memory = Memory(caching_dir)
     copy = memory.cache(afni.Copy)
@@ -29,7 +34,7 @@ def _fix_obliquity(to_fix_filename, reference_filename, caching_dir=None,
         use_ext=False)
     out_copy_oblique = copy(in_file=reference_filename,
                             out_file=orig_reference_filename,
-                            environ={'AFNI_DECONFLICT': 'OVERWRITE'})
+                            environ=environ)
 
     to_fix_basename = os.path.basename(to_fix_filename)
     orig_to_fix_filename = fname_presuffix(os.path.join(
@@ -37,17 +42,24 @@ def _fix_obliquity(to_fix_filename, reference_filename, caching_dir=None,
         use_ext=False)
     out_copy = copy(in_file=to_fix_filename,
                     out_file=orig_to_fix_filename,
-                    environ={'AFNI_DECONFLICT': 'OVERWRITE'})
+                    environ=environ)
 
     out_refit = refit(in_file=out_copy.outputs.out_file,
                       atrcopy=(out_copy_oblique.outputs.out_file,
                                'IJK_TO_DICOM_REAL'))
-    out_copy = copy(in_file=out_refit.outputs.out_file,
-                    environ={'AFNI_DECONFLICT': 'OVERWRITE'},
-                    out_file=to_fix_filename)
+    if fixed_filename:
+        out_copy = copy(in_file=out_refit.outputs.out_file,
+                        environ=environ,
+                        out_file=fixed_filename)
+    else:
+        out_copy = copy(in_file=out_refit.outputs.out_file,
+                        environ={'AFNI_DECONFLICT': 'OVERWRITE'},
+                        out_file=to_fix_filename)
+
     if clear_memory:
         shutil.rmtree(tmp_folder)  # XXX to do later on
         memory.clear_previous_run()
+    return out_copy.outputs.out_file
 
 ##############################################################################
 # Retrieve the data
@@ -259,7 +271,10 @@ out_catmatvec = catmatvec(in_file=[(mat_filename, 'ONELINE')],
 # 3dWarp doesn't put the obliquity in the header, so do it manually
 # This step generates one file per slice and per time point, so we are making
 # sure they are removed at the end
-_fix_obliquity(registered_anat_filename, unbiased_func_filename,
+stop
+a = _fix_obliquity(registered_anat_filename, unbiased_func_filename,
+               fixed_filename=fname_presuffix(registered_anat_filename,
+                                              suffix='_Ob'),
                caching_dir=os.path.dirname(unbiased_func_filename))
 
 ##############################################################################
