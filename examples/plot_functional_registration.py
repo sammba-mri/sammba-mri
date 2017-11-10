@@ -40,7 +40,7 @@ catmatvec = memory.cache(afni.CatMatvec)
 
 func_filename = '/tmp/func.nii.gz'
 anat_filename = '/tmp/anat.nii.gz'
-if not os.path.isfile(func_filename) or not os.path.isfile(anat_filename):
+if os.path.isfile(func_filename) or not os.path.isfile(anat_filename):
     out_refit = refit(in_file=retest.func[0], xyzscale=.1)
     out_center_mass = center_mass(
         in_file=out_refit.outputs.out_file,
@@ -61,8 +61,8 @@ if not os.path.isfile(func_filename) or not os.path.isfile(anat_filename):
         shutil.copy(raw_filename, filename)
         img = nibabel.load(filename)
         header = img.header
-        sform, code = header.get_sform(coded=True)
-        np.savetxt(os.path.join(cache_directory, 'sform.txt'), sform)
+        sform0, code = header.get_sform(coded=True)
+        np.savetxt(os.path.join(cache_directory, 'sform.txt'), sform0)
         catmatvec_out_file = os.path.join(cache_directory, 'cat.1D')
         out_catmatvec = catmatvec(
             in_file=[(os.path.join(cache_directory, 'sform.txt'), 'ONELINE'),
@@ -72,6 +72,10 @@ if not os.path.isfile(func_filename) or not os.path.isfile(anat_filename):
             out_file=catmatvec_out_file)
         sform = np.loadtxt(catmatvec_out_file)
         sform = np.hstack((sform, [0, 0, 0, 1])).reshape((4, 4))
+        sform1 = sform0.copy()
+        sform1[0] *= -1
+        sform1[[1, 2]] = sform1[[2, 1]]
+        np.testing.assert_array_equal(sform, sform1)
         header.set_sform(sform)
         header.set_qform(sform, int(code), strip_shears=False)
         nibabel.Nifti1Image(img.get_data(), sform, header).to_filename(filename)
