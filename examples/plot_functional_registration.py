@@ -41,12 +41,12 @@ catmatvec = memory.cache(afni.CatMatvec)
 func_filename = '/tmp/func.nii.gz'
 anat_filename = '/tmp/anat.nii.gz'
 if not os.path.isfile(func_filename) or not os.path.isfile(anat_filename):
-    out_refit = refit(in_file=retest.func[0], xdel=.1, ydel=.1, zdel=.1)
+    out_refit = refit(in_file=retest.func[0], xyzscale=.1)
     out_center_mass = center_mass(
         in_file=out_refit.outputs.out_file,
         cm_file=os.path.join(cache_directory, 'cm.txt'),
         set_cm=(0, 0, 0))
-    
+
     # orientation correctors for use later
     # https://en.wikipedia.org/wiki/Rotation_formalisms_in_three_dimensions
     # Euler_angles_.28_z-y.E2.80.99-x.E2.80.B3_intrinsic.29_.E2.86.92_Rotation_matrix
@@ -54,7 +54,7 @@ if not os.path.isfile(func_filename) or not os.path.isfile(anat_filename):
                np.atleast_2d([1, 0, 0, 0, 0, 0, 1, 0, 0, -1, 0, 0]), fmt='%d')
     np.savetxt(os.path.join(cache_directory, 'y180.1d'),
                np.atleast_2d([-1, 0, 0, 0, 0, 1, 0, 0, 0, 0, -1, 0]), fmt='%d')
-    
+
     for raw_filename, filename in zip([retest.anat[0],
                                        out_center_mass.outputs.out_file],
                                       [anat_filename, func_filename]):
@@ -191,9 +191,11 @@ rigid_transform_file = out_allineate.outputs.out_matrix
 # functional
 catmatvec = memory.cache(afni.CatMatvec)
 catmatvec_out_file = fname_presuffix(rigid_transform_file, suffix='INV')
-out_catmatvec = catmatvec(in_file=[(rigid_transform_file, 'I')],
-                          oneline=True,
-                          out_file=catmatvec_out_file)
+if not os.path.isfile(catmatvec_out_file):
+    out_catmatvec = catmatvec(in_file=[(rigid_transform_file, 'I')],
+                              oneline=True,
+                              out_file=catmatvec_out_file)
+    # XXX not cached I don't understand why
 out_allineate = allineate(
     in_file=unbiased_anat_filename,
     master=unbiased_func_filename,
@@ -218,8 +220,9 @@ out_warp = warp(in_file=anat_filename,
                 verbose=True)
 allineated_anat_filename = out_warp.outputs.out_file
 mat_filename = fname_presuffix(allineated_anat_filename, suffix='_warp.mat',
-                               useext=False)
-np.savetxt(mat_filename, [out_warp.runtime.stdout], fmt='%s')
+                               use_ext=False)
+if not os.path.isfile(mat_filename):
+    np.savetxt(mat_filename, [out_warp.runtime.stdout], fmt='%s')
 
 # Reformat transform matrix
 catmatvec = memory.cache(afni.CatMatvec)
@@ -271,11 +274,6 @@ def _fix_obliquity(to_fix_filename, reference_filename, caching_dir=None,
         memory.clear_previous_run()
 
 
-copy = memory.cache(afni.Copy)
-tmp_folder = os.path.join(
-    os.path.dirname(unbiased_func_filename), 'tmp')
-if not os.path.isdir(tmp_folder):
-    os.makedirs(tmp_folder)
 _fix_obliquity(allineated_anat_filename, unbiased_func_filename,
                caching_dir=os.path.dirname(unbiased_func_filename))
 
@@ -367,34 +365,7 @@ for warped_slice in warped_slices:
 
 for (resampled_allineated_anat_filename, warped_slice) in zip(
         resampled_allineated_anat_filenames, warped_slices):
-    tmp_folder = os.path.join(
-        os.path.dirname(resampled_allineated_anat_filename), 'tmp')
-    if not os.path.isdir(tmp_folder):
-        os.makedirs(tmp_folder)
-
-    resampled_allineated_anat_basename = os.path.basename(resampled_allineated_anat_filename)
-    orig_resampled_allineated_anat_filename = fname_presuffix(os.path.join(
-        tmp_folder, resampled_allineated_anat_filename), suffix='+orig.BRIK',
-        use_ext=False)
-    out_copy_oblique = copy(in_file=resampled_allineated_anat_filename,
-                            out_file=orig_resampled_allineated_anat_filename,
-                            environ={'AFNI_DECONFLICT': 'OVERWRITE'})
-
-    warped_slice_basename = os.path.basename(warped_slice)
-    orig_warped_slice_filename = fname_presuffix(os.path.join(
-        tmp_folder, warped_slice_basename), suffix='+orig.BRIK',
-        use_ext=False)
-    out_copy = copy(in_file=warped_slice,
-                    out_file=orig_warped_slice_filename,
-                    environ={'AFNI_DECONFLICT': 'OVERWRITE'})
-
-    out_refit = refit(in_file=out_copy.outputs.out_file,
-                      atrcopy=(out_copy_oblique.outputs.out_file,
-                               'IJK_TO_DICOM_REAL'))
-    out_copy = copy(in_file=out_refit.outputs.out_file,
-                    environ={'AFNI_DECONFLICT': 'OVERWRITE'},
-                    out_file=warped_slice)
-    # shutil.rmtree(tmp_folder) # XXX to do later on
+    _fix_obliquity(warped_slice, resampled_allineated_anat_filename)
 
 ###############################################################################
 # Finally, merge all slices !
@@ -409,19 +380,19 @@ out_merge = merge(in_files=warped_slices, dimension='z')
 
 ###############################################################################
 # Slice
-allineated_oblique_filenames = []
+sliced_func_filenames = []
 for slice_n in range(n_slices):
     out_slicer = slicer(in_file=allineated_oblique_filename,
                         keep='{0} {1}'.format(slice_n, slice_n),
                         out_file=fname_presuffix(allineated_oblique_filename,
                                                  suffix='Sl%d' % slice_n))
-    allineated_oblique_filenames.append(out_slicer.outputs.out_file)
+    sliced_func_filenames.append(out_slicer.outputs.out_file)
 
 ###############################################################################
 # Check no empty slice
 empty_slices = []
-for n, allineated_oblique_filename in enumerate(allineated_oblique_filenames):
-    out_clip_func = clip_level(in_file=allineated_oblique_filename)
+for n, sliced_func_filename in enumerate(sliced_func_filenames):
+    out_clip_func = clip_level(in_file=sliced_func_filename)
     if out_clip_func.outputs.clip_val < 1e-7:
         empty_slices.append(n)
 
@@ -430,8 +401,8 @@ assert(empty_slices == [])
 ###############################################################################
 # Resample
 resampled_func_filenames = []
-for allineated_oblique_filename in allineated_oblique_filenames:
-    out_resample = resample(in_file=allineated_oblique_filename,
+for sliced_func_filename in sliced_func_filenames:
+    out_resample = resample(in_file=sliced_func_filename,
                             voxel_size=(.1, .1, voxel_size_z),
                             outputtype='NIFTI_GZ')
     resampled_func_filenames.append(out_resample.outputs.out_file)
@@ -440,47 +411,22 @@ for allineated_oblique_filename in allineated_oblique_filenames:
 # Apply the previously computed warp
 warp_apply = memory.cache(afni.NwarpApply)
 warped_func_slices = []
-for (allineated_oblique_filename, warp_filename) in zip(
-        allineated_oblique_filenames, warp_filenames):
-    out_warp_apply = warp_apply(in_file=allineated_oblique_filename,
+for (resampled_func_filename, warp_filename) in zip(
+        resampled_func_filenames, warp_filenames):
+    out_warp_apply = warp_apply(in_file=resampled_func_filename,
                                 warp=warp_filename,
                                 out_file=fname_presuffix(
-                                    allineated_oblique_filename, suffix='_qw'))
+                                    resampled_func_filename, suffix='_qw'))
     warped_func_slices.append(out_warp_apply.outputs.out_file)
 
 ###############################################################################
 # and fix the obliquity
 for (resampled_allineated_anat_filename, warped_func_slice) in zip(
         resampled_allineated_anat_filenames, warped_func_slices):
-    tmp_folder = os.path.join(
-        os.path.dirname(resampled_allineated_anat_filename), 'tmp')
-    if not os.path.isdir(tmp_folder):
-        os.makedirs(tmp_folder)
+    _fix_obliquity(warped_func_slice, resampled_allineated_anat_filename)
 
-    resampled_allineated_anat_basename = os.path.basename(resampled_allineated_anat_filename)
-    orig_resampled_allineated_anat_filename = fname_presuffix(os.path.join(
-        tmp_folder, resampled_allineated_anat_basename), suffix='+orig.BRIK',
-        use_ext=False)
-    out_copy_oblique = copy(in_file=resampled_allineated_anat_filename,
-                            out_file=orig_resampled_allineated_anat_filename,
-                            environ={'AFNI_DECONFLICT': 'OVERWRITE'})
-
-    warped_func_slice_basename = os.path.basename(warped_func_slice)
-    orig_warped_slice_filename = fname_presuffix(os.path.join(
-        tmp_folder, warped_func_slice_basename), suffix='+orig.BRIK',
-        use_ext=False)
-    out_copy = copy(in_file=warped_func_slice,
-                    out_file=orig_warped_slice_filename,
-                    environ={'AFNI_DECONFLICT': 'OVERWRITE'})
-
-    out_refit = refit(in_file=out_copy.outputs.out_file,
-                      atrcopy=(out_copy_oblique.outputs.out_file,
-                               'IJK_TO_DICOM_REAL'))
-    out_copy = copy(in_file=out_refit.outputs.out_file,
-                    environ={'AFNI_DECONFLICT': 'OVERWRITE'},
-                    out_file=warped_func_slice)
-    # shutil.rmtree(tmp_folder) # XXX to do later on
 
 ###############################################################################
 # Finally, merge all slices !
 out_merge = merge(in_files=warped_func_slices, dimension='z')
+out_merge = merge(in_files=resampled_allineated_anat_filenames, dimension='z')
