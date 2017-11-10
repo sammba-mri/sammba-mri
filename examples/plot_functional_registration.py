@@ -297,17 +297,6 @@ for slice_n in range(n_slices):
 ##############################################################################
 # Below line is to deal with slices where there is no signal (for example
 # rostral end of some anatomicals)
-empty_slices = []
-for n, (sliced_bias_corrected_filename,
-        sliced_registered_anat_filename) in enumerate(
-        zip(sliced_bias_corrected_filenames,
-            sliced_registered_anat_filenames)):
-    out_clip_anat = clip_level(in_file=sliced_registered_anat_filename)
-    out_clip_func = clip_level(in_file=sliced_bias_corrected_filename)
-    if out_clip_anat.outputs.clip_val < 1e-7 or out_clip_func.outputs.clip_val < 1e-7:
-        empty_slices.append(n)
-
-assert(empty_slices == [])
 
 ##############################################################################
 # The inverse warp frequently fails, Resampling can help it work better
@@ -385,16 +374,6 @@ for slice_n in range(n_slices):
                         out_file=fname_presuffix(allineated_filename,
                                                  suffix='Sl%d' % slice_n))
     sliced_func_filenames.append(out_slicer.outputs.out_file)
-
-###############################################################################
-# sanitizing,
-empty_slices = []
-for n, sliced_func_filename in enumerate(sliced_func_filenames):
-    out_clip_func = clip_level(in_file=sliced_func_filename)
-    if out_clip_func.outputs.clip_val < 1e-7:
-        empty_slices.append(n)
-
-assert(empty_slices == [])
 
 ###############################################################################
 # and resampling.
