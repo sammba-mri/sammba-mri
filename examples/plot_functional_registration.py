@@ -40,7 +40,7 @@ catmatvec = memory.cache(afni.CatMatvec)
 
 func_filename = '/tmp/func.nii.gz'
 anat_filename = '/tmp/anat.nii.gz'
-if os.path.isfile(func_filename) or not os.path.isfile(anat_filename):
+if not os.path.isfile(func_filename) or not os.path.isfile(anat_filename):
     out_refit = refit(in_file=retest.func[0], xyzscale=.1)
     out_center_mass = center_mass(
         in_file=out_refit.outputs.out_file,
