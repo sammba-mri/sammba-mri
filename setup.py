@@ -171,7 +171,7 @@ if __name__ == "__main__":
               'Programming Language :: Python :: 3.4',
           ],
           packages=find_packages(),
-          package_data={'sammba.testing.data': ['*.nii', '*.nii.gz'],
+          package_data={'sammba.testing_data': ['*.nii', '*.nii.gz'],
                         'sammba.data_fetchers.description': ['*.rst'],
                         },
 install_requires=install_requires,)
