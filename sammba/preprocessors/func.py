@@ -8,10 +8,16 @@ from sammba.interfaces import RatsMM
 from .utils import fix_obliquity
 
 
-def register_func_to_anat(func_filename, anat_filename, write_dir, tr,
+def register_func_to_anat(func_filename, anat_filename, tr, write_dir,
                           caching=False):
+    """
+    The functional volume is aligned to the anatomical, first with a rigid body
+    registration and then on a per-slice basis (only a fine correction, this is
+    mostly for correction of EPI distortion). This pipeline includes
+    slice timing.
+    """
     if caching:
-        memory = Memory(write_dir)
+        memory = Memory(write_dir, base_dir='sammba_cache')
         tshift = memory.cache(afni.TShift)
         clip_level = memory.cache(afni.ClipLevel)
         threshold = memory.cache(fsl.Threshold)
@@ -23,11 +29,14 @@ def register_func_to_anat(func_filename, anat_filename, write_dir, tr,
         rats = memory.cache(RatsMM)
         calc = memory.cache(afni.Calc)
         allineate = memory.cache(afni.Allineate)
+        allineate2 = memory.cache(afni.Allineate)
+        unifize = memory.cache(afni.Unifize)
         catmatvec = memory.cache(afni.CatMatvec)
         warp = memory.cache(afni.Warp)
         resample = memory.cache(afni.Resample)
         slicer = memory.cache(afni.ZCutUp)
         warp_apply = memory.cache(afni.NwarpApply)
+        qwarp = memory.cache(afni.Qwarp)
         merge = memory.cache(fsl.Merge)
     else:
         tshift = afni.TShift().run
@@ -35,20 +44,24 @@ def register_func_to_anat(func_filename, anat_filename, write_dir, tr,
         threshold = fsl.Threshold().run
         volreg = afni.Volreg().run
         allineate = afni.Allineate().run
+        allineate2 = afni.Allineate().run  # TODO: remove after fixed bug
         copy_geom = fsl.CopyGeom().run
         bias_correct = ants.N4BiasFieldCorrection().run
         tstat = afni.TStat().run
         rats = RatsMM().run
         calc = afni.Calc().run
         allineate = afni.Allineate().run
+        unifize = afni.Unifize().run
         catmatvec = afni.CatMatvec().run
         warp = afni.Warp().run
         resample = afni.Resample().run
         slicer = afni.ZCutUp().run
         warp_apply = afni.NwarpApply().run
+        qwarp = afni.Qwarp().run
         merge = fsl.Merge().run
 
     # Correct slice timing
+    os.chdir(write_dir)
     out_tshift = tshift(in_file=func_filename,
                         outputtype='NIFTI_GZ',
                         tpattern='altplus',
@@ -70,8 +83,8 @@ def register_func_to_anat(func_filename, anat_filename, write_dir, tr,
                                            use_ext=False)
     out_volreg = volreg(in_file=thresholded_filename,
                         outputtype='NIFTI_GZ',
-                        oned_file=oned_filename,
-                        oned_matrix_save=oned_matrix_filename)  # XXX dfile not saved
+                        oned_file=oned_filename,  # XXX dfile not saved
+                        oned_matrix_save=oned_matrix_filename)
     # XXX: bad output: up and down on y-axis
 
     # Apply the registration to the whole head
@@ -82,7 +95,7 @@ def register_func_to_anat(func_filename, anat_filename, write_dir, tr,
                               out_file=allineated_filename)
 
     # 3dAllineate removes the obliquity. This is not a good way to readd it as
-    # removes motion correction info in the header if it were an AFNI file...as 
+    # removes motion correction info in the header if it were an AFNI file...as
     # it happens it's NIfTI which does not store that so irrelevant!
     out_copy_geom = copy_geom(dest_file=out_allineate.outputs.out_file,
                               in_file=out_volreg.outputs.out_file)
@@ -100,7 +113,6 @@ def register_func_to_anat(func_filename, anat_filename, write_dir, tr,
     unbiased_func_filename = out_bias_correct.outputs.output_image
 
     # Bias correct the antomical image
-    unifize = memory.cache(afni.Unifize)
     out_unifize = unifize(in_file=anat_filename, outputtype='NIFTI_GZ')
     unbiased_anat_filename = out_unifize.outputs.out_file
 
@@ -118,7 +130,7 @@ def register_func_to_anat(func_filename, anat_filename, write_dir, tr,
 
     # Compute the transformation from the functional image to the anatomical
     # XXX: why in this sense
-    out_allineate = allineate(
+    out_allineate = allineate2(
         in_file=out_cacl.outputs.out_file,
         reference=unbiased_anat_filename,
         out_matrix='BmBe_shr.aff12.1D',
@@ -130,9 +142,9 @@ def register_func_to_anat(func_filename, anat_filename, write_dir, tr,
     # apply the inverse transformation to register to the anatomical volume
     catmatvec_out_file = fname_presuffix(rigid_transform_file, suffix='INV')
     if not os.path.isfile(catmatvec_out_file):
-        out_catmatvec = catmatvec(in_file=[(rigid_transform_file, 'I')],
-                                  oneline=True,
-                                  out_file=catmatvec_out_file)
+        _ = catmatvec(in_file=[(rigid_transform_file, 'I')],
+                      oneline=True,
+                      out_file=catmatvec_out_file)
         # XXX not cached I don't understand why
     out_allineate = allineate(
         in_file=unbiased_anat_filename,
@@ -156,18 +168,11 @@ def register_func_to_anat(func_filename, anat_filename, write_dir, tr,
     if not os.path.isfile(mat_filename):
         np.savetxt(mat_filename, [out_warp.runtime.stdout], fmt='%s')
 
-    # Reformat transform matrix
-    out_catmatvec = catmatvec(in_file=[(mat_filename, 'ONELINE')],
-                              out_file=fname_presuffix(mat_filename,
-                                                       suffix='.aff12.1D ',
-                                                       use_ext=False))  # XXX not used
-
     # 3dWarp doesn't put the obliquity in the header, so do it manually
-    # This step generates one file per slice and per time point, so we are making
-    # sure they are removed at the end
+    # This step generates one file per slice and per time point, so we are
+    # making sure they are removed at the end
     registered_anat_oblique_filename = fix_obliquity(
         registered_anat_filename, unbiased_func_filename,
-        caching_dir=os.path.dirname(unbiased_func_filename),
         overwrite=False)
 
     # Slice anatomical image
@@ -193,20 +198,19 @@ def register_func_to_anat(func_filename, anat_filename, write_dir, tr,
                                                      suffix='Sl%d' % slice_n))
         sliced_bias_corrected_filenames.append(out_slicer.outputs.out_file)
 
-    ##############################################################################
     # Below line is to deal with slices where there is no signal (for example
     # rostral end of some anatomicals)
-    
+
     # The inverse warp frequently fails, Resampling can help it work better
     voxel_size_z = anat_img.header.get_zooms()[2]
-    
     resampled_registered_anat_filenames = []
     for sliced_registered_anat_filename in sliced_registered_anat_filenames:
         out_resample = resample(in_file=sliced_registered_anat_filename,
                                 voxel_size=(.1, .1, voxel_size_z),
                                 outputtype='NIFTI_GZ')
-        resampled_registered_anat_filenames.append(out_resample.outputs.out_file)
-    
+        resampled_registered_anat_filenames.append(
+            out_resample.outputs.out_file)
+
     resampled_bias_corrected_filenames = []
     for sliced_bias_corrected_filename in sliced_bias_corrected_filenames:
         out_resample = resample(in_file=sliced_bias_corrected_filename,
@@ -216,7 +220,6 @@ def register_func_to_anat(func_filename, anat_filename, write_dir, tr,
             out_resample.outputs.out_file)
 
     # single slice non-linear functional to anatomical registration
-    qwarp = memory.cache(afni.Qwarp)
     warped_slices = []
     warp_filenames = []
     for (resampled_bias_corrected_filename,
@@ -291,10 +294,12 @@ def register_func_to_anat(func_filename, anat_filename, write_dir, tr,
     # XXX why no resampling back before ?
     for (resampled_registered_anat_filename, warped_func_slice) in zip(
             resampled_registered_anat_filenames, warped_func_slices):
-        fix_obliquity(warped_func_slice, resampled_registered_anat_filename)
+        _ = fix_obliquity(warped_func_slice,
+                          resampled_registered_anat_filename)
 
     # Finally, merge all slices !
     out_merge_func = merge(in_files=warped_func_slices, dimension='z')
     out_merge_anat = merge(in_files=resampled_registered_anat_filenames,
                            dimension='z')
-    return out_merge_func.outputs.out_file, out_merge_anat.outputs.out_file
+    return (out_merge_func.outputs.merged_file,
+            out_merge_anat.outputs.merged_file)
