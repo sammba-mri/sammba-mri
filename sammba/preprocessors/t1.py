@@ -6,36 +6,71 @@ from sammba.externals.nipype.caching import Memory
 from sklearn.datasets.base import Bunch
 
 
-def register_to_common(t1_filenames, write_dir, common_filename=None,
-                       brain_volume=400, registration_kind='nonlinear',
-                       nonlinear_iters=3, nonlinear_levels=[1, 2, 3],
+def register_to_common(t1_filenames, write_dir, brain_volume=400,
+                       registration_kind='affine',
+                       nonlinear_levels=[1, 2, 3],
                        nonlinear_minimal_patch=75,
-                       convergence=0.005, caching=False):
-    """
-    The functional volume is aligned to the anatomical, first with a rigid body
-    registration and then on a per-slice basis (only a fine correction, this is
-    mostly for correction of EPI distortion). This pipeline includes
-    slice timing.
+                       convergence=0.005, caching=False, verbose=0):
+    """ Create common template from native T1 weighted images and achieve
+    their registration to it.
 
     Parameters
     ----------
-    pipeline_graph : one of {'orig', 'hierarchical', 'flat', 'exec', 'colored'}
-        'orig': creates a top level graph without expanding internal
-        workflow nodes;
-        'flat': expands workflow nodes recursively;
-        'hierarchical': expands workflow nodes recursively with a notion
-        on hierarchy;
-        'colored': expands workflow nodes recursively with a
-        notion on hierarchy in color;
-        'exec': expands workflows to depict iterables
+    t1_filenames : list of str
+        Paths to the T1 weighted images.
+
+    write_dir : Str
+        Path to an existant directory to save output files to.
+
+    brain_volume : float, optional
+        Volumes of the brain as passed to Rats_MM brain extraction tool.
+        Default to 400 for the mouse brain.
+
+    registration_kind : one of {'rigid', 'affine', 'nonlinear'}, optional
+        The allowed transform kind.
+
+    nonlinear_levels : list of int, optional
+        Maximal levels for each nonlinear warping iteration. Passed iteratively
+        to sammba.externals.nipype.interfaces.afni.Qwarp
+
+    nonlinear_minimal_patch : int, optional
+        Minimal patch for the final nonlinear warp, passed to
+        sammba.externals.nipype.interfaces.afni.Qwarp
+
+    caching : bool, optional
+        If True, caching is used for all the registration steps.
+
+    convergence : float, optional
+        Convergence limit, passed to
+
+    verbose : bool, optional
+        If True, all steps are verbose.
+
+    Returns
+    -------
+    data : sklearn.datasets.base.Bunch
+        Dictionary-like object, the interest attributes are :
+
+        - 'registered': string list. Paths to registered images.
+        - 'transforms': string list. Paths to the transforms from the raw
+                        images to the registered images.
     """
-    registration_kinds = ['rigid-body', 'affine', 'nonlinear']
+    registration_kinds = ['rigid', 'affine', 'nonlinear']
     if registration_kind not in registration_kinds:
         raise ValueError(
             'Registration kind must be one of {0}, you entered {1}'.format(
                 registration_kinds, registration_kind))
+
     if caching:
+        if verbose:
+            terminal_output = 'allatonce'
+        else:
+            terminal_output = 'none'
+
         memory = Memory(write_dir)
+        copy = memory.cache(afni.Copy)
+        copy.interface().set_default_terminal_output('file')
+
         unifize = memory.cache(afni.Unifize)
         clip_level = memory.cache(afni.ClipLevel)
         rats = memory.cache(RatsMM)
@@ -54,26 +89,43 @@ def register_to_common(t1_filenames, write_dir, common_filename=None,
         nwarp_cat = memory.cache(afni.NwarpCat)
         warp_apply = memory.cache(afni.NwarpApply)
     else:
-        unifize = afni.Unifize().run
-        clip_level = afni.ClipLevel().run
-        rats = RatsMM().run
-        apply_mask = fsl.ApplyMask().run
-        center_mass = afni.CenterMass().run
-        refit = afni.Refit().run
-        tcat = afni.TCat().run
-        tstat = afni.TStat().run
-        undump = afni.Undump().run
-        resample = afni.Resample().run
-        allineate = afni.Allineate().run
-        allineate2 = afni.Allineate().run
-        mask_tool = afni.MaskTool().run
-        catmatvec = afni.CatMatvec().run
-        qwarp = afni.Qwarp().run
-        nwarp_cat = afni.NwarpCat().run
-        warp_apply = afni.NwarpApply().run
+        if verbose:
+            terminal_output = 'allatonce'
+        else:
+            terminal_output = 'none'
+
+        copy = afni.Copy(terminal_output=terminal_output).run
+        unifize = afni.Unifize(terminal_output=terminal_output).run
+        clip_level = afni.ClipLevel().run  # XXX fix nipype bug with 'none'
+        rats = RatsMM(terminal_output=terminal_output).run
+        apply_mask = fsl.ApplyMask(terminal_output=terminal_output).run
+        center_mass = afni.CenterMass(terminal_output=terminal_output).run
+        refit = afni.Refit(terminal_output=terminal_output).run
+        tcat = afni.TCat(terminal_output=terminal_output).run
+        tstat = afni.TStat(terminal_output=terminal_output).run
+        undump = afni.Undump(terminal_output=terminal_output).run
+        resample = afni.Resample(terminal_output=terminal_output).run
+        allineate = afni.Allineate(terminal_output=terminal_output).run
+        allineate2 = afni.Allineate(terminal_output=terminal_output).run
+        mask_tool = afni.MaskTool(terminal_output=terminal_output).run
+        catmatvec = afni.CatMatvec(terminal_output=terminal_output).run
+        qwarp = afni.Qwarp(terminal_output=terminal_output).run
+        nwarp_cat = afni.NwarpCat(terminal_output=terminal_output).run
+        warp_apply = afni.NwarpApply(terminal_output=terminal_output).run
 
     current_dir = os.getcwd()
     os.chdir(write_dir)
+
+    ###########################################################################
+    # First copy anatomical files, to make sure they are never changed
+    # and they have different names across individuals
+    copied_t1_filenames = []
+    for n, anat_file in enumerate(t1_filenames):
+        suffixed_file = fname_presuffix(anat_file, suffix='_{}'.format(n))
+        copied_file = os.path.join(write_dir, os.path.basename(suffixed_file))
+        out_copy = copy(in_file=anat_file, out_file=copied_file)
+        copied_t1_filenames.append(out_copy.outputs.out_file)
+
     ###########################################################################
     # Register using center of mass
     # -----------------------------
@@ -81,11 +133,8 @@ def register_to_common(t1_filenames, write_dir, common_filename=None,
     #
     # First we loop through anatomical scans and correct intensities for bias.
     unifized_files = []
-    for n, anat_file in enumerate(t1_filenames):
-        out_file = fname_presuffix(anat_file,
-                                   suffix='_{}_corrected'.format(n))
-        out_file = os.path.join(write_dir, os.path.basename(out_file))
-        out_unifize = unifize(in_file=anat_file, out_file=out_file)
+    for n, anat_file in enumerate(copied_t1_filenames):
+        out_unifize = unifize(in_file=anat_file, outputtype='NIFTI_GZ')
         unifized_files.append(out_unifize.outputs.out_file)
 
     ###########################################################################
@@ -98,7 +147,8 @@ def register_to_common(t1_filenames, write_dir, common_filename=None,
         out_rats = rats(
             in_file=unifized_file,
             volume_threshold=brain_volume,
-            intensity_threshold=int(out_clip_level.outputs.clip_val))
+            intensity_threshold=int(out_clip_level.outputs.clip_val),
+            terminal_output=terminal_output)
         out_apply_mask = apply_mask(in_file=unifized_file,
                                     mask_file=out_rats.outputs.out_file)
         out_center_mass = center_mass(
@@ -118,7 +168,8 @@ def register_to_common(t1_filenames, write_dir, common_filename=None,
     ###########################################################################
     # The brain files with new image center are concatenated to produce
     # a quality check video
-    out_tcat = tcat(in_files=brain_files, outputtype='NIFTI_GZ')
+    out_tcat = tcat(in_files=brain_files, outputtype='NIFTI_GZ',
+                    terminal_output=terminal_output)
 
     ###########################################################################
     # and averaged
@@ -206,47 +257,10 @@ def register_to_common(t1_filenames, write_dir, common_filename=None,
     out_tstat_shr = tstat(in_file=out_tcat.outputs.out_file,
                           outputtype='NIFTI_GZ')
 
-    if registration_kind == 'rigid-body':
-        os.chdir(write_dir)
-        return Bunch(registered_anats=shift_rotated_head_files,
+    if registration_kind == 'rigid':
+        os.chdir(current_dir)
+        return Bunch(registered=shift_rotated_head_files,
                      transforms=rigid_transform_files)
-
-    mask_node = pe.Node(afni.MaskTool(), name='generate_count_mask')
-    allineate_node3 = pe.Node(afni.Allineate(), name='affine_register')
-    catmatvec_node = pe.Node(afni.CatMatvec(), name='concatenate_transforms')
-    allineate_node4 = pe.Node(afni.Allineate(), name='apply_transform_on_head')
-    allineate_node5 = pe.Node(afni.Allineate(),
-                              name='apply_transform_on_brain')
-    tcat_node3 = pe.Node(
-        afni.TCat(), name='concatenate_affine_registred_across_individuals')
-    tstat_node3 = pe.Node(afni.TStat(),
-                          name='compute_affine_registred_average')
-
-    workflow.add_nodes([mask_node, allineate_node3, catmatvec_node,
-                        allineate_node4, allineate_node5,
-                        tcat_node3, tstat_node3])
-
-    workflow.connect(tcat_node2, 'out_file', mask_node, 'in_file')
-    workflow.connect(mask_node, 'out_file', allineate_node3, 'weight')
-    workflow.connect(allineate_node2, 'out_file', allineate_node3, 'in_file')
-    workflow.connect(allineate_node3, 'out_matrix', catmatvec_node, 'in_file')
-    #XXX how can we enter multiple files ? 
-    workflow.connect(catmatvec_node, 'out_file', allineate_node4, 'in_matrix')
-    workflow.connect(allineate_node, 'out_file', allineate_node4, 'in_file')
-
-    workflow.connect(unifize_node, 'out_file', catmatvec_node, 'in_file')
-    workflow.connect(rats_node, 'out_file', apply_mask_node, 'mask_file')
-    workflow.connect(apply_mask_node, 'out_file',
-                     center_mass_node, 'in_file')
-    workflow.connect(unifize_node, 'out_file', refit_node, 'in_file')
-    workflow.connect(center_mass_node, 'out_file',
-                     refit_node, 'duporigin_file')
-    workflow.connect(center_mass_node, 'out_file', tcat_node, 'in_files')
-    workflow.connect(tcat_node, 'out_file', tstat_node, 'in_file')
-    workflow.connect(tstat_node, 'out_file', undump_node, 'in_file')
-    workflow.connect(undump_node, 'out_file', refit_node2, 'in_file')
-    workflow.connect(refit_node, 'out_file', resample_node, 'master')
-    workflow.connect(refit_node2, 'out_file', resample_node, 'in_file')
 
     ###########################################################################
     # Affine transform
@@ -325,7 +339,7 @@ def register_to_common(t1_filenames, write_dir, common_filename=None,
 
     if registration_kind == 'affine':
         os.chdir(current_dir)
-        return Bunch(registered_anats=allineated_head_files,
+        return Bunch(registered=allineated_head_files,
                      transforms=affine_transform_files)
 
     ###########################################################################
@@ -346,6 +360,9 @@ def register_to_common(t1_filenames, write_dir, common_filename=None,
     # The input source images are initially transformed prior to registration,
     # to ensure that they are already quite well-aligned to the template.
     # To save time, we only achieve one refinement level per step
+    if nonlinear_levels is None:
+        nonlinear_levels = [1, 2, 3]
+
     warped_files = []
     warp_files = []
     for affine_transform_file, shifted_head_file in zip(affine_transform_files,
@@ -376,7 +393,7 @@ def register_to_common(t1_filenames, write_dir, common_filename=None,
     # 3dQwarp help for further detail).
     # The input transform is the former warp and needs to be concatenated to
     # IDENT initially; I forget why, I think it is to avoid some weird bug.
-    if nonlinear_iters > 1:
+    if len(nonlinear_levels) > 1:
         previous_warp_files = warp_files
         warped_files = []
         warp_files = []
@@ -409,8 +426,11 @@ def register_to_common(t1_filenames, write_dir, common_filename=None,
     # avoid building up reslice errors.
     # Warp with mini-patch
     # In this particular case, minpatch=75 corresponds to a level of 4
-    if nonlinear_iters > 2:
-        for n_iter in range(2, nonlinear_iters):
+    if len(nonlinear_levels) > 2:
+        if nonlinear_minimal_patch is None:
+            nonlinear_minimal_patch = 75
+
+        for n_iter, inilev in enumerate(nonlinear_levels[2:]):
             previous_warp_files = warp_files
             warped_files = []
             warp_files = []
@@ -424,18 +444,19 @@ def register_to_common(t1_filenames, write_dir, common_filename=None,
                     iwarp=True,
                     weight=out_mask_tool.outputs.out_file,
                     iniwarp=[warp_file],
-                    inilev=nonlinear_levels[n_iter],
+                    inilev=inilev,
                     minpatch=nonlinear_minimal_patch,
                     out_file=fname_presuffix(
-                        shifted_head_file, suffix='_warped{}'.format(n_iter)))
+                        shifted_head_file,
+                        suffix='_warped{}'.format(n_iter + 3)))
                 warped_files.append(out_qwarp.outputs.warped_source)
                 warp_files.append(out_qwarp.outputs.source_warp)
 
             out_tcat = tcat(
                 in_files=warped_files,
-                out_file=os.path.join(write_dir,
-                                      'warped_{0}iters_heads.nii.gz'.format(
-                                      n_iter)))
+                out_file=os.path.join(
+                    write_dir, 'warped_{0}iters_heads.nii.gz'.format(n_iter +
+                                                                     3)))
             out_tstat_warp_head = tstat(in_file=out_tcat.outputs.out_file,
                                         outputtype='NIFTI_GZ')
 
@@ -453,11 +474,11 @@ def register_to_common(t1_filenames, write_dir, common_filename=None,
             in_file=head_file,
             warp=warp_file,
             master=out_tstat_warp_head.outputs.out_file,
-            out_file=fname_presuffix(head_file,
-                                     suffix='_warped{}'.format(nonlinear_iters)
+            out_file=fname_presuffix(
+                head_file, suffix='_warped{}'.format(len(nonlinear_levels))
                                      ))
         warped_files.append(out_warp_apply.outputs.out_file)
 
     os.chdir(current_dir)
-    return Bunch(registered_anats=warped_files,
+    return Bunch(registered=warped_files,
                  transforms=warp_files)

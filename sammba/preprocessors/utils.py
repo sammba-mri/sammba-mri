@@ -8,27 +8,40 @@ from sammba.externals.nipype.interfaces import afni, fsl
 from sammba.interfaces import RatsMM
 
 
-def correct_affines(in_file, out_file, in_place=False, axes_to_permute=None,
-                    axes_to_flip=None, xyzscale=None, cm_file=None):
+def _reset_affines(in_file, out_file, overwrite=False, axes_to_permute=None,
+                   axes_to_flip=None, xyzscale=None, center_mass=None,
+                   verbose=1):
     """Sets the qform equal to the sform in the header, with optionally
        rescaling, setting the image center to 0, permuting or/and flipping axes
     """
-    shutil.copy(in_file, out_file)
+    if not os.path.isfile(out_file) or overwrite:
+        shutil.copy(in_file, out_file)
+    else:
+        return
+
+    if verbose:
+        terminal_output = 'stream'
+    else:
+        terminal_output = 'none'
+
     in_file = out_file
     if xyzscale is not None:
         refit = afni.Refit()
         refit.inputs.in_file = in_file
-        refit.inputs.xyzscale = .1
+        refit.inputs.xyzscale = xyzscale
+        refit.set_default_terminal_output(terminal_output)
         result = refit.run()
         in_file = result.outputs.out_file
 
-    if cm_file is not None:
-        center_mass = afni.CenterMass()
-        center_mass.inputs.in_file = in_file
-        center_mass.inputs.cm_file = fname_presuffix(out_file, suffix='.txt',
-                                                     use_ext=False)
-        center_mass.inputs.set_cm = (0, 0, 0)
-        result = center_mass.run()
+    if center_mass is not None:
+        set_center_mass = afni.CenterMass()
+        set_center_mass.inputs.in_file = in_file
+        set_center_mass.inputs.cm_file = fname_presuffix(out_file,
+                                                         suffix='.txt',
+                                                         use_ext=False)
+        set_center_mass.inputs.set_cm = center_mass
+        set_center_mass.set_default_terminal_output(terminal_output)
+        result = set_center_mass.run()
         in_file = result.outputs.out_file
 
     img = nibabel.load(in_file)
@@ -151,7 +164,6 @@ def create_pipeline_graph(pipeline_name, graph_file,
 
     #######################################################################
     # Specify rigid body registration pipeline steps
-    print(afni)
     unifize_node = pe.Node(interface=afni.Unifize(), name='bias_correct')
     clip_level_node = pe.Node(interface=afni.ClipLevel(),
                               name='compute_mask_threshold')
@@ -214,6 +226,47 @@ def create_pipeline_graph(pipeline_name, graph_file,
                      apply_allineate_node1, 'in_matrix')
     workflow.connect(apply_allineate_node1, 'out_file', tcat_node3, 'in_files')
     workflow.connect(tcat_node3, 'out_file', tstat_node3, 'in_file')
+    if pipeline_name in ['affine_registration', 'nonlinear_registration']:
+        mask_node = pe.Node(afni.MaskTool(), name='generate_count_mask')
+        allineate_node3 = pe.Node(afni.Allineate(), name='affine_register')
+        catmatvec_node = pe.Node(afni.CatMatvec(), name='concatenate_transforms')
+        allineate_node4 = pe.Node(afni.Allineate(), name='apply_transform_on_head')
+        allineate_node5 = pe.Node(afni.Allineate(),
+                                  name='apply_transform_on_brain')
+        tcat_node3 = pe.Node(
+            afni.TCat(), name='concatenate_affine_registred_across_individuals')
+        tstat_node3 = pe.Node(afni.TStat(),
+                              name='compute_affine_registred_average')
+    
+        workflow.add_nodes([mask_node, allineate_node3, catmatvec_node,
+                            allineate_node4, allineate_node5,
+                            tcat_node3, tstat_node3])
+    
+        workflow.connect(tcat_node2, 'out_file', mask_node, 'in_file')
+        workflow.connect(mask_node, 'out_file', allineate_node3, 'weight')
+        workflow.connect(allineate_node2, 'out_file', allineate_node3, 'in_file')
+        workflow.connect(allineate_node3, 'out_matrix', catmatvec_node, 'in_file')
+        #XXX how can we enter multiple files ? 
+        workflow.connect(catmatvec_node, 'out_file', allineate_node4, 'in_matrix')
+        workflow.connect(allineate_node, 'out_file', allineate_node4, 'in_file')
+    
+        workflow.connect(unifize_node, 'out_file', catmatvec_node, 'in_file')
+        workflow.connect(rats_node, 'out_file', apply_mask_node, 'mask_file')
+        workflow.connect(apply_mask_node, 'out_file',
+                         center_mass_node, 'in_file')
+        workflow.connect(unifize_node, 'out_file', refit_node, 'in_file')
+        workflow.connect(center_mass_node, 'out_file',
+                         refit_node, 'duporigin_file')
+        workflow.connect(center_mass_node, 'out_file', tcat_node, 'in_files')
+        workflow.connect(tcat_node, 'out_file', tstat_node, 'in_file')
+        workflow.connect(tstat_node, 'out_file', undump_node, 'in_file')
+        workflow.connect(undump_node, 'out_file', refit_node2, 'in_file')
+        workflow.connect(refit_node, 'out_file', resample_node, 'master')
+        workflow.connect(refit_node2, 'out_file', resample_node, 'in_file')
+
+    if pipeline_name == 'nonlinear_registration':
+        pass
+
     current_dir = os.getcwd()
     os.chdir(write_dir)
     _ = workflow.write_graph(graph2use=graph_kind, dotfilename=graph_file)

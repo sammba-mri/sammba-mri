@@ -108,3 +108,8 @@ ENV/
 
 # Rope project settings
 .ropeproject
+
+# AFNI generated files
+*.aff12.1D
+*.BRIK
+*.HEAD

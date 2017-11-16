@@ -39,7 +39,6 @@ func_filename = os.path.join(write_dir, 'func.nii.gz')
 anat_filename = os.path.join(write_dir, 'anat.nii.gz')
 preprocessors.correct_affines(in_file=retest.func[0],
                               xyzscale=.1,
-                              cm_file=os.path.join(write_dir, 'cm.txt'),
                               axes_to_permute=[(1, 2)],
                               axes_to_flip=[0],
                               out_file=func_filename)

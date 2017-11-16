@@ -2,13 +2,15 @@ import os
 import numpy as np
 import warnings
 import json
+from ..preprocessors.utils import _reset_affines
 from sklearn.datasets.base import Bunch
 from nilearn.datasets.utils import _fetch_files, _fetch_file, _get_dataset_dir
 from .utils import _get_dataset_descr
 
 
 def fetch_zurich_test_retest(subjects=range(15), sessions=[1], data_dir=None,
-                             url=None, resume=True, verbose=1):
+                             url=None, resume=True, verbose=1,
+                             correct_headers=False):
     """Download and loads the ETH-Zurich test-retest dataset.
 
     Parameters
@@ -152,6 +154,31 @@ def fetch_zurich_test_retest(subjects=range(15), sessions=[1], data_dir=None,
         anat.append(a)
 
     fdescr = _get_dataset_descr(dataset_name)
+
+    # This data has wrong sforms and qforms in the headers, so we correct them.
+    if correct_headers:
+        corrected_anat = []
+        for a in anat:
+            corrected_a = os.path.join(os.path.dirname(a),
+                                       '3DRARE_corrected.nii.gz')
+            _reset_affines(a, corrected_a,
+                           axes_to_permute=[(1, 2)],
+                           axes_to_flip=[0],
+                           verbose=0)
+            corrected_anat.append(corrected_a)
+        corrected_func = []
+        for f in func:
+            corrected_f = os.path.join(os.path.dirname(f),
+                                       'rsfMRI_corrected.nii.gz')
+            _reset_affines(f, corrected_f,
+                           center_mass=(0, 0, 0),
+                           xyzscale=.1,
+                           axes_to_permute=[(1, 2)],
+                           axes_to_flip=[0],
+                           verbose=0)
+            corrected_func.append(corrected_f)
+        anat = corrected_anat
+        func = corrected_func
 
     return Bunch(anat=anat, func=func, session=session, description=fdescr)
 
