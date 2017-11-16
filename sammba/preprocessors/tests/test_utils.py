@@ -1,9 +1,10 @@
 import os
+import tempfile
 from numpy.testing import assert_array_equal
+import nibabel
+from nilearn._utils.testing import assert_raises_regex
 from sammba.preprocessors import utils
 from sammba import testing_data
-import nibabel
-import tempfile
 
 
 def test_correct_affines():
@@ -26,3 +27,28 @@ def test_correct_affines():
         os.remove(out_file)
     if os.path.exists(tempdir):
         os.removedirs(tempdir)
+
+
+def test_create_pipeline_graph():
+    # Check error is raised if unkown pipeline name
+    assert_raises_regex(NotImplementedError, 'Pipeline name must be one of',
+                        utils.create_pipeline_graph, 'rigid-body', '')
+
+    # Check error is raised if wrong graph kind
+    assert_raises_regex(ValueError, "Graph kind must be one of ",
+                        utils.create_pipeline_graph,
+                        'rigid-body_registration', '', graph_kind='original')
+
+    # Check graph file is created
+    tempdir = tempfile.mkdtemp()
+    graph_file = os.path.join(tempdir, 'tmp_graph.dot')
+    utils.create_pipeline_graph('rigid-body_registration', graph_file)
+    assert(os.path.exists(graph_file))
+
+    os.remove(graph_file)
+    os.removedirs(tempdir)
+
+    # Check error is raised if writing directory dosn't exist
+    assert_raises_regex(IOError, 'directory not existant',
+                        utils.create_pipeline_graph,
+                        'rigid-body_registration', graph_file)
