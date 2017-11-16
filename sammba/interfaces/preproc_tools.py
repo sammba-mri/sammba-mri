@@ -1,6 +1,16 @@
-from nipype.interfaces.base import (TraitedSpec, CommandLineInputSpec,
-                                    CommandLine, traits)
+"""Useful preprocessing interfaces
+
+    Change directory to provide relative paths for doctests
+    >>> import os
+    >>> sammba_dir = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
+    >>> datadir = os.path.realpath(os.path.join(sammba_dir, 'testing_data'))
+    >>> os.chdir(datadir)
+"""
 import os
+from sammba.externals.nipype.interfaces.base import (TraitedSpec,
+                                                     CommandLineInputSpec,
+                                                     CommandLine, traits,
+                                                     isdefined)
 
 
 class RatsMMInputSpec(CommandLineInputSpec):
@@ -12,7 +22,9 @@ class RatsMMInputSpec(CommandLineInputSpec):
         position=0)
     out_file = traits.File(
         desc="Output Image",
-        mandatory=True,
+        name_template='%s_masked',
+        name_source='in_file',
+        keep_extension=True,
         argstr="%s",
         position=1)
     volume_threshold = traits.Int(
@@ -40,13 +52,11 @@ class RatsMM(CommandLine):
     ========
 
     >>> from sammba.interfaces import RatsMM
-    >>> data_dir = os.path.dirname(os.path.dirname(__file__))
     >>> rats_masker = RatsMM()
-    >>> rats_masker.inputs.in_file = os.path.join(data_dir, 'testing_data/structural.nii')
+    >>> rats_masker.inputs.in_file = 'structural.nii'
     >>> rats_masker.inputs.intensity_threshold = 1000
-    >>> rats_masker.inputs.out_file = 'masked.nii'
-    >>> rats_masker.cmd  # doctest: +IGNORE_UNICODE
-    'RATS_MM'
+    >>> rats_masker.cmdline  # doctest: +IGNORE_UNICODE
+    'RATS_MM structural.nii structural_masked.nii -t 1000'
     >>> res = rats_masker.run()  # doctest: +SKIP
     """
     input_spec = RatsMMInputSpec
@@ -55,5 +65,9 @@ class RatsMM(CommandLine):
 
     def _list_outputs(self):
         outputs = self.output_spec().get()
-        outputs['out_file'] = os.path.abspath(self.inputs.out_file)
+        if isdefined(self.inputs.out_file):
+            outputs['out_file'] = os.path.abspath(self.inputs.out_file)
+        else:
+            outputs['out_file'] = os.path.abspath(
+                self._filename_from_source('out_file'))
         return outputs
