@@ -16,16 +16,14 @@ variable head tissue.
 # -----------------
 from sammba import data_fetchers
 
-retest = data_fetchers.fetch_zurich_test_retest(subjects=[0, 1, 2, 4, 5, 7])
-
-retest = data_fetchers.fetch_zurich_test_retest(subjects=[0, 1])
+retest = data_fetchers.fetch_zurich_test_retest(subjects=range(6))
 
 ##############################################################################
 # Define the writing directory
 # ----------------------------
 import os
 
-write_dir = os.path.join(os.getcwd(), 'zurich_results')
+write_dir = os.path.join(os.getcwd(), 'zurich_registration')
 if not os.path.exists(write_dir):
     os.makedirs(write_dir)
 
@@ -37,7 +35,7 @@ from sammba.preprocessors import correct_affines
 
 anat_filenames = []
 for raw_anat_finame in retest.anat:
-    mouse_id = os.path.dirname(raw_anat_finame)
+    mouse_id = os.path.basename(os.path.dirname(raw_anat_finame))
     anat_filename = os.path.join(write_dir, mouse_id + '_anat.nii.gz')
     correct_affines(in_file=raw_anat_finame,
                     axes_to_permute=[(1, 2)],
@@ -46,14 +44,14 @@ for raw_anat_finame in retest.anat:
     anat_filenames.append(anat_filename)
 
 ##############################################################################
-# Register: Rigid-body 
+# Register: Rigid-body
 # --------------------
 from sammba.preprocessors import register_to_common
 
 rigid_body = register_to_common(anat_filenames, write_dir,
                                 registration_kind='rigid-body',
-                                caching=False)
-
+                                caching=True)
+stop
 ##############################################################################
 # We set caching to True, so that this step computations are not restarted.
 ##############################################################################
