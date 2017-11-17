@@ -10,7 +10,7 @@ def register_to_common(t1_filenames, write_dir, common_filename=None,
                        brain_volume=400, registration_kind='nonlinear',
                        nonlinear_iters=3, nonlinear_levels=[1, 2, 3],
                        nonlinear_minimal_patch=75,
-                       convergence=0.005, caching=False):
+                       convergence=0.005, caching=False, verbose=0):
     """
     The functional volume is aligned to the anatomical, first with a rigid body
     registration and then on a per-slice basis (only a fine correction, this is
@@ -36,6 +36,7 @@ def register_to_common(t1_filenames, write_dir, common_filename=None,
                 registration_kinds, registration_kind))
     if caching:
         memory = Memory(write_dir)
+        copy = memory.cache(afni.Copy)
         unifize = memory.cache(afni.Unifize)
         clip_level = memory.cache(afni.ClipLevel)
         rats = memory.cache(RatsMM)
@@ -54,6 +55,7 @@ def register_to_common(t1_filenames, write_dir, common_filename=None,
         nwarp_cat = memory.cache(afni.NwarpCat)
         warp_apply = memory.cache(afni.NwarpApply)
     else:
+        copy = afni.Copy().run
         unifize = afni.Unifize().run
         clip_level = afni.ClipLevel().run
         rats = RatsMM().run
@@ -72,8 +74,25 @@ def register_to_common(t1_filenames, write_dir, common_filename=None,
         nwarp_cat = afni.NwarpCat().run
         warp_apply = afni.NwarpApply().run
 
+    if verbose:
+        terminal_output = 'allatonce'
+    else:
+        terminal_output = 'none'
+
     current_dir = os.getcwd()
     os.chdir(write_dir)
+
+    ###########################################################################
+    # First copy anatomical files, to make sure they are never changed
+    # and they have different names across individuals
+    copied_t1_filenames = []
+    for n, anat_file in enumerate(t1_filenames):
+        suffixed_file = fname_presuffix(anat_file, suffix='_{}'.format(n))
+        copied_file = os.path.join(write_dir, os.path.basename(suffixed_file))
+        out_copy = copy(in_file=anat_file, out_file=copied_file,
+                        terminal_output=terminal_output)
+        copied_t1_filenames.append(out_copy.outputs.out_file)
+
     ###########################################################################
     # Register using center of mass
     # -----------------------------
@@ -81,11 +100,9 @@ def register_to_common(t1_filenames, write_dir, common_filename=None,
     #
     # First we loop through anatomical scans and correct intensities for bias.
     unifized_files = []
-    for n, anat_file in enumerate(t1_filenames):
-        out_file = fname_presuffix(anat_file,
-                                   suffix='_{}_corrected'.format(n))
-        out_file = os.path.join(write_dir, os.path.basename(out_file))
-        out_unifize = unifize(in_file=anat_file, out_file=out_file)
+    for n, anat_file in enumerate(copied_t1_filenames):
+        out_unifize = unifize(in_file=anat_file, outputtype='NIFTI_GZ',
+                              terminal_output=terminal_output)
         unifized_files.append(out_unifize.outputs.out_file)
 
     ###########################################################################
@@ -98,38 +115,45 @@ def register_to_common(t1_filenames, write_dir, common_filename=None,
         out_rats = rats(
             in_file=unifized_file,
             volume_threshold=brain_volume,
-            intensity_threshold=int(out_clip_level.outputs.clip_val))
+            intensity_threshold=int(out_clip_level.outputs.clip_val),
+            terminal_output=terminal_output)
         out_apply_mask = apply_mask(in_file=unifized_file,
-                                    mask_file=out_rats.outputs.out_file)
+                                    mask_file=out_rats.outputs.out_file,
+                                    terminal_output=terminal_output)
         out_center_mass = center_mass(
             in_file=out_apply_mask.outputs.out_file,
             cm_file=fname_presuffix(unifized_file, suffix='_cm.txt',
                                     use_ext=False),
-            set_cm=(0, 0, 0))
+            set_cm=(0, 0, 0),
+            terminal_output=terminal_output)
         brain_files.append(out_center_mass.outputs.out_file)
 
     ###########################################################################
     # Same header change, for head files.
     head_files = []
     for unifized_file, brain_file in zip(unifized_files, brain_files):
-        out_refit = refit(in_file=unifized_file, duporigin_file=brain_file)
+        out_refit = refit(in_file=unifized_file, duporigin_file=brain_file,
+                          terminal_output=terminal_output)
         head_files.append(out_refit.outputs.out_file)
 
     ###########################################################################
     # The brain files with new image center are concatenated to produce
     # a quality check video
-    out_tcat = tcat(in_files=brain_files, outputtype='NIFTI_GZ')
+    out_tcat = tcat(in_files=brain_files, outputtype='NIFTI_GZ',
+                    terminal_output=terminal_output)
 
     ###########################################################################
     # and averaged
-    out_tstat = tstat(in_file=out_tcat.outputs.out_file, outputtype='NIFTI_GZ')
+    out_tstat = tstat(in_file=out_tcat.outputs.out_file, outputtype='NIFTI_GZ',
+                      terminal_output=terminal_output)
 
     ###########################################################################
     # to create an empty template, with origin placed at CoM
     out_undump = undump(in_file=out_tstat.outputs.out_file,
-                        outputtype='NIFTI_GZ')
+                        outputtype='NIFTI_GZ', terminal_output=terminal_output)
     out_refit = refit(in_file=out_undump.outputs.out_file,
-                      xorigin='cen', yorigin='cen', zorigin='cen')
+                      xorigin='cen', yorigin='cen', zorigin='cen',
+                      terminal_output=terminal_output)
 
     ###########################################################################
     # Finally, we shift heads and brains within the images to place the CoM at
@@ -138,14 +162,16 @@ def register_to_common(t1_filenames, write_dir, common_filename=None,
     for head_file in head_files:
         out_resample = resample(in_file=head_file,
                                 master=out_refit.outputs.out_file,
-                                outputtype='NIFTI_GZ')
+                                outputtype='NIFTI_GZ',
+                                terminal_output=terminal_output)
         shifted_head_files.append(out_resample.outputs.out_file)
 
     shifted_brain_files = []
     for brain_file in brain_files:
         out_resample = resample(in_file=brain_file,
                                 master=out_refit.outputs.out_file,
-                                outputtype='NIFTI_GZ')
+                                outputtype='NIFTI_GZ',
+                                terminal_output=terminal_output)
         shifted_brain_files.append(out_resample.outputs.out_file)
 
     ###########################################################################
@@ -153,7 +179,8 @@ def register_to_common(t1_filenames, write_dir, common_filename=None,
     out_tcat = tcat(in_files=shifted_brain_files,
                     out_file=os.path.join(write_dir, 'shifted_brains.nii.gz'))
     out_tstat_shifted_brain = tstat(in_file=out_tcat.outputs.out_file,
-                                    outputtype='NIFTI_GZ')
+                                    outputtype='NIFTI_GZ',
+                                    terminal_output=terminal_output)
 
     ###########################################################################
     # At this point, we achieved a translation-only registration of the raw
@@ -180,7 +207,8 @@ def register_to_common(t1_filenames, write_dir, common_filename=None,
             convergence=convergence,
             two_blur=1,
             warp_type='shift_rotate',
-            out_file=fname_presuffix(shifted_brain_file, suffix='_shr'))
+            out_file=fname_presuffix(shifted_brain_file, suffix='_shr'),
+            terminal_output=terminal_output)
         rigid_transform_files.append(out_allineate.outputs.out_matrix)
         shift_rotated_brain_files.append(out_allineate.outputs.out_file)
 
@@ -194,7 +222,8 @@ def register_to_common(t1_filenames, write_dir, common_filename=None,
             in_file=shifted_head_file,
             master=out_tstat_shifted_brain.outputs.out_file,
             in_matrix=rigid_transform_file,
-            out_file=fname_presuffix(shifted_head_file, suffix='_shr'))
+            out_file=fname_presuffix(shifted_head_file, suffix='_shr'),
+            terminal_output=terminal_output)
         shift_rotated_head_files.append(out_allineate.outputs.out_file)
 
     ###########################################################################
@@ -204,49 +233,15 @@ def register_to_common(t1_filenames, write_dir, common_filename=None,
         in_files=shift_rotated_head_files,
         out_file=os.path.join(write_dir, 'rigid_body_registered_heads.nii.gz'))
     out_tstat_shr = tstat(in_file=out_tcat.outputs.out_file,
-                          outputtype='NIFTI_GZ')
+                          outputtype='NIFTI_GZ',
+                          terminal_output=terminal_output)
 
     if registration_kind == 'rigid-body':
-        os.chdir(write_dir)
-        return Bunch(registered_anats=shift_rotated_head_files,
+        os.chdir(current_dir)
+        return Bunch(rigid_body_anats=shift_rotated_head_files,
+                     affine_anats=None,
+                     warped_anats=None,
                      transforms=rigid_transform_files)
-
-    mask_node = pe.Node(afni.MaskTool(), name='generate_count_mask')
-    allineate_node3 = pe.Node(afni.Allineate(), name='affine_register')
-    catmatvec_node = pe.Node(afni.CatMatvec(), name='concatenate_transforms')
-    allineate_node4 = pe.Node(afni.Allineate(), name='apply_transform_on_head')
-    allineate_node5 = pe.Node(afni.Allineate(),
-                              name='apply_transform_on_brain')
-    tcat_node3 = pe.Node(
-        afni.TCat(), name='concatenate_affine_registred_across_individuals')
-    tstat_node3 = pe.Node(afni.TStat(),
-                          name='compute_affine_registred_average')
-
-    workflow.add_nodes([mask_node, allineate_node3, catmatvec_node,
-                        allineate_node4, allineate_node5,
-                        tcat_node3, tstat_node3])
-
-    workflow.connect(tcat_node2, 'out_file', mask_node, 'in_file')
-    workflow.connect(mask_node, 'out_file', allineate_node3, 'weight')
-    workflow.connect(allineate_node2, 'out_file', allineate_node3, 'in_file')
-    workflow.connect(allineate_node3, 'out_matrix', catmatvec_node, 'in_file')
-    #XXX how can we enter multiple files ? 
-    workflow.connect(catmatvec_node, 'out_file', allineate_node4, 'in_matrix')
-    workflow.connect(allineate_node, 'out_file', allineate_node4, 'in_file')
-
-    workflow.connect(unifize_node, 'out_file', catmatvec_node, 'in_file')
-    workflow.connect(rats_node, 'out_file', apply_mask_node, 'mask_file')
-    workflow.connect(apply_mask_node, 'out_file',
-                     center_mass_node, 'in_file')
-    workflow.connect(unifize_node, 'out_file', refit_node, 'in_file')
-    workflow.connect(center_mass_node, 'out_file',
-                     refit_node, 'duporigin_file')
-    workflow.connect(center_mass_node, 'out_file', tcat_node, 'in_files')
-    workflow.connect(tcat_node, 'out_file', tstat_node, 'in_file')
-    workflow.connect(tstat_node, 'out_file', undump_node, 'in_file')
-    workflow.connect(undump_node, 'out_file', refit_node2, 'in_file')
-    workflow.connect(refit_node, 'out_file', resample_node, 'master')
-    workflow.connect(refit_node2, 'out_file', resample_node, 'in_file')
 
     ###########################################################################
     # Affine transform
@@ -325,7 +320,9 @@ def register_to_common(t1_filenames, write_dir, common_filename=None,
 
     if registration_kind == 'affine':
         os.chdir(current_dir)
-        return Bunch(registered_anats=allineated_head_files,
+        return Bunch(rigid_body_anats=shift_rotated_head_files,
+                     affine_anats=allineated_head_files,
+                     warped_anats=None,
                      transforms=affine_transform_files)
 
     ###########################################################################
@@ -459,5 +456,7 @@ def register_to_common(t1_filenames, write_dir, common_filename=None,
         warped_files.append(out_warp_apply.outputs.out_file)
 
     os.chdir(current_dir)
-    return Bunch(registered_anats=warped_files,
+    return Bunch(rigid_body_anats=shift_rotated_head_files,
+                 affine_anats=allineated_head_files,
+                 warped_anats=warped_files,
                  transforms=warp_files)
