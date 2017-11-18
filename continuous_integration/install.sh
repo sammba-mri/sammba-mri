@@ -96,7 +96,7 @@ if [[ "$DISTRIB" == "neurodebian" ]]; then
     bash <(wget -q -O- http://neuro.debian.net/_files/neurodebian-travis.sh)
     sudo apt-get install -qq python-scipy python-nose python-nibabel\
          python-sklearn python-pandas python-nilearn python-patsy\
-         python-networkx -configparser
+         python-networkx python-configparser
 
 elif [[ "$DISTRIB" == "conda" ]]; then
     create_new_conda_env
