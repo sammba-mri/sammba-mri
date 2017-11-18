@@ -161,20 +161,21 @@ def fetch_zurich_test_retest(subjects=range(15), sessions=[1], data_dir=None,
         for a in anat:
             corrected_a = os.path.join(os.path.dirname(a),
                                        '3DRARE_corrected.nii.gz')
-            _reset_affines(in_file=a,
+            _reset_affines(a, corrected_a,
                            axes_to_permute=[(1, 2)],
                            axes_to_flip=[0],
-                           out_file=corrected_a)
+                           verbose=0)
             corrected_anat.append(corrected_a)
         corrected_func = []
         for f in func:
             corrected_f = os.path.join(os.path.dirname(f),
                                        'rsfMRI_corrected.nii.gz')
-            _reset_affines(in_file=f,
+            _reset_affines(f, corrected_f,
+                           center_mass=(0, 0, 0),
                            xyzscale=.1,
                            axes_to_permute=[(1, 2)],
                            axes_to_flip=[0],
-                           out_file=corrected_f)
+                           verbose=0)
             corrected_func.append(corrected_f)
         anat = corrected_anat
         func = corrected_func

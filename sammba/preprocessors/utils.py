@@ -9,7 +9,8 @@ from sammba.interfaces import RatsMM
 
 
 def _reset_affines(in_file, out_file, overwrite=False, axes_to_permute=None,
-                   axes_to_flip=None, xyzscale=None, cm_file=None):
+                   axes_to_flip=None, xyzscale=None, center_mass=None,
+                   verbose=1):
     """Sets the qform equal to the sform in the header, with optionally
        rescaling, setting the image center to 0, permuting or/and flipping axes
     """
@@ -18,21 +19,29 @@ def _reset_affines(in_file, out_file, overwrite=False, axes_to_permute=None,
     else:
         return
 
+    if verbose:
+        terminal_output = 'stream'
+    else:
+        terminal_output = 'none'
+
     in_file = out_file
     if xyzscale is not None:
         refit = afni.Refit()
         refit.inputs.in_file = in_file
-        refit.inputs.xyzscale = .1
+        refit.inputs.xyzscale = xyzscale
+        refit.set_default_terminal_output(terminal_output)
         result = refit.run()
         in_file = result.outputs.out_file
 
-    if cm_file is not None:
-        center_mass = afni.CenterMass()
-        center_mass.inputs.in_file = in_file
-        center_mass.inputs.cm_file = fname_presuffix(out_file, suffix='.txt',
-                                                     use_ext=False)
-        center_mass.inputs.set_cm = (0, 0, 0)
-        result = center_mass.run()
+    if center_mass is not None:
+        set_center_mass = afni.CenterMass()
+        set_center_mass.inputs.in_file = in_file
+        set_center_mass.inputs.cm_file = fname_presuffix(out_file,
+                                                         suffix='.txt',
+                                                         use_ext=False)
+        set_center_mass.inputs.set_cm = center_mass
+        set_center_mass.set_default_terminal_output(terminal_output)
+        result = set_center_mass.run()
         in_file = result.outputs.out_file
 
     img = nibabel.load(in_file)
