@@ -18,7 +18,6 @@ def test_RatsMM_inputs():
     intensity_threshold=dict(argstr='-t %s',
     ),
     out_file=dict(argstr='%s',
-    mandatory=True,
     position=1,
     ),
     terminal_output=dict(deprecated='1.0.0',
