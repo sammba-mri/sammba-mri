@@ -25,7 +25,7 @@ matrix:
            PANDAS_VERSION="0.13.0" NETWORKX_VERSION="*"
            PACKAGING_VERSION="*" CONFIGPARSER_VERSION="*"
            FUTURE_VERSION="0.16.0" TRAITS_VERSION="4.6"
-           SIMPLEJSON_VERSION="3.8.0"
+           SIMPLEJSON_VERSION="3.8.0" PROV_VERSION=="1.5.0"
     # Neurodebian on Ubuntu 14.04
     - dist: trusty
       env: DISTRIB="neurodebian" PYTHON_VERSION="2.7"
@@ -38,21 +38,23 @@ matrix:
            NETWORKX_VERSION="*" COVERAGE="true"
            PACKAGING_VERSION="*" CONFIGPARSER_VERSION="*"
            FUTURE_VERSION="0.16.0" TRAITS_VERSION="4.6"
-           SIMPLEJSON_VERSION="3.8.0"
+           SIMPLEJSON_VERSION="3.8.0" PROV_VERSION=="1.5.0"
     # Python 3.4 with intermediary versions
     - env: DISTRIB="conda" PYTHON_VERSION="3.4"
            NUMPY_VERSION="1.8.2" SCIPY_VERSION="0.14.0"
            SCIKIT_LEARN_VERSION="0.15.2" MATPLOTLIB_VERSION="1.4.0"
            PANDAS_VERSION="*" PATSY_VERSION="*" NETWORKX_VERSION="*"
-           PACKAGING_VERSION="*"
+           FUTURE_VERSION="0.16.0" PACKAGING_VERSION="*"
            TRAITS_VERSION="4.6" SIMPLEJSON_VERSION="3.8.0"
+           PROV_VERSION=="1.5.0"
     # Most recent versions (Python 3)
     - env: DISTRIB="conda" PYTHON_VERSION="3.5"
            NUMPY_VERSION="*" SCIPY_VERSION="*"
            SCIKIT_LEARN_VERSION="*" MATPLOTLIB_VERSION="*" COVERAGE="true"
            PANDAS_VERSION="*" NETWORKX_VERSION="*"
-           PACKAGING_VERSION="*"
+           FUTURE_VERSION="0.16.0" PACKAGING_VERSION="*"
            TRAITS_VERSION="4.6" SIMPLEJSON_VERSION="3.8.0"
+           PROV_VERSION=="1.5.0"
 
 install:
     - source continuous_integration/install.sh
