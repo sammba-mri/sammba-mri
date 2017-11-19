@@ -26,6 +26,7 @@ create_new_venv() {
     pip install nose
     pip install doctest-ignore-unicode
     pip install packaging
+    pip install prov
 }
 
 print_conda_requirements() {
@@ -38,7 +39,7 @@ print_conda_requirements() {
     #   - for scikit-learn, SCIKIT_LEARN_VERSION is used
     TO_INSTALL_ALWAYS="pip nose libgfortran=1.0=0 nomkl"
     REQUIREMENTS="$TO_INSTALL_ALWAYS"
-    TO_INSTALL_MAYBE="python numpy scipy matplotlib scikit-learn pandas configparser future traits simplejson networkx prov"
+    TO_INSTALL_MAYBE="python numpy scipy matplotlib scikit-learn pandas configparser future traits simplejson networkx packaging"
     for PACKAGE in $TO_INSTALL_MAYBE; do
         # Capitalize package name and add _VERSION
         PACKAGE_VERSION_VARNAME="${PACKAGE^^}_VERSION"
@@ -98,7 +99,7 @@ if [[ "$DISTRIB" == "neurodebian" ]]; then
     sudo apt-get install -qq python-scipy python-nose python-nibabel\
          python-sklearn python-pandas python-nilearn python-patsy\
          python-networkx python-configparser python-future python-traits\
-         python-simplejson python-prov
+         python-simplejson
 
 elif [[ "$DISTRIB" == "conda" ]]; then
     create_new_conda_env
@@ -113,7 +114,7 @@ elif [[ "$DISTRIB" == "conda" ]]; then
     pip install nilearn
     pip install patsy
     # dependencies that are only available through pip
-    pip install packaging
+    pip install prov
     # Allow nose to ignore unicode in doctest
     pip install doctest-ignore-unicode
 
