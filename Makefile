@@ -29,7 +29,7 @@ inplace:
 	$(PYTHON) setup.py build_ext -i
 
 test-code:
-	$(NOSETESTS) -s sammba
+	$(NOSETESTS) -s sammba --with-doctest-ignore-unicode
 
 test-doc:
 	$(NOSETESTS) -s --with-doctest --doctest-tests --doctest-extension=rst \
