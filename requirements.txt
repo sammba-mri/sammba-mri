@@ -13,4 +13,11 @@ ipython
 Sphinx
 sphinx-rtd-theme
 Pillow
-
+packaging
+configparser
+future >= 0.16.0
+traits >= 4.6
+simplejson >= 3.8.0
+prov == 1.5.0
+funcsigs
+click
