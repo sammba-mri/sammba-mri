@@ -50,13 +50,12 @@ display.add_edges(affine.affine_anats[0])
 
 
 ##############################################################################
-# Register: Nonlinear
-# -------------------
-# We also allow nonlinear warps.
-nonlinear = register_to_common(retest.anat, write_dir,
-                               registration_kind='nonlinear', caching=True)
+# Register: Rigid-body
+# --------------------
+# Compare to rigid-body registration
+rigid = register_to_common(retest.anat, write_dir, registration_kind='rigid')
 
-average_img = image.mean_img(nonlinear.registered_anats)
-display = plotting.plot_anat(average_img, dim=-1.6, title='nonlinear')
-display.add_edges(nonlinear.registered_anats[0])
+average_img = image.mean_img(rigid.registered_anats)
+display = plotting.plot_anat(average_img, dim=-1.6, title='rigid-body')
+display.add_edges(rigid.registered_anats[0])
 plotting.show()

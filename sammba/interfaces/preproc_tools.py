@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """Useful preprocessing interfaces
 
     Change directory to provide relative paths for doctests
@@ -6,6 +7,7 @@
     >>> datadir = os.path.realpath(os.path.join(sammba_dir, 'testing_data'))
     >>> os.chdir(datadir)
 """
+from __future__ import print_function, division, unicode_literals, absolute_import
 import os
 from sammba.externals.nipype.interfaces.base import (TraitedSpec,
                                                      CommandLineInputSpec,
@@ -56,7 +58,7 @@ class RatsMM(CommandLine):
     >>> rats_masker.inputs.in_file = 'structural.nii'
     >>> rats_masker.inputs.intensity_threshold = 1000
     >>> rats_masker.cmdline  # doctest: +IGNORE_UNICODE
-    u'RATS_MM structural.nii structural_masked.nii -t 1000'
+    'RATS_MM structural.nii structural_masked.nii -t 1000'
     >>> res = rats_masker.run()  # doctest: +SKIP
     """
     input_spec = RatsMMInputSpec
