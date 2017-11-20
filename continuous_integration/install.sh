@@ -27,6 +27,7 @@ create_new_venv() {
     pip install prov
     pip install nose
     pip install doctest-ignore-unicode
+    sudo apt-get install graphviz
 }
 
 print_conda_requirements() {
@@ -99,7 +100,7 @@ if [[ "$DISTRIB" == "neurodebian" ]]; then
     sudo apt-get install -qq python-scipy python-nose python-nibabel\
          python-sklearn python-pandas python-nilearn python-patsy\
          python-networkx python-configparser python-future python-traits\
-         python-simplejson python-funcsigs python-click
+         python-simplejson python-funcsigs python-click graphviz
 
 elif [[ "$DISTRIB" == "conda" ]]; then
     create_new_conda_env
