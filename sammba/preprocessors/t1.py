@@ -11,16 +11,49 @@ def register_to_common(t1_filenames, write_dir, brain_volume=400,
                        nonlinear_levels=[1, 2, 3],
                        nonlinear_minimal_patch=75,
                        convergence=0.005, caching=False, verbose=0):
-    """
-    The functional volume is aligned to the anatomical, first with a rigid body
-    registration and then on a per-slice basis (only a fine correction, this is
-    mostly for correction of EPI distortion). This pipeline includes
-    slice timing.
+    """ Create common template from native T1 weighted images and achieve
+    their registration to it.
 
     Parameters
     ----------
-    registration_kind : one of {'rigid', 'affine', 'nonlinear'}
+    t1_filenames : list of str
+        Paths to the T1 weighted images.
+
+    write_dir : Str
+        Path to an existant directory to save output files to.
+
+    brain_volume : float, optional
+        Volumes of the brain as passed to Rats_MM brain extraction tool.
+        Default to 400 for the mouse brain.
+
+    registration_kind : one of {'rigid', 'affine', 'nonlinear'}, optional
         The allowed transform kind.
+
+    nonlinear_levels : list of int, optional
+        Maximal levels for each nonlinear warping iteration. Passed iteratively
+        to sammba.externals.nipype.interfaces.afni.Qwarp
+
+    nonlinear_minimal_patch : int, optional
+        Minimal patch for the final nonlinear warp, passed to
+        sammba.externals.nipype.interfaces.afni.Qwarp
+
+    caching : bool, optional
+        If True, caching is used for all the registration steps.
+
+    convergence : float, optional
+        Convergence limit, passed to
+
+    verbose : bool, optional
+        If True, all steps are verbose.
+
+    Returns
+    -------
+    data : sklearn.datasets.base.Bunch
+        Dictionary-like object, the interest attributes are :
+
+        - 'registered': string list. Paths to registered images.
+        - 'transforms': string list. Paths to the transforms from the raw
+                        images to the registered images.
     """
     registration_kinds = ['rigid', 'affine', 'nonlinear']
     if registration_kind not in registration_kinds:
@@ -226,9 +259,7 @@ def register_to_common(t1_filenames, write_dir, brain_volume=400,
 
     if registration_kind == 'rigid':
         os.chdir(current_dir)
-        return Bunch(rigid_anats=shift_rotated_head_files,
-                     affine_anats=None,
-                     warped_anats=None,
+        return Bunch(registered=shift_rotated_head_files,
                      transforms=rigid_transform_files)
 
     ###########################################################################
@@ -308,9 +339,7 @@ def register_to_common(t1_filenames, write_dir, brain_volume=400,
 
     if registration_kind == 'affine':
         os.chdir(current_dir)
-        return Bunch(rigid_anats=shift_rotated_head_files,
-                     affine_anats=allineated_head_files,
-                     warped_anats=None,
+        return Bunch(registered=allineated_head_files,
                      transforms=affine_transform_files)
 
     ###########################################################################
@@ -400,6 +429,7 @@ def register_to_common(t1_filenames, write_dir, brain_volume=400,
     if len(nonlinear_levels) > 2:
         if nonlinear_minimal_patch is None:
             nonlinear_minimal_patch = 75
+
         for n_iter, inilev in enumerate(nonlinear_levels[2:]):
             previous_warp_files = warp_files
             warped_files = []
@@ -417,15 +447,16 @@ def register_to_common(t1_filenames, write_dir, brain_volume=400,
                     inilev=inilev,
                     minpatch=nonlinear_minimal_patch,
                     out_file=fname_presuffix(
-                        shifted_head_file, suffix='_warped{}'.format(n_iter)))
+                        shifted_head_file,
+                        suffix='_warped{}'.format(n_iter + 3)))
                 warped_files.append(out_qwarp.outputs.warped_source)
                 warp_files.append(out_qwarp.outputs.source_warp)
 
             out_tcat = tcat(
                 in_files=warped_files,
-                out_file=os.path.join(write_dir,
-                                      'warped_{0}iters_heads.nii.gz'.format(
-                                      n_iter)))
+                out_file=os.path.join(
+                    write_dir, 'warped_{0}iters_heads.nii.gz'.format(n_iter +
+                                                                     3)))
             out_tstat_warp_head = tstat(in_file=out_tcat.outputs.out_file,
                                         outputtype='NIFTI_GZ')
 
@@ -449,7 +480,5 @@ def register_to_common(t1_filenames, write_dir, brain_volume=400,
         warped_files.append(out_warp_apply.outputs.out_file)
 
     os.chdir(current_dir)
-    return Bunch(rigid_anats=shift_rotated_head_files,
-                 affine_anats=allineated_head_files,
-                 warped_anats=warped_files,
+    return Bunch(registered=warped_files,
                  transforms=warp_files)
