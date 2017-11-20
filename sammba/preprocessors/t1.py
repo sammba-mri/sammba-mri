@@ -61,16 +61,14 @@ def register_to_common(t1_filenames, write_dir, brain_volume=400,
             'Registration kind must be one of {0}, you entered {1}'.format(
                 registration_kinds, registration_kind))
 
+    if verbose:
+        terminal_output = 'allatonce'
+    else:
+        terminal_output = 'none'
     if caching:
-        if verbose:
-            terminal_output = 'allatonce'
-        else:
-            terminal_output = 'none'
 
         memory = Memory(write_dir)
         copy = memory.cache(afni.Copy)
-        copy.interface().set_default_terminal_output('file')
-
         unifize = memory.cache(afni.Unifize)
         clip_level = memory.cache(afni.ClipLevel)
         rats = memory.cache(RatsMM)
@@ -88,12 +86,11 @@ def register_to_common(t1_filenames, write_dir, brain_volume=400,
         qwarp = memory.cache(afni.Qwarp)
         nwarp_cat = memory.cache(afni.NwarpCat)
         warp_apply = memory.cache(afni.NwarpApply)
+        for func in [copy, unifize, rats, apply_mask, center_mass, refit,
+                     tcat, tstat, undump, resample, allineate, allineate2,
+                     mask_tool, catmatvec, qwarp, nwarp_cat, warp_apply]:
+            func.interface().set_default_terminal_output(terminal_output)
     else:
-        if verbose:
-            terminal_output = 'allatonce'
-        else:
-            terminal_output = 'none'
-
         copy = afni.Copy(terminal_output=terminal_output).run
         unifize = afni.Unifize(terminal_output=terminal_output).run
         clip_level = afni.ClipLevel().run  # XXX fix nipype bug with 'none'
