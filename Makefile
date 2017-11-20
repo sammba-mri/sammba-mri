@@ -33,6 +33,7 @@ test-code:
 
 test-doc:
 	$(NOSETESTS) -s --with-doctest --doctest-tests --doctest-extension=rst \
+	--with-doctest-ignore-unicode \
 	--doctest-extension=inc --doctest-fixtures=_fixture doc/ \
 
 test-coverage:

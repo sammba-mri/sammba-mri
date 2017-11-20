@@ -2,9 +2,10 @@
 
     Change directory to provide relative paths for doctests
     >>> import os
-    >>> sammba_dir = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
-    >>> datadir = os.path.realpath(os.path.join(sammba_dir, 'testing_data'))
-    >>> os.chdir(datadir)
+    >>> current_filepath = os.path.realpath(__file__)
+    >>> sammba_dir = os.path.dirname(os.path.dirname(current_filepath))
+    >>> data_dir = os.path.realpath(os.path.join(sammba_dir, 'testing_data'))
+    >>> os.chdir(data_dir)
 """
 import os
 from sammba.externals.nipype.interfaces.base import (TraitedSpec,
@@ -56,12 +57,12 @@ class RatsMM(CommandLine):
     >>> rats_masker.inputs.in_file = 'structural.nii'
     >>> rats_masker.inputs.intensity_threshold = 1000
     >>> rats_masker.cmdline  # doctest: +IGNORE_UNICODE
-    u'RATS_MM structural.nii structural_masked.nii -t 1000'
+    'RATS_MM structural.nii structural_masked.nii -t 1000'
     >>> res = rats_masker.run()  # doctest: +SKIP
     """
     input_spec = RatsMMInputSpec
     output_spec = RatsMMOutputSpec
-    _cmd = u'RATS_MM'
+    _cmd = 'RATS_MM'
 
     def _list_outputs(self):
         outputs = self.output_spec().get()
