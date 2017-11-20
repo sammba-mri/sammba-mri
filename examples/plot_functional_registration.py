@@ -17,7 +17,8 @@ variable head tissue.
 # -------------
 from sammba import data_fetchers
 
-retest = data_fetchers.fetch_zurich_test_retest(subjects=[0])
+retest = data_fetchers.fetch_zurich_test_retest(subjects=[0],
+                                                correct_headers=True)
 
 ##############################################################################
 # Define the write directory
@@ -30,29 +31,13 @@ if not os.path.exists(write_dir):
     os.makedirs(write_dir)
 
 ##############################################################################
-# Correct orientation
-# -------------------
-# For this data, we need to correct the header for wrong sforms and qforms
-from sammba import preprocessors
-
-func_filename = os.path.join(write_dir, 'func.nii.gz')
-anat_filename = os.path.join(write_dir, 'anat.nii.gz')
-preprocessors.correct_affines(in_file=retest.func[0],
-                              xyzscale=.1,
-                              axes_to_permute=[(1, 2)],
-                              axes_to_flip=[0],
-                              out_file=func_filename)
-preprocessors.correct_affines(in_file=retest.anat[0],
-                              axes_to_permute=[(1, 2)],
-                              axes_to_flip=[0],
-                              out_file=anat_filename)
-
-##############################################################################
 # Functional to anatomical registration
 # -------------------------------------
+from sammba import preprocessors
+
 registered_func_filename, resampled_anat_filename = \
-    preprocessors.register_func_to_anat(func_filename,
-                                        anat_filename,
+    preprocessors.register_func_to_anat(retest.func[0],
+                                        retest.anat[0],
                                         tr='1',
                                         write_dir=write_dir)
 
