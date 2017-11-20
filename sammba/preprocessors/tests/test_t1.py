@@ -4,6 +4,7 @@ import tempfile
 import numpy as np
 from numpy.testing import assert_array_almost_equal
 from nilearn._utils.testing import assert_raises_regex
+from sammba.externals.nipype.interfaces import afni
 from sammba.preprocessors import t1
 from sammba import testing_data
 
@@ -19,10 +20,12 @@ def test_register_to_common():
                         registration_kind='rigidd')
 
     # test common space of one image is itself
-    registration = t1.register_to_common([anat_file], tempdir,
-                                         registration_kind='rigid', verbose=0)
-    transform = np.loadtxt(registration.transforms[0])
-    assert_array_almost_equal(transform, [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0])
+    if afni.Info().version():
+        registration = t1.register_to_common([
+            anat_file], tempdir, registration_kind='rigid', verbose=0)
+        transform = np.loadtxt(registration.transforms[0])
+        assert_array_almost_equal(transform,
+                                  [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0])
 
     if os.path.exists(tempdir):
         shutil.rmtree(tempdir)

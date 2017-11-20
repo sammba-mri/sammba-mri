@@ -56,7 +56,7 @@ class RatsMM(CommandLine):
     >>> rats_masker.inputs.in_file = 'structural.nii'
     >>> rats_masker.inputs.intensity_threshold = 1000
     >>> rats_masker.cmdline  # doctest: +IGNORE_UNICODE
-    'RATS_MM structural.nii structural_masked.nii -t 1000'
+    u'RATS_MM structural.nii structural_masked.nii -t 1000'
     >>> res = rats_masker.run()  # doctest: +SKIP
     """
     input_spec = RatsMMInputSpec

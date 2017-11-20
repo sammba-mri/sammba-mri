@@ -164,7 +164,6 @@ def create_pipeline_graph(pipeline_name, graph_file,
 
     #######################################################################
     # Specify rigid body registration pipeline steps
-    print(afni)
     unifize_node = pe.Node(interface=afni.Unifize(), name='bias_correct')
     clip_level_node = pe.Node(interface=afni.ClipLevel(),
                               name='compute_mask_threshold')
