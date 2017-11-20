@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """Useful preprocessing interfaces
 
     Change directory to provide relative paths for doctests
@@ -7,7 +6,6 @@
     >>> datadir = os.path.realpath(os.path.join(sammba_dir, 'testing_data'))
     >>> os.chdir(datadir)
 """
-from __future__ import print_function, division, unicode_literals, absolute_import
 import os
 from sammba.externals.nipype.interfaces.base import (TraitedSpec,
                                                      CommandLineInputSpec,
@@ -63,7 +61,7 @@ class RatsMM(CommandLine):
     """
     input_spec = RatsMMInputSpec
     output_spec = RatsMMOutputSpec
-    _cmd = 'RATS_MM'
+    _cmd = u'RATS_MM'
 
     def _list_outputs(self):
         outputs = self.output_spec().get()
