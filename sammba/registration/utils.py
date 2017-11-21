@@ -185,10 +185,10 @@ def create_pipeline_graph(pipeline_name, graph_file,
     tcat3 = pe.Node(afni.TCat(), name='concatenate_across_individuals3')
     tstat3 = pe.Node(afni.TStat(), name='compute_average3')
 
-    workflow.adds([unifize, clip_level, rats, apply_mask, center_mass,
-                   refit_copy, tcat1, tstat1, undump, refit_set, resample1,
-                   resample2, shift_rotate, apply_allineate1, tcat2, tstat2,
-                   tcat3, tstat3])
+    workflow.add_nodes([unifize, clip_level, rats, apply_mask, center_mass,
+                        refit_copy, tcat1, tstat1, undump, refit_set,
+                        resample1, resample2, shift_rotate, apply_allineate1,
+                        tcat2, tstat2, tcat3, tstat3])
 
     #######################################################################
     # and connections
@@ -231,8 +231,8 @@ def create_pipeline_graph(pipeline_name, graph_file,
             afni.TCat(), name='concatenate_across_individuals4')
         tstat3 = pe.Node(afni.TStat(), name='compute_average4')
 
-        workflow.adds([mask, allineate, catmatvec, apply_allineate3,
-                       apply_allineate4, tcat3, tstat3])
+        workflow.add_nodes([mask, allineate, catmatvec, apply_allineate3,
+                            apply_allineate4, tcat3, tstat3])
 
         workflow.connect(tcat2, 'out_file', mask, 'in_file')
         workflow.connect(mask, 'out_file', allineate, 'weight')
