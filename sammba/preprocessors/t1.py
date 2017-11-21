@@ -87,7 +87,7 @@ def register_to_common(t1_filenames, write_dir, brain_volume=400,
         qwarp = memory.cache(afni.Qwarp)
         nwarp_cat = memory.cache(afni.NwarpCat)
         warp_apply = memory.cache(afni.NwarpApply)
-        for func in [copy, unifize, rats, apply_mask, center_mass, refit,
+        for func in [copy, unifize, rats, apply_mask, refit,
                      tcat, tstat, undump, resample, allineate, allineate2,
                      mask_tool, catmatvec, qwarp, nwarp_cat, warp_apply]:
             func.interface().set_default_terminal_output(terminal_output)
@@ -97,7 +97,7 @@ def register_to_common(t1_filenames, write_dir, brain_volume=400,
         clip_level = afni.ClipLevel().run  # XXX fix nipype bug with 'none'
         rats = RatsMM(terminal_output=terminal_output).run
         apply_mask = fsl.ApplyMask(terminal_output=terminal_output).run
-        center_mass = afni.CenterMass(terminal_output=terminal_output).run
+        center_mass = afni.CenterMass().run  # XXX fix nipype bug with 'none'
         refit = afni.Refit(terminal_output=terminal_output).run
         tcat = afni.TCat(terminal_output=terminal_output).run
         tstat = afni.TStat(terminal_output=terminal_output).run
