@@ -33,13 +33,11 @@ if not os.path.exists(write_dir):
 ##############################################################################
 # Functional to anatomical registration
 # -------------------------------------
-from sammba import preprocessors
+from sammba import registration
 
 registered_func_filename, resampled_anat_filename = \
-    preprocessors.register_func_to_anat(retest.func[0],
-                                        retest.anat[0],
-                                        tr='1',
-                                        write_dir=write_dir)
+    registration.func_to_anat(retest.func[0], retest.anat[0], tr=1.,
+                              write_dir=write_dir)
 
 ###############################################################################
 # Check out the results

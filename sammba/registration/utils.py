@@ -144,8 +144,8 @@ def create_pipeline_graph(pipeline_name, graph_file,
         notion on hierarchy in color;
         'exec': expands workflows to depict iterables
     """
-    pipeline_names = ['rigid-body_registration', 'affine_registration',
-                      'nonlinear_registration']
+    pipeline_names = ['rigid_anat_to_common', 'affine_anat_to_common',
+                      'nonlinear_anat_to_common']
     if pipeline_name not in pipeline_names:
         raise NotImplementedError(
             'Pipeline name must be one of {0}, you entered {1}'.format(
@@ -241,30 +241,8 @@ def create_pipeline_graph(pipeline_name, graph_file,
         workflow.add_nodes([mask_node, allineate_node3, catmatvec_node,
                             allineate_node4, allineate_node5,
                             tcat_node3, tstat_node3])
-    
-        workflow.connect(tcat_node2, 'out_file', mask_node, 'in_file')
-        workflow.connect(mask_node, 'out_file', allineate_node3, 'weight')
-        workflow.connect(allineate_node2, 'out_file', allineate_node3, 'in_file')
-        workflow.connect(allineate_node3, 'out_matrix', catmatvec_node, 'in_file')
-        #XXX how can we enter multiple files ? 
-        workflow.connect(catmatvec_node, 'out_file', allineate_node4, 'in_matrix')
-        workflow.connect(allineate_node, 'out_file', allineate_node4, 'in_file')
-    
-        workflow.connect(unifize_node, 'out_file', catmatvec_node, 'in_file')
-        workflow.connect(rats_node, 'out_file', apply_mask_node, 'mask_file')
-        workflow.connect(apply_mask_node, 'out_file',
-                         center_mass_node, 'in_file')
-        workflow.connect(unifize_node, 'out_file', refit_node, 'in_file')
-        workflow.connect(center_mass_node, 'out_file',
-                         refit_node, 'duporigin_file')
-        workflow.connect(center_mass_node, 'out_file', tcat_node, 'in_files')
-        workflow.connect(tcat_node, 'out_file', tstat_node, 'in_file')
-        workflow.connect(tstat_node, 'out_file', undump_node, 'in_file')
-        workflow.connect(undump_node, 'out_file', refit_node2, 'in_file')
-        workflow.connect(refit_node, 'out_file', resample_node, 'master')
-        workflow.connect(refit_node2, 'out_file', resample_node, 'in_file')
 
-    if pipeline_name == 'nonlinear_registration':
+    if pipeline_name == 'nonlinear_anat_to_common':
         pass
 
     current_dir = os.getcwd()

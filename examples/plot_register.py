@@ -31,9 +31,9 @@ if not os.path.exists(write_dir):
 ##############################################################################
 # Register: Affine registration
 # -----------------------------
-from sammba.preprocessors import register_to_common
+from sammba.registration import anats_to_common
 
-affine = register_to_common(retest.anat, write_dir, caching=False)
+affine = anats_to_common(retest.anat, write_dir, caching=False)
 
 ##############################################################################
 # We set caching to True, so that this step computations are not restarted.
@@ -53,8 +53,8 @@ display.add_edges(affine.registered[0])
 # Register: Rigid-body
 # --------------------
 # Compare to rigid-body registration
-rigid = register_to_common(retest.anat, write_dir, caching=True,
-                           registration_kind='rigid')
+rigid = anats_to_common(retest.anat, write_dir, caching=True,
+                        registration_kind='rigid')
 
 average_img = image.mean_img(rigid.registered)
 display = plotting.plot_anat(average_img, dim=-1.7, title='rigid-body')
