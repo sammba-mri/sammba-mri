@@ -164,83 +164,89 @@ def create_pipeline_graph(pipeline_name, graph_file,
 
     #######################################################################
     # Specify rigid body registration pipeline steps
-    unifize_node = pe.Node(interface=afni.Unifize(), name='bias_correct')
-    clip_level_node = pe.Node(interface=afni.ClipLevel(),
-                              name='compute_mask_threshold')
-    rats_node = pe.Node(interface=RatsMM(), name='compute_brain_mask')
-    apply_mask_node = pe.Node(interface=fsl.ApplyMask(),
-                              name='apply_brain_mask')
-    center_mass_node = pe.Node(interface=afni.CenterMass(),
-                               name='compute_and_set_cm_in_header')
-    refit_copy_node = pe.Node(afni.Refit(), name='copy_cm_in_header')
-    tcat_node1 = pe.Node(afni.TCat(), name='concatenate_across_individuals1')
-    tstat_node1 = pe.Node(afni.TStat(), name='compute_average1')
-    undump_node = pe.Node(afni.Undump(), name='create_empty_template')
-    refit_set_node = pe.Node(afni.Refit(), name='set_cm_in_header')
-    resample_node1 = pe.Node(afni.Resample(), name='resample1')
-    resample_node2 = pe.Node(afni.Resample(), name='resample2')
-    shift_rotate_node = pe.Node(afni.Allineate(), name='shift_rotate')
-    apply_allineate_node1 = pe.Node(afni.Allineate(),
-                                    name='apply_transform1')
-    tcat_node2 = pe.Node(afni.TCat(), name='concatenate_across_individuals2')
-    tstat_node2 = pe.Node(afni.TStat(), name='compute_average2')
-    tcat_node3 = pe.Node(afni.TCat(), name='concatenate_across_individuals3')
-    tstat_node3 = pe.Node(afni.TStat(), name='compute_average3')
+    unifize = pe.Node(interface=afni.Unifize(), name='bias_correct')
+    clip_level = pe.Node(interface=afni.ClipLevel(),
+                         name='compute_mask_threshold')
+    rats = pe.Node(interface=RatsMM(), name='compute_brain_mask')
+    apply_mask = pe.Node(interface=fsl.ApplyMask(), name='apply_brain_mask')
+    center_mass = pe.Node(interface=afni.CenterMass(),
+                          name='compute_and_set_cm_in_header')
+    refit_copy = pe.Node(afni.Refit(), name='copy_cm_in_header')
+    tcat1 = pe.Node(afni.TCat(), name='concatenate_across_individuals1')
+    tstat1 = pe.Node(afni.TStat(), name='compute_average1')
+    undump = pe.Node(afni.Undump(), name='create_empty_template')
+    refit_set = pe.Node(afni.Refit(), name='set_cm_in_header')
+    resample1 = pe.Node(afni.Resample(), name='resample1')
+    resample2 = pe.Node(afni.Resample(), name='resample2')
+    shift_rotate = pe.Node(afni.Allineate(), name='shift_rotate')
+    apply_allineate1 = pe.Node(afni.Allineate(), name='apply_transform1')
+    tcat2 = pe.Node(afni.TCat(), name='concatenate_across_individuals2')
+    tstat2 = pe.Node(afni.TStat(), name='compute_average2')
+    tcat3 = pe.Node(afni.TCat(), name='concatenate_across_individuals3')
+    tstat3 = pe.Node(afni.TStat(), name='compute_average3')
 
-    workflow.add_nodes([unifize_node, clip_level_node, rats_node,
-                        apply_mask_node, center_mass_node, refit_copy_node,
-                        tcat_node1, tstat_node1,
-                        undump_node, refit_set_node, resample_node1,
-                        resample_node2,
-                        shift_rotate_node, apply_allineate_node1,
-                        tcat_node2, tstat_node2, tcat_node3, tstat_node3])
+    workflow.adds([unifize, clip_level, rats, apply_mask, center_mass,
+                   refit_copy, tcat1, tstat1, undump, refit_set, resample1,
+                   resample2, shift_rotate, apply_allineate1, tcat2, tstat2,
+                   tcat3, tstat3])
 
     #######################################################################
     # and connections
-    workflow.connect(unifize_node, 'out_file', clip_level_node, 'in_file')
-    workflow.connect(clip_level_node, 'clip_val',
-                     rats_node, 'intensity_threshold')
-    workflow.connect(unifize_node, 'out_file', rats_node, 'in_file')
-    workflow.connect(rats_node, 'out_file', apply_mask_node, 'mask_file')
-    workflow.connect(apply_mask_node, 'out_file',
-                     center_mass_node, 'in_file')
-    workflow.connect(unifize_node, 'out_file', refit_copy_node, 'in_file')
-    workflow.connect(center_mass_node, 'out_file',
-                     refit_copy_node, 'duporigin_file')
-    workflow.connect(center_mass_node, 'out_file', tcat_node1, 'in_files')
-    workflow.connect(tcat_node1, 'out_file', tstat_node1, 'in_file')
-    workflow.connect(tstat_node1, 'out_file', undump_node, 'in_file')
-    workflow.connect(undump_node, 'out_file', refit_set_node, 'in_file')
-    workflow.connect(refit_set_node, 'out_file', resample_node1, 'master')
-    workflow.connect(refit_set_node, 'out_file', resample_node1, 'in_file')
-    workflow.connect(refit_copy_node, 'out_file', resample_node2, 'master')
-    workflow.connect(center_mass_node, 'out_file', resample_node2, 'in_file')
-    workflow.connect(resample_node2, 'out_file', tcat_node2, 'in_files')
-    workflow.connect(tcat_node2, 'out_file', tstat_node2, 'in_file')
-    workflow.connect(tstat_node2, 'out_file', shift_rotate_node, 'reference')
-    workflow.connect(resample_node2, 'out_file', shift_rotate_node, 'in_file')
-    workflow.connect(tstat_node2, 'out_file', apply_allineate_node1, 'master')
-    workflow.connect(resample_node1, 'out_file',
-                     apply_allineate_node1, 'in_file')
-    workflow.connect(shift_rotate_node, 'out_matrix',
-                     apply_allineate_node1, 'in_matrix')
-    workflow.connect(apply_allineate_node1, 'out_file', tcat_node3, 'in_files')
-    workflow.connect(tcat_node3, 'out_file', tstat_node3, 'in_file')
+    workflow.connect(unifize, 'out_file', clip_level, 'in_file')
+    workflow.connect(clip_level, 'clip_val',
+                     rats, 'intensity_threshold')
+    workflow.connect(unifize, 'out_file', rats, 'in_file')
+    workflow.connect(rats, 'out_file', apply_mask, 'mask_file')
+    workflow.connect(apply_mask, 'out_file',
+                     center_mass, 'in_file')
+    workflow.connect(unifize, 'out_file', refit_copy, 'in_file')
+    workflow.connect(center_mass, 'out_file',
+                     refit_copy, 'duporigin_file')
+    workflow.connect(center_mass, 'out_file', tcat1, 'in_files')
+    workflow.connect(tcat1, 'out_file', tstat1, 'in_file')
+    workflow.connect(tstat1, 'out_file', undump, 'in_file')
+    workflow.connect(undump, 'out_file', refit_set, 'in_file')
+    workflow.connect(refit_set, 'out_file', resample1, 'master')
+    workflow.connect(refit_copy, 'out_file', resample1, 'in_file')
+    workflow.connect(refit_set, 'out_file', resample2, 'master')
+    workflow.connect(center_mass, 'out_file', resample2, 'in_file')
+    workflow.connect(resample2, 'out_file', tcat2, 'in_files')
+    workflow.connect(tcat2, 'out_file', tstat2, 'in_file')
+    workflow.connect(tstat2, 'out_file', shift_rotate, 'reference')
+    workflow.connect(resample2, 'out_file', shift_rotate, 'in_file')
+    workflow.connect(tstat2, 'out_file', apply_allineate1, 'master')
+    workflow.connect(resample1, 'out_file',
+                     apply_allineate1, 'in_file')
+    workflow.connect(shift_rotate, 'out_matrix',
+                     apply_allineate1, 'in_matrix')
+    workflow.connect(apply_allineate1, 'out_file', tcat3, 'in_files')
+    workflow.connect(tcat3, 'out_file', tstat3, 'in_file')
     if pipeline_name in ['affine_registration', 'nonlinear_registration']:
-        mask_node = pe.Node(afni.MaskTool(), name='generate_count_mask')
-        allineate_node3 = pe.Node(afni.Allineate(), name='affine_register')
-        catmatvec_node = pe.Node(afni.CatMatvec(), name='concatenate_transforms')
-        allineate_node4 = pe.Node(afni.Allineate(), name='apply_transform_on_head')
-        allineate_node5 = pe.Node(afni.Allineate(),
-                                  name='apply_transform_on_brain')
-        tcat_node3 = pe.Node(
-            afni.TCat(), name='concatenate_affine_registred_across_individuals')
-        tstat_node3 = pe.Node(afni.TStat(),
-                              name='compute_affine_registred_average')
-    
-        workflow.add_nodes([mask_node, allineate_node3, catmatvec_node,
-                            allineate_node4, allineate_node5,
-                            tcat_node3, tstat_node3])
+        mask = pe.Node(afni.MaskTool(), name='generate_count_mask')
+        allineate = pe.Node(afni.Allineate(), name='allineate')
+        catmatvec = pe.Node(afni.CatMatvec(), name='concatenate_transforms')
+        apply_allineate3 = pe.Node(afni.Allineate(), name='apply_transform3')
+        apply_allineate4 = pe.Node(afni.Allineate(), name='apply_transform4')
+        tcat3 = pe.Node(
+            afni.TCat(), name='concatenate_across_individuals4')
+        tstat3 = pe.Node(afni.TStat(), name='compute_average4')
+
+        workflow.adds([mask, allineate, catmatvec, apply_allineate3,
+                       apply_allineate4, tcat3, tstat3])
+
+        workflow.connect(tcat2, 'out_file', mask, 'in_file')
+        workflow.connect(mask, 'out_file', allineate, 'weight')
+        workflow.connect(apply_allineate1, 'out_file',
+                         allineate, 'in_file')
+        workflow.connect(allineate, 'out_matrix',
+                         catmatvec, 'in_file')
+        #XXX how can we enter multiple files ? 
+        workflow.connect(catmatvec, 'out_file',
+                         apply_allineate3, 'in_matrix')
+        workflow.connect(resample1, 'out_file',
+                         apply_allineate3, 'in_file')
+        workflow.connect(apply_allineate3, 'out_file', tcat3, 'in_files')
+        workflow.connect(tcat3, 'out_file', tstat3, 'in_file')
 
     if pipeline_name == 'nonlinear_anat_to_common':
         pass
