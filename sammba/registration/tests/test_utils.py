@@ -37,18 +37,23 @@ def test_create_pipeline_graph():
     # Check error is raised if wrong graph kind
     assert_raises_regex(ValueError, "Graph kind must be one of ",
                         utils.create_pipeline_graph,
-                        'rigid-body_registration', '', graph_kind='original')
+                        'anat_to_common_rigid', '', graph_kind='original')
 
     # Check graph file is created
     tempdir = tempfile.mkdtemp()
-    graph_file = os.path.join(tempdir, 'tmp_graph.dot')
-    utils.create_pipeline_graph('rigid-body_registration', graph_file)
+    graph_file = os.path.join(tempdir, 'tmp_graph')
+    utils.create_pipeline_graph('anat_to_common_rigid', graph_file)
     assert(os.path.exists(graph_file))
+    graph_path = graph_file + '.png'
 
-    os.remove(graph_file)
-    os.removedirs(tempdir)
+    if os.path.exists(graph_file):
+        os.remove(graph_file)
+    if os.path.exists(graph_path):
+        os.remove(graph_path)
+    if os.path.exists(tempdir):
+        os.removedirs(tempdir)
 
     # Check error is raised if writing directory dosn't exist
     assert_raises_regex(IOError, 'directory not existant',
                         utils.create_pipeline_graph,
-                        'rigid-body_registration', graph_file)
+                        'anat_to_common_rigid', graph_file)

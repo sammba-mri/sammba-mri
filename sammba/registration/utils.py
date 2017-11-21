@@ -128,9 +128,9 @@ def create_pipeline_graph(pipeline_name, graph_file,
     """
     Parameters
     ----------
-    pipeline_name : one of {'rigid-body_registration',
-                            'affine registration',
-                            'nonlinear registration'}
+    pipeline_name : one of {'anat_to_common_rigid',
+                            'anat_to_common_affine',
+                            'anat_to_common_nonlinear'}
 
     graph_file : Str, path to save the graph image
 
@@ -144,8 +144,8 @@ def create_pipeline_graph(pipeline_name, graph_file,
         notion on hierarchy in color;
         'exec': expands workflows to depict iterables
     """
-    pipeline_names = ['rigid_anat_to_common', 'affine_anat_to_common',
-                      'nonlinear_anat_to_common']
+    pipeline_names = ['anat_to_common_rigid', 'anat_to_common_affine',
+                      'anat_to_common_nonlinear']
     if pipeline_name not in pipeline_names:
         raise NotImplementedError(
             'Pipeline name must be one of {0}, you entered {1}'.format(
@@ -221,7 +221,8 @@ def create_pipeline_graph(pipeline_name, graph_file,
                      apply_allineate1, 'in_matrix')
     workflow.connect(apply_allineate1, 'out_file', tcat3, 'in_files')
     workflow.connect(tcat3, 'out_file', tstat3, 'in_file')
-    if pipeline_name in ['affine_registration', 'nonlinear_registration']:
+    if pipeline_name in ['anat_to_common_affine',
+                         'anat_to_common_nonlinear']:
         mask = pe.Node(afni.MaskTool(), name='generate_count_mask')
         allineate = pe.Node(afni.Allineate(), name='allineate')
         catmatvec = pe.Node(afni.CatMatvec(), name='concatenate_transforms')
@@ -248,7 +249,7 @@ def create_pipeline_graph(pipeline_name, graph_file,
         workflow.connect(apply_allineate3, 'out_file', tcat3, 'in_files')
         workflow.connect(tcat3, 'out_file', tstat3, 'in_file')
 
-    if pipeline_name == 'nonlinear_anat_to_common':
+    if pipeline_name == 'anat_to_common_nonlinear':
         pass
 
     current_dir = os.getcwd()
