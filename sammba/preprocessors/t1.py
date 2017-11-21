@@ -65,6 +65,7 @@ def register_to_common(t1_filenames, write_dir, brain_volume=400,
         terminal_output = 'allatonce'
     else:
         terminal_output = 'none'
+
     if caching:
 
         memory = Memory(write_dir)
@@ -119,8 +120,8 @@ def register_to_common(t1_filenames, write_dir, brain_volume=400,
     copied_t1_filenames = []
     for n, anat_file in enumerate(t1_filenames):
         suffixed_file = fname_presuffix(anat_file, suffix='_{}'.format(n))
-        copied_file = os.path.join(write_dir, os.path.basename(suffixed_file))
-        out_copy = copy(in_file=anat_file, out_file=copied_file)
+        out_file = os.path.join(write_dir, os.path.basename(suffixed_file))
+        out_copy = copy(in_file=anat_file, out_file=out_file)
         copied_t1_filenames.append(out_copy.outputs.out_file)
 
     ###########################################################################
@@ -182,26 +183,26 @@ def register_to_common(t1_filenames, write_dir, brain_volume=400,
     ###########################################################################
     # Finally, we shift heads and brains within the images to place the CoM at
     # the image center.
-    shifted_head_files = []
+    centered_head_files = []
     for head_file in head_files:
         out_resample = resample(in_file=head_file,
                                 master=out_refit.outputs.out_file,
                                 outputtype='NIFTI_GZ')
-        shifted_head_files.append(out_resample.outputs.out_file)
+        centered_head_files.append(out_resample.outputs.out_file)
 
-    shifted_brain_files = []
+    centered_brain_files = []
     for brain_file in brain_files:
         out_resample = resample(in_file=brain_file,
                                 master=out_refit.outputs.out_file,
                                 outputtype='NIFTI_GZ')
-        shifted_brain_files.append(out_resample.outputs.out_file)
+        centered_brain_files.append(out_resample.outputs.out_file)
 
     ###########################################################################
     # Quality check videos and average brain
-    out_tcat = tcat(in_files=shifted_brain_files,
-                    out_file=os.path.join(write_dir, 'shifted_brains.nii.gz'))
-    out_tstat_shifted_brain = tstat(in_file=out_tcat.outputs.out_file,
-                                    outputtype='NIFTI_GZ')
+    out_tcat = tcat(in_files=centered_brain_files,
+                    out_file=os.path.join(write_dir, 'centered_brains.nii.gz'))
+    out_tstat_centered_brain = tstat(in_file=out_tcat.outputs.out_file,
+                                     outputtype='NIFTI_GZ')
 
     ###########################################################################
     # At this point, we achieved a translation-only registration of the raw
@@ -218,17 +219,19 @@ def register_to_common(t1_filenames, write_dir, brain_volume=400,
     # image or, more biased, a nicely-aligned individual.
     shift_rotated_brain_files = []
     rigid_transform_files = []
-    for shifted_brain_file in shifted_brain_files:
+    for centered_brain_file in centered_brain_files:
+        suffixed_matrix = fname_presuffix(centered_brain_file,
+                                          suffix='_shr.aff12.1D',
+                                          use_ext=False)
+        out_matrix = os.path.join(write_dir, os.path.basename(suffixed_matrix))
         out_allineate = allineate(
-            in_file=shifted_brain_file,
-            reference=out_tstat_shifted_brain.outputs.out_file,
-            out_matrix=fname_presuffix(shifted_brain_file,
-                                       suffix='_shr.aff12.1D',
-                                       use_ext=False),
+            in_file=centered_brain_file,
+            reference=out_tstat_centered_brain.outputs.out_file,
+            out_matrix=out_matrix,
             convergence=convergence,
             two_blur=1,
             warp_type='shift_rotate',
-            out_file=fname_presuffix(shifted_brain_file, suffix='_shr'))
+            out_file=fname_presuffix(centered_brain_file, suffix='_shr'))
         rigid_transform_files.append(out_allineate.outputs.out_matrix)
         shift_rotated_brain_files.append(out_allineate.outputs.out_file)
 
@@ -236,13 +239,15 @@ def register_to_common(t1_filenames, write_dir, brain_volume=400,
     # Application to the whole head image. can also be used for a good
     # demonstration of linear vs. non-linear registration quality
     shift_rotated_head_files = []
-    for shifted_head_file, rigid_transform_file in zip(shifted_head_files,
-                                                       rigid_transform_files):
+    for centered_head_file, rigid_transform_file in zip(centered_head_files,
+                                                        rigid_transform_files):
+        suffixed_file = fname_presuffix(centered_head_file, suffix='_shr')
+        out_file = os.path.join(write_dir, os.path.basename(suffixed_file))
         out_allineate = allineate2(
-            in_file=shifted_head_file,
-            master=out_tstat_shifted_brain.outputs.out_file,
+            in_file=centered_head_file,
+            master=out_tstat_centered_brain.outputs.out_file,
             in_matrix=rigid_transform_file,
-            out_file=fname_presuffix(shifted_head_file, suffix='_shr'))
+            out_file=out_file)
         shift_rotated_head_files.append(out_allineate.outputs.out_file)
 
     ###########################################################################
@@ -286,9 +291,12 @@ def register_to_common(t1_filenames, write_dir, brain_volume=400,
             weight=out_mask_tool.outputs.out_file,
             out_file=fname_presuffix(shift_rotated_head_file,
                                      suffix='_affine'))
-        catmatvec_out_file = fname_presuffix(shift_rotated_head_file,
-                                             suffix='_cat.aff12.1D',
-                                             use_ext=False)
+
+        suffixed_matrix = fname_presuffix(shift_rotated_head_file,
+                                          suffix='_affine_catenated.aff12.1D',
+                                          use_ext=False)
+        catmatvec_out_file = os.path.join(write_dir,
+                                          os.path.basename(suffixed_matrix))
         out_catmatvec = catmatvec(in_file=[(rigid_transform_file, 'ONELINE'),
                                            (out_allineate.outputs.out_matrix,
                                             'ONELINE')],
@@ -296,34 +304,34 @@ def register_to_common(t1_filenames, write_dir, brain_volume=400,
         affine_transform_files.append(catmatvec_out_file)
 
     ###########################################################################
-    # Typically, convergence should be set to 0.005 but we increase it for
-    # speed reason.
-
-    ###########################################################################
     # Each resulting registration matrix is concatenated to the corresponding
     # rigid bory registration matrix then directly applied to the CoM brain
     # and head, reducing reslice errors in the final result.
     allineated_brain_files = []
-    for shifted_brain_file, affine_transform_file in zip(
-            shifted_brain_files, affine_transform_files):
+    for centered_brain_file, affine_transform_file in zip(
+            centered_brain_files, affine_transform_files):
         out_allineate = allineate2(
-            in_file=shifted_brain_file,
+            in_file=centered_brain_file,
             master=out_tstat_shr.outputs.out_file,
             in_matrix=affine_transform_file,
-            out_file=fname_presuffix(shifted_brain_file, suffix='_shr_affine'))
+            out_file=fname_presuffix(centered_brain_file,
+                                     suffix='_shr_affine_catenated'))
         allineated_brain_files.append(out_allineate.outputs.out_file)
 
     ###########################################################################
     # The application to the whole head image can also be used for a good
     # demonstration of linear vs. non-linear registration quality.
     allineated_head_files = []
-    for shifted_head_file, affine_transform_file in zip(
-            shifted_head_files, affine_transform_files):
+    for centered_head_file, affine_transform_file in zip(
+            centered_head_files, affine_transform_files):
+        suffixed_file = fname_presuffix(centered_head_file,
+                                        suffix='_shr_affine_catenated')
+        out_file = os.path.join(write_dir, os.path.basename(suffixed_file))
         out_allineate = allineate2(
-            in_file=shifted_head_file,
+            in_file=centered_head_file,
             master=out_tstat_shr.outputs.out_file,
             in_matrix=affine_transform_file,
-            out_file=fname_presuffix(shifted_head_file, suffix='_shr_affine'))
+            out_file=out_file)
         allineated_head_files.append(out_allineate.outputs.out_file)
 
     ###########################################################################
@@ -362,10 +370,10 @@ def register_to_common(t1_filenames, write_dir, brain_volume=400,
 
     warped_files = []
     warp_files = []
-    for affine_transform_file, shifted_head_file in zip(affine_transform_files,
-                                                        shifted_head_files):
+    for affine_transform_file, centered_head_file in zip(affine_transform_files,
+                                                         centered_head_files):
         out_qwarp = qwarp(
-            in_file=shifted_head_file,
+            in_file=centered_head_file,
             base_file=out_tstat_allineated_head.outputs.out_file,
             nmi=True,
             noneg=True,
@@ -374,7 +382,7 @@ def register_to_common(t1_filenames, write_dir, brain_volume=400,
             iniwarp=[affine_transform_file],
             inilev=0,
             maxlev=nonlinear_levels[0],
-            out_file=fname_presuffix(shifted_head_file, suffix='_warped1'))
+            out_file=fname_presuffix(centered_head_file, suffix='_warped1'))
         warp_files.append(out_qwarp.outputs.source_warp)
         warped_files.append(out_qwarp.outputs.warped_source)
 
@@ -394,13 +402,13 @@ def register_to_common(t1_filenames, write_dir, brain_volume=400,
         previous_warp_files = warp_files
         warped_files = []
         warp_files = []
-        for warp_file, shifted_head_file in zip(previous_warp_files,
-                                                shifted_head_files):
+        for warp_file, centered_head_file in zip(previous_warp_files,
+                                                 centered_head_files):
             out_nwarp_cat = nwarp_cat(
                 in_files=[('IDENT', out_tstat_warp_head.outputs.out_file),
                           warp_file], out_file='iniwarp.nii.gz')
             out_qwarp = qwarp(
-                in_file=shifted_head_file,
+                in_file=centered_head_file,
                 base_file=out_tstat_warp_head.outputs.out_file,
                 nmi=True,
                 noneg=True,
@@ -409,7 +417,8 @@ def register_to_common(t1_filenames, write_dir, brain_volume=400,
                 iniwarp=[out_nwarp_cat.outputs.out_file],
                 inilev=nonlinear_levels[0],
                 maxlev=nonlinear_levels[1],
-                out_file=fname_presuffix(shifted_head_file, suffix='_warped2'))
+                out_file=fname_presuffix(centered_head_file,
+                                         suffix='_warped2'))
             warp_files.append(out_qwarp.outputs.source_warp)
             warped_files.append(out_qwarp.outputs.warped_source)
 
@@ -431,10 +440,19 @@ def register_to_common(t1_filenames, write_dir, brain_volume=400,
             previous_warp_files = warp_files
             warped_files = []
             warp_files = []
-            for warp_file, shifted_head_file in zip(previous_warp_files,
-                                                    shifted_head_files):
+            for warp_file, centered_head_file in zip(previous_warp_files,
+                                                     centered_head_files):
+                suffixed_file = fname_presuffix(
+                    centered_head_file,
+                    suffix='_warped{}'.format(n_iter + 3))
+                if n_iter == len(nonlinear_levels):
+                    out_file = os.path.join(write_dir,
+                                            os.path.basename(suffixed_file))
+                else:
+                    out_file = suffixed_file
+
                 out_qwarp = qwarp(
-                    in_file=shifted_head_file,
+                    in_file=centered_head_file,
                     base_file=out_tstat_warp_head.outputs.out_file,
                     nmi=True,
                     noneg=True,
@@ -443,9 +461,7 @@ def register_to_common(t1_filenames, write_dir, brain_volume=400,
                     iniwarp=[warp_file],
                     inilev=inilev,
                     minpatch=nonlinear_minimal_patch,
-                    out_file=fname_presuffix(
-                        shifted_head_file,
-                        suffix='_warped{}'.format(n_iter + 3)))
+                    out_file=out_file)
                 warped_files.append(out_qwarp.outputs.warped_source)
                 warp_files.append(out_qwarp.outputs.source_warp)
 
@@ -466,14 +482,16 @@ def register_to_common(t1_filenames, write_dir, brain_volume=400,
     # --------------------
     # Apply non-linear registration results to uncorrected images
     warped_files = []
-    for head_file, warp_file in zip(head_files, warp_files):
+    for centered_head_file, warp_file in zip(centered_head_files, warp_files):
+        suffixed_file = fname_presuffix(
+            centered_head_file,
+            suffix='affine_warp{}_catenated'.format(len(nonlinear_levels)))
+        out_file = os.path.join(write_dir, os.path.basename(suffixed_file))
         out_warp_apply = warp_apply(
-            in_file=head_file,
+            in_file=centered_head_file,
             warp=warp_file,
             master=out_tstat_warp_head.outputs.out_file,
-            out_file=fname_presuffix(
-                head_file, suffix='_warped{}'.format(len(nonlinear_levels))
-                                     ))
+            out_file=out_file)
         warped_files.append(out_warp_apply.outputs.out_file)
 
     os.chdir(current_dir)

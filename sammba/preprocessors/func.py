@@ -17,7 +17,7 @@ def register_func_to_anat(func_filename, anat_filename, tr, write_dir,
     slice timing.
     """
     if caching:
-        memory = Memory(write_dir, base_dir='sammba_cache')
+        memory = Memory(write_dir)
         tshift = memory.cache(afni.TShift)
         clip_level = memory.cache(afni.ClipLevel)
         threshold = memory.cache(fsl.Threshold)
@@ -65,7 +65,7 @@ def register_func_to_anat(func_filename, anat_filename, tr, write_dir,
     out_tshift = tshift(in_file=func_filename,
                         outputtype='NIFTI_GZ',
                         tpattern='altplus',
-                        tr=tr)
+                        tr=str(tr))
     tshifted_filename = out_tshift.outputs.out_file
 
     # Register to the first volume

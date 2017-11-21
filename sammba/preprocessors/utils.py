@@ -40,7 +40,7 @@ def _reset_affines(in_file, out_file, overwrite=False, axes_to_permute=None,
                                                          suffix='.txt',
                                                          use_ext=False)
         set_center_mass.inputs.set_cm = center_mass
-        set_center_mass.set_default_terminal_output(terminal_output)
+#        set_center_mass.set_default_terminal_output(terminal_output) # XXX BUG
         result = set_center_mass.run()
         in_file = result.outputs.out_file
 
