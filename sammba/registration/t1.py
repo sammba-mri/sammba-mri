@@ -6,11 +6,11 @@ from sammba.externals.nipype.caching import Memory
 from sklearn.datasets.base import Bunch
 
 
-def register_to_common(t1_filenames, write_dir, brain_volume=400,
-                       registration_kind='affine',
-                       nonlinear_levels=[1, 2, 3],
-                       nonlinear_minimal_patch=75,
-                       convergence=0.005, caching=False, verbose=0):
+def anats_to_common(t1_filenames, write_dir, brain_volume=400,
+                    registration_kind='affine',
+                    nonlinear_levels=[1, 2, 3],
+                    nonlinear_minimal_patch=75,
+                    convergence=0.005, caching=False, verbose=0):
     """ Create common template from native T1 weighted images and achieve
     their registration to it.
 
@@ -208,6 +208,28 @@ def register_to_common(t1_filenames, write_dir, brain_volume=400,
     # At this point, we achieved a translation-only registration of the raw
     # anatomical images to each other's brain's (as defined by the brain
     # extractor) CoMs.
+    
+        workflow.connect(tcat_node2, 'out_file', mask_node, 'in_file')
+        workflow.connect(mask_node, 'out_file', allineate_node3, 'weight')
+        workflow.connect(allineate_node2, 'out_file', allineate_node3, 'in_file')
+        workflow.connect(allineate_node3, 'out_matrix', catmatvec_node, 'in_file')
+        #XXX how can we enter multiple files ? 
+        workflow.connect(catmatvec_node, 'out_file', allineate_node4, 'in_matrix')
+        workflow.connect(allineate_node, 'out_file', allineate_node4, 'in_file')
+    
+        workflow.connect(unifize_node, 'out_file', catmatvec_node, 'in_file')
+        workflow.connect(rats_node, 'out_file', apply_mask_node, 'mask_file')
+        workflow.connect(apply_mask_node, 'out_file',
+                         center_mass_node, 'in_file')
+        workflow.connect(unifize_node, 'out_file', refit_node, 'in_file')
+        workflow.connect(center_mass_node, 'out_file',
+                         refit_node, 'duporigin_file')
+        workflow.connect(center_mass_node, 'out_file', tcat_node, 'in_files')
+        workflow.connect(tcat_node, 'out_file', tstat_node, 'in_file')
+        workflow.connect(tstat_node, 'out_file', undump_node, 'in_file')
+        workflow.connect(undump_node, 'out_file', refit_node2, 'in_file')
+        workflow.connect(refit_node, 'out_file', resample_node, 'master')
+        workflow.connect(refit_node2, 'out_file', resample_node, 'in_file')
 
     ###########################################################################
     # Shift rotate
