@@ -11,6 +11,7 @@ Contents:
 .. toctree::
    :maxdepth: 2
 
+   authors.rst
    user_guide.rst
    auto_examples/index.rst
    reference.rst

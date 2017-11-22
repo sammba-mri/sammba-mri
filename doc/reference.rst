@@ -26,6 +26,26 @@ sammba-MRI API Reference
    fetch_zurich_test_retest
    fetch_zurich_anesthesiant
 
+.. _registration_ref:
+
+:mod:`sammba.registration`: Registration utilities
+==================================================
+
+.. automodule:: sammba.registration
+   :no-members:
+   :no-inherited-members:
+
+**Functions**:
+
+.. currentmodule:: sammba.registration
+
+.. autosummary::
+   :toctree: generated/
+   :template: function.rst
+
+   anats_to_common
+   create_pipeline_graph
+
 .. _interfaces_ref:
 
 External tools wrapped in python

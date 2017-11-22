@@ -24,18 +24,53 @@ The required dependencies to use the software are the python packages:
 * Nibabel >= 2.0.1
 * Nilearn >= 0.1.3
 * Matplotlib >= 1.1.1
-* Nipype 0.11.0
 * NetworkX >= 1.7
-* Enthought Traits >= 4.3
-* Dateutil >= 1.5
 * Pandas >= 0.12
+* packaging
+* configparser
+* future >= 0.16.0
+* traits >= 4.6
+* simplejson >= 3.8.0
+* prov == 1.5.0
+* funcsigs
+* click
+
 
 as well as the interfaces:
 
-* FSL >= 4.1.0
-* SPM8/12
+* AFNI
+* FSL >= 5.0
+* ANTS
 
-If you want to run the tests, you need nose >= 1.2.1
+If you want to run the tests, you need nose >= 1.2.1 and doctest-ignore-unicode
+
+
+Installation
+============
+
+First install Anaconda and nilearn as explained in `nilearn installation page <http://nilearn.github.io/introduction.html#installing-nilearn/>`_.
+
+Next install the remaining python dependencies using conda::
+
+    conda install pandas configparser future traits simplejson networkx packaging funcsigs
+
+Some dependencies are only available through pip::
+
+    pip install packaging prov
+
+Finally, you need `graphviz <http://www.graphviz.org/>`_::
+
+    sudo apt-get install graphviz
+
+For the moment sammba-mri is available as a development version. To download the source code, run the shell command::
+
+    git clone https://github.com/sammba-mri/sammba-mri.git
+
+In the ``sammba-mri`` directory created by the previous step, run
+(again, as a shell command)::
+
+    python setup.py install --user
+
 
 Interfaces configuration
 ========================
@@ -57,26 +92,16 @@ To test if FSL is correctly installed, open a new terminal and type in the shell
 
 You should see the FSL GUI with the version number in the header.
 
-**Configuring SPM**: Add the following lines specifying the location of the spm folder to your .bashrc file::
+**Configuring AFNI**: To be able to run AFNI make sure to add the following lines of code to your .bashrc file::
 
-    # SPM8
-    export SPM_PATH=/i2bm/local/spm8-standalone/spm8_mcr/spm8
+    # AFNI
+    export PATH=/usr/lib/afni/bin:$PATH
 
-**Using SPM MCR**: If you don't have a matlab licence, specify the location of the Matlab Compiler Runtime and force the
-use of the standalone MCR version of spm by appending the following lines to the .bashrc::
+**Configuring ANTs**: Add the following line to your .bashrc file so that your system knows where to find the ANTs binaries::
 
-    # SPM MCR
-    export SPMMCRCMD='/home/salma/Téléchargements/spm8/run_spm8.sh /home/salma/Téléchargements/MCR/v713 script'
-    export FORCE_SPMMCR='True'
+    # ANTs
+    export PATH=/usr/local/antsbin/bin:$PATH
+    export ANTSPATH=/usr/local/antsbin/bin/
 
-Installation
-============
-For the moment sammba-mri is available as a development version. To download the source code, run the shell command::
 
-    git clone https://github.com/sammba-mri/sammba-mri
-
-In the ``sammba-mri`` directory created by the previous step, run
-(again, as a shell command)::
-
-    python setup.py install --user
 

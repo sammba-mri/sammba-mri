@@ -1,15 +1,14 @@
 import os
 import numpy as np
 import nibabel
-from nipype.caching import Memory
-from nipype.interfaces import afni, fsl, ants
-from nipype.utils.filemanip import fname_presuffix
+from sammba.externals.nipype.caching import Memory
+from sammba.externals.nipype.interfaces import afni, fsl, ants
+from sammba.externals.nipype.utils.filemanip import fname_presuffix
 from sammba.interfaces import RatsMM
 from .utils import fix_obliquity
 
 
-def register_func_to_anat(func_filename, anat_filename, tr, write_dir,
-                          caching=False):
+def func_to_anat(func_filename, anat_filename, tr, write_dir, caching=False):
     """
     The functional volume is aligned to the anatomical, first with a rigid body
     registration and then on a per-slice basis (only a fine correction, this is
@@ -17,7 +16,7 @@ def register_func_to_anat(func_filename, anat_filename, tr, write_dir,
     slice timing.
     """
     if caching:
-        memory = Memory(write_dir, base_dir='sammba_cache')
+        memory = Memory(write_dir)
         tshift = memory.cache(afni.TShift)
         clip_level = memory.cache(afni.ClipLevel)
         threshold = memory.cache(fsl.Threshold)
@@ -65,7 +64,7 @@ def register_func_to_anat(func_filename, anat_filename, tr, write_dir,
     out_tshift = tshift(in_file=func_filename,
                         outputtype='NIFTI_GZ',
                         tpattern='altplus',
-                        tr=tr)
+                        tr=str(tr))
     tshifted_filename = out_tshift.outputs.out_file
 
     # Register to the first volume
@@ -120,7 +119,6 @@ def register_func_to_anat(func_filename, anat_filename, tr, write_dir,
     out_clip_level = clip_level(in_file=unbiased_func_filename)
     # XXX bad: brain mask cut
     out_rats = rats(in_file=unbiased_func_filename,
-                    out_file='UnBm.nii.gz',
                     volume_threshold=400,
                     intensity_threshold=int(out_clip_level.outputs.clip_val))
     out_cacl = calc(in_file_a=unbiased_func_filename,
@@ -133,10 +131,12 @@ def register_func_to_anat(func_filename, anat_filename, tr, write_dir,
     out_allineate = allineate2(
         in_file=out_cacl.outputs.out_file,
         reference=unbiased_anat_filename,
-        out_matrix='BmBe_shr.aff12.1D',
+        out_matrix=fname_presuffix(out_cacl.outputs.out_file,
+                                   suffix='_shr.aff12.1D',
+                                   use_ext=False),
         center_of_mass='',
         warp_type='shift_rotate',
-        out_file='BmBe_shr.nii.gz')
+        out_file=fname_presuffix(out_cacl.outputs.out_file, suffix='_shr'))
     rigid_transform_file = out_allineate.outputs.out_matrix
 
     # apply the inverse transformation to register to the anatomical volume
@@ -150,7 +150,8 @@ def register_func_to_anat(func_filename, anat_filename, tr, write_dir,
         in_file=unbiased_anat_filename,
         master=unbiased_func_filename,
         in_matrix=catmatvec_out_file,
-        out_file='BmBe_shr_in_func_space.nii.gz')
+        out_file=fname_presuffix(unbiased_anat_filename,
+                                 suffix='_shr_in_func_space'))
 
     # suppanatwarp="$base"_BmBe_shr.aff12.1D
 
