@@ -125,26 +125,21 @@ def fix_obliquity(to_fix_filename, reference_filename, caching=False,
 
 def create_pipeline_graph(pipeline_name, graph_file,
                           graph_kind='hierarchical'):
-    """
+    """Creates pipeline graph for a given piepline.
+
     Parameters
     ----------
-    pipeline_name : one of {'anat_to_common_rigid',
-                            'anat_to_common_affine',
-                            'anat_to_common_nonlinear'}
+    pipeline_name : one of {'anat_to_common_rigid', 'anat_to_common_affine',
+        'anat_to_common_nonlinear'}
         Pipeline name.
 
-    graph_file : Str, path to save the graph image
+    graph_file : str.
+        Path to save the graph image to.
 
-    graph_kind : one of {'orig', 'hierarchical', 'flat', 'exec',
-                         'colored'}, optional
-        'orig': creates a top level graph without expanding internal
-        workflow nodes;
-        'flat': expands workflow nodes recursively;
-        'hierarchical': expands workflow nodes recursively with a notion
-        on hierarchy;
-        'colored': expands workflow nodes recursively with a
-        notion on hierarchy in color;
-        'exec': expands workflows to depict iterables
+    graph_kind : one of {'orig', 'hierarchical', 'flat', 'exec', 'colored'},
+        optional.
+        The kind of the graph, passed to
+        sammba.externals.nipype.pipeline.workflows.Workflow().write_graph
     """
     pipeline_names = ['anats_to_common_rigid', 'anats_to_common_affine',
                       'anats_to_common_nonlinear']
