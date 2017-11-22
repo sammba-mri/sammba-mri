@@ -3,11 +3,21 @@
 #functions to convert Bruker Paravision enhanced multiframe DICOM files into
 #NIfTI-1 format.
 
-#main function is EnDCM_to_NII. it's in the function description, but thanks
-#again to  common.py of dicom2nifiti by Arne Brys, icometrix, which saved me
-#when it comes to specifying the affine for nibabel
+#depends on the presence of a compiled version of dcmdump (part of OFFIS dcmtk;
+#http://dcmtk.org/dcmtk.php.en and http://support.dcmtk.org/docs/dcmdump.html)
+#which does the initial parsing: extraction of the header/metadata as text and
+#the image data as a raw vector
 
-#PV6folder_to_NIIs calls EnDCM_to_NII recursively
+#so this is effectively a python wrapper to dcmdump, processing and passing
+#its output to nibabel and a text file
+
+#useful documents include DICOM spec C.7.6.2.1.1 and 10.7.1.3
+#common.py of dicom2nifiti by Arne Brys, icometrix saved me when it comes to
+#specifiying the affine for nibabel! see http://dicom2nifti.readthedocs.io.
+#he effectively did the hard part, interpreting nibabel's DICOM tutorial for me
+
+#exports to a .txt text file some meta-data useful to the processing of certain
+#protocols such as perfusion, T1/T2 mapping and diffusion
 
 #only tested on PV6 .dcm files and a limited number of sequences. little or no
 #error-checking. there are a lot of circumstances where this converter will
@@ -15,7 +25,7 @@
 
 #library uses:
 #numpy: affine and image matrix manipulation
-#os: parsing dcmdump output, standardise file/folder paths, file deletion
+#os: standardise file/folder paths, file deletion
 #subprocess: interface dcmdump
 #itertools and pandas: image frame and parameter sorting
 #nibabel: NIfTI-1 format
@@ -60,54 +70,24 @@ def rotate_affine(angle, axis):
 
 #%%
     
-def EnDCM_to_NII(dcmdump_path, EnDCM, save_directory, SIAPfix):
+def EnDCM_to_NII(dcmdump_path, EnDCM, save_directory, SIAPfix, valstart, splt1, splt2):
     """
-    the actual DICOM to NIfTI-1 converter
+    the actual converter
     assumes int16; this will be changed in the future.
-    dcmdump_path is the path to the compiled dcmdump (see paragraph after next)
+    dcmdump_path is the path to the compiled dcmdump
     EnDCM is the DICOM file (typically named EnIm1.dcm).
     save_directory is what it says it is
     SIAPfix is a yes or no to swapping the superior-inferior and
     anterior-posterior axes to be how I think they should be. In rodents,
     Paravision sets dorsal-ventral as AP and rostral-caudal as SI. I think they
     should be the other way round https://en.wikipedia.org/wiki/Anatomical_terms_of_location#Main_terms
-        
-    files are named based on several tag values found in the DICOM. also saved
-    with the same name as the .nii.gz is a .txt file of extracted meta-data
-    that could be useful to the processing of certain protocols such as
-    perfusion, T1/T2 mapping and diffusion
-    
-    depends on access to a compiled version of dcmdump (part of OFFIS dcmtk;
-    http://dcmtk.org/dcmtk.php.en and http://support.dcmtk.org/docs/dcmdump.html)
-    which does the initial parsing: extraction of the header/metadata as text
-    and the image data as a raw vector
-
-    so this is effectively a python wrapper to dcmdump, processing and passing
-    its output to nibabel and a text file
-
-    useful documents include DICOM spec C.7.6.2.1.1 and 10.7.1.3
-    common.py of dicom2nifiti by Arne Brys, icometrix saved me when it comes to
-    specifying the affine for nibabel! see http://dicom2nifti.readthedocs.io.
-    he effectively did the hard part, interpreting nibabel's DICOM tutorial for
-    me
+    valstart and splt1 are parameters used to determine how to parse dcmdump
+    output, which differs according to the os. for unix these are respectively
+    15 and \\, for windows 17 and \\\\. splt2 splits the EnDCM path to help
+    determine the experiment folder/number, which is always 3 levels higher.
+    of course, file/folder separators differ according to os, with unix being /
+    and windows \\.
     """
-#%%
-
-    #valstart and splt1 are parameters used to determine how to parse dcmdump
-    #output, which differs according to the os. for unix these are respectively
-    #15 and \\, for windows 17 and \\\\. splt2 splits the EnDCM path to help
-    #determine the experiment folder/number, which is always 3 levels higher.
-    #of course, file/folder separators differ according to os, with unix being
-    #/ and windows \\.
-    if os.name == 'nt':
-        valstart = 17
-        splt1 = '\\\\'
-        splt2 = '\\'
-    if os.name == 'posix':
-        valstart = 15
-        splt1 = '\\'
-        splt2 = '/'
-
 #%%
 
     #regularise/standardise input paths
@@ -376,18 +356,3 @@ def EnDCM_to_NII(dcmdump_path, EnDCM, save_directory, SIAPfix):
     ptbl.to_csv(path_or_buf = os.path.join(save_directory, NIIname[:-7] +
                                            '_ptbl.txt'),
                 sep = '\t', index = 0)
-
-#%%
-
-def recursive_EnDCMs_to_NIIs(dcmdump_path, sessdir, save_directory, SIAPfix):
-    """
-    to fill
-    """
-#%%
-
-    for root, dirs, files in os.walk(sessdir):
-        for file in files:
-            if file.startswith('EnIm'):
-                if file.endswith('.dcm'):
-                    EnDCM_to_NII(dcmdump_path, os.path.join(root, file),
-                                 save_directory, SIAPfix)
