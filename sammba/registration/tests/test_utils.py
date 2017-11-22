@@ -41,19 +41,14 @@ def test_create_pipeline_graph():
 
     # Check graph file is created
     tempdir = tempfile.mkdtemp()
-    graph_file = os.path.join(tempdir, 'tmp_graph')
+    graph_file = os.path.join(tempdir, 'tmp_graph.png')
     utils.create_pipeline_graph('anat_to_common_rigid', graph_file)
     assert(os.path.exists(graph_file))
-    graph_path = graph_file + '.png'
 
+    graph_file_root, _ = os.path.splitext(graph_file)
     if os.path.exists(graph_file):
         os.remove(graph_file)
-    if os.path.exists(graph_path):
-        os.remove(graph_path)
+    if os.path.exists(graph_file_root):
+        os.remove(graph_file_root)
     if os.path.exists(tempdir):
         os.removedirs(tempdir)
-
-    # Check error is raised if writing directory dosn't exist
-    assert_raises_regex(IOError, 'directory not existant',
-                        utils.create_pipeline_graph,
-                        'anat_to_common_rigid', graph_file)

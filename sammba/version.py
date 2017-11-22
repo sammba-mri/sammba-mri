@@ -2,9 +2,6 @@
 """
 sammba version, required package versions, and utilities for checking
 """
-# Author: Bertrand Thirion
-# License: simplified BSD
-
 # PEP0440 compatible formatted version, see:
 # https://www.python.org/dev/peps/pep-0440/
 #
@@ -21,7 +18,7 @@ sammba version, required package versions, and utilities for checking
 # Dev branch marker is: 'X.Y.dev' or 'X.Y.devN' where N is an integer.
 # 'X.Y.dev0' is the canonical version of 'X.Y.dev'
 #
-__version__ = '0.1.0'
+__version__ = '0.0.1'
 
 _SAMMBA_INSTALL_MSG = 'See %s for installation information.' % (
     'http://sammba-mri.github.io/introduction.html#installation')

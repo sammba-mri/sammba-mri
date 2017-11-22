@@ -131,10 +131,12 @@ def create_pipeline_graph(pipeline_name, graph_file,
     pipeline_name : one of {'anat_to_common_rigid',
                             'anat_to_common_affine',
                             'anat_to_common_nonlinear'}
+        Pipeline name.
 
     graph_file : Str, path to save the graph image
 
-    graph_kind : one of {'orig', 'hierarchical', 'flat', 'exec', 'colored'}
+    graph_kind : one of {'orig', 'hierarchical', 'flat', 'exec',
+                         'colored'}, optional
         'orig': creates a top level graph without expanding internal
         workflow nodes;
         'flat': expands workflow nodes recursively;
@@ -156,10 +158,6 @@ def create_pipeline_graph(pipeline_name, graph_file,
             'Graph kind must be one of {0}, you entered {1}'.format(
                 graph_kinds, graph_kind))
 
-    graph_file = os.path.abspath(graph_file)
-    write_dir = os.path.dirname(graph_file)
-    if not os.path.isdir(write_dir):
-        raise IOError('{0} directory not existant'.format(write_dir))
     workflow = pe.Workflow(name=pipeline_name)
 
     #######################################################################
@@ -226,14 +224,13 @@ def create_pipeline_graph(pipeline_name, graph_file,
         mask = pe.Node(afni.MaskTool(), name='generate_count_mask')
         allineate = pe.Node(afni.Allineate(), name='allineate')
         catmatvec = pe.Node(afni.CatMatvec(), name='concatenate_transforms')
-        apply_allineate3 = pe.Node(afni.Allineate(), name='apply_transform3')
-        apply_allineate4 = pe.Node(afni.Allineate(), name='apply_transform4')
+        apply_allineate2 = pe.Node(afni.Allineate(), name='apply_transform2')
         tcat3 = pe.Node(
             afni.TCat(), name='concatenate_across_individuals4')
         tstat3 = pe.Node(afni.TStat(), name='compute_average4')
 
-        workflow.add_nodes([mask, allineate, catmatvec, apply_allineate3,
-                            apply_allineate4, tcat3, tstat3])
+        workflow.add_nodes([mask, allineate, catmatvec, apply_allineate2,
+                            tcat3, tstat3])
 
         workflow.connect(tcat2, 'out_file', mask, 'in_file')
         workflow.connect(mask, 'out_file', allineate, 'weight')
@@ -243,16 +240,20 @@ def create_pipeline_graph(pipeline_name, graph_file,
                          catmatvec, 'in_file')
         #XXX how can we enter multiple files ? 
         workflow.connect(catmatvec, 'out_file',
-                         apply_allineate3, 'in_matrix')
+                         apply_allineate2, 'in_matrix')
         workflow.connect(resample1, 'out_file',
-                         apply_allineate3, 'in_file')
-        workflow.connect(apply_allineate3, 'out_file', tcat3, 'in_files')
+                         apply_allineate2, 'in_file')
+        workflow.connect(apply_allineate2, 'out_file', tcat3, 'in_files')
         workflow.connect(tcat3, 'out_file', tstat3, 'in_file')
 
     if pipeline_name == 'anat_to_common_nonlinear':
         pass
 
-    current_dir = os.getcwd()
-    os.chdir(write_dir)
-    _ = workflow.write_graph(graph2use=graph_kind, dotfilename=graph_file)
-    os.chdir(current_dir)
+    graph_file_root, graph_file_ext = os.path.splitext(graph_file)
+    if graph_file_ext:
+        _ = workflow.write_graph(graph2use=graph_kind,
+                                 format=graph_file_ext[1:],
+                                 dotfilename=graph_file_root)
+    else:
+        _ = workflow.write_graph(graph2use=graph_kind,
+                                 dotfilename=graph_file_root)

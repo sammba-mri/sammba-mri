@@ -60,3 +60,11 @@ average_img = image.mean_img(rigid.registered)
 display = plotting.plot_anat(average_img, dim=-1.7, title='rigid-body')
 display.add_edges(rigid.registered[0])
 plotting.show()
+
+##############################################################################
+# Visualize pipeline steps
+# -------------------------
+from sammba.registration import create_pipeline_graph
+
+graph_file = os.path.join(write_dir, 'rigid_registration_graph')
+create_pipeline_graph('anats_to_common_rigid', graph_file)
