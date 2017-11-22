@@ -146,8 +146,8 @@ def create_pipeline_graph(pipeline_name, graph_file,
         notion on hierarchy in color;
         'exec': expands workflows to depict iterables
     """
-    pipeline_names = ['anat_to_common_rigid', 'anat_to_common_affine',
-                      'anat_to_common_nonlinear']
+    pipeline_names = ['anats_to_common_rigid', 'anats_to_common_affine',
+                      'anats_to_common_nonlinear']
     if pipeline_name not in pipeline_names:
         raise NotImplementedError(
             'Pipeline name must be one of {0}, you entered {1}'.format(
@@ -219,7 +219,7 @@ def create_pipeline_graph(pipeline_name, graph_file,
                      apply_allineate1, 'in_matrix')
     workflow.connect(apply_allineate1, 'out_file', tcat3, 'in_files')
     workflow.connect(tcat3, 'out_file', tstat3, 'in_file')
-    if pipeline_name in ['anat_to_common_affine',
+    if pipeline_name in ['anats_to_common_affine',
                          'anat_to_common_nonlinear']:
         mask = pe.Node(afni.MaskTool(), name='generate_count_mask')
         allineate = pe.Node(afni.Allineate(), name='allineate')
@@ -246,7 +246,7 @@ def create_pipeline_graph(pipeline_name, graph_file,
         workflow.connect(apply_allineate2, 'out_file', tcat3, 'in_files')
         workflow.connect(tcat3, 'out_file', tstat3, 'in_file')
 
-    if pipeline_name == 'anat_to_common_nonlinear':
+    if pipeline_name == 'anats_to_common_nonlinear':
         pass
 
     graph_file_root, graph_file_ext = os.path.splitext(graph_file)

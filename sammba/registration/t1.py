@@ -19,7 +19,7 @@ def anats_to_common(t1_filenames, write_dir, brain_volume=400,
     t1_filenames : list of str
         Paths to the T1 weighted images.
 
-    write_dir : Str
+    write_dir : str
         Path to an existant directory to save output files to.
 
     brain_volume : float, optional
@@ -51,10 +51,12 @@ def anats_to_common(t1_filenames, write_dir, brain_volume=400,
     data : sklearn.datasets.base.Bunch
         Dictionary-like object, the interest attributes are :
 
-        - 'registered': string list. Paths to registered images. Note that
-                        they they have undergone a bias correction step before.
-        - 'transforms': string list. Paths to the transforms from the raw
-                        images to the registered images.
+        - 'registered' : list of str.
+                         Paths to registered images. Note that
+                         they have undergone a bias correction step before.
+        - 'transforms' : list of str.
+                         Paths to the transforms from the raw
+                         images to the registered images.
     """
     registration_kinds = ['rigid', 'affine', 'nonlinear']
     if registration_kind not in registration_kinds:
@@ -369,8 +371,8 @@ def anats_to_common(t1_filenames, write_dir, brain_volume=400,
 
     warped_files = []
     warp_files = []
-    for affine_transform_file, centered_head_file in zip(affine_transform_files,
-                                                         centered_head_files):
+    for affine_transform_file, centered_head_file in zip(
+            affine_transform_files, centered_head_files):
         out_qwarp = qwarp(
             in_file=centered_head_file,
             base_file=out_tstat_allineated_head.outputs.out_file,

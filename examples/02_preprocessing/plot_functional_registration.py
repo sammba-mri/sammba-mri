@@ -2,15 +2,10 @@
 fMRI registration
 =================
 
-Here we show how to create a template from multiple anatomical scans.
-Initially, registration is of extracted brains. Once these are reasonably
-aligned, whole heads are registered, weighted by masks that, if parameters
-are chosen well, include some scalp. The amount of scalp is hopefully enough
-to help in differentiating the brain-scalp boundary without including so much
-head tissue that it starts to contaminate the registration with the highly
-variable head tissue.
-"""
+Standard functional preprocessing and registration of functional image to
+anatomical.
 
+"""
 
 ##############################################################################
 # Retrieve data
