@@ -8,7 +8,7 @@ from sammba.interfaces import RatsMM
 from .utils import fix_obliquity
 
 
-def func_to_anat(func_filename, anat_filename, tr, write_dir, caching=False):
+def func_and_anat(func_filename, anat_filename, tr, write_dir, caching=False):
     """
     The functional volume is aligned to the anatomical, first with a rigid body
     registration and then on a per-slice basis (only a fine correction, this is
@@ -68,7 +68,7 @@ def func_to_anat(func_filename, anat_filename, tr, write_dir, caching=False):
     tshifted_filename = out_tshift.outputs.out_file
 
     # Register to the first volume
-    # XXX why do you need a thresholded image ?    
+    # XXX why do you need a thresholded image ?
     out_clip_level = clip_level(in_file=tshifted_filename)
     out_threshold = threshold(in_file=tshifted_filename,
                               thresh=out_clip_level.outputs.clip_val)
@@ -121,25 +121,37 @@ def func_to_anat(func_filename, anat_filename, tr, write_dir, caching=False):
     out_rats = rats(in_file=unbiased_func_filename,
                     volume_threshold=400,
                     intensity_threshold=int(out_clip_level.outputs.clip_val))
-    out_cacl = calc(in_file_a=unbiased_func_filename,
-                    in_file_b=out_rats.outputs.out_file,
-                    expr='a*b',
-                    outputtype='NIFTI_GZ')
+    out_cacl_func = calc(in_file_a=unbiased_func_filename,
+                         in_file_b=out_rats.outputs.out_file,
+                         expr='a*b',
+                         outputtype='NIFTI_GZ')
 
-    # Compute the transformation from the functional image to the anatomical
+    # Mask the anatomical volume outside the brain.
+    out_clip_level = clip_level(in_file=unbiased_anat_filename)
+    # XXX bad: brain mask cut
+    out_rats = rats(in_file=unbiased_anat_filename,
+                    volume_threshold=400,
+                    intensity_threshold=int(out_clip_level.outputs.clip_val))
+    out_cacl_anat = calc(in_file_a=unbiased_anat_filename,
+                         in_file_b=out_rats.outputs.out_file,
+                         expr='a*b',
+                         outputtype='NIFTI_GZ')
+
+    # Compute the transformation from functional to anatomical brain
     # XXX: why in this sense
     out_allineate = allineate2(
-        in_file=out_cacl.outputs.out_file,
-        reference=unbiased_anat_filename,
-        out_matrix=fname_presuffix(out_cacl.outputs.out_file,
+        in_file=out_cacl_func.outputs.out_file,
+        reference=out_cacl_anat.outputs.out_file,
+        out_matrix=fname_presuffix(out_cacl_func.outputs.out_file,
                                    suffix='_shr.aff12.1D',
                                    use_ext=False),
         center_of_mass='',
         warp_type='shift_rotate',
-        out_file=fname_presuffix(out_cacl.outputs.out_file, suffix='_shr'))
+        out_file=fname_presuffix(out_cacl_func.outputs.out_file,
+                                 suffix='_shr'))
     rigid_transform_file = out_allineate.outputs.out_matrix
 
-    # apply the inverse transformation to register to the anatomical volume
+    # apply the inverse transformation to register the anatomical to the func
     catmatvec_out_file = fname_presuffix(rigid_transform_file, suffix='INV')
     if not os.path.isfile(catmatvec_out_file):
         _ = catmatvec(in_file=[(rigid_transform_file, 'I')],
@@ -203,6 +215,7 @@ def func_to_anat(func_filename, anat_filename, tr, write_dir, caching=False):
     # rostral end of some anatomicals)
 
     # The inverse warp frequently fails, Resampling can help it work better
+    # XXX why specifically .1 in voxel_size ?
     voxel_size_z = anat_img.header.get_zooms()[2]
     resampled_registered_anat_filenames = []
     for sliced_registered_anat_filename in sliced_registered_anat_filenames:
@@ -247,19 +260,19 @@ def func_to_anat(func_filename, anat_filename, tr, write_dir, caching=False):
 
     # Resample the mean volume back to the initial resolution,
     voxel_size = nibabel.load(
-        sliced_bias_corrected_filename).header.get_zooms()
+        unbiased_func_filename).header.get_zooms()
     resampled_warped_slices = []
     for warped_slice in warped_slices:
         out_resample = resample(in_file=warped_slice,
-                                voxel_size=voxel_size + (voxel_size[0],),
+                                voxel_size=voxel_size,
                                 outputtype='NIFTI_GZ')
         resampled_warped_slices.append(out_resample.outputs.out_file)
 
     # fix the obliquity
-    for (resampled_registered_anat_filename, resampled_warped_slice) in zip(
-            resampled_registered_anat_filenames, resampled_warped_slices):
+    for (sliced_registered_anat_filename, resampled_warped_slice) in zip(
+            sliced_registered_anat_filenames, resampled_warped_slices):
         _ = fix_obliquity(resampled_warped_slice,
-                          resampled_registered_anat_filename)
+                          sliced_registered_anat_filename)
 
     # Merge all slices !
 #    out_merge_mean = merge(in_files=resampled_warped_slices, dimension='z')
@@ -273,34 +286,25 @@ def func_to_anat(func_filename, anat_filename, tr, write_dir, caching=False):
                                                      suffix='Sl%d' % slice_n))
         sliced_func_filenames.append(out_slicer.outputs.out_file)
 
-    # resample functional slices
-    resampled_func_filenames = []
-    for sliced_func_filename in sliced_func_filenames:
-        out_resample = resample(in_file=sliced_func_filename,
-                                voxel_size=(.1, .1, voxel_size_z),
-                                outputtype='NIFTI_GZ')
-        resampled_func_filenames.append(out_resample.outputs.out_file)
-
     # Apply the precomputed warp slice by slice
     warped_func_slices = []
-    for (resampled_func_filename, warp_filename) in zip(
-            resampled_func_filenames, warp_filenames):
-        out_warp_apply = warp_apply(in_file=resampled_func_filename,
+    for (sliced_func_filename, warp_filename) in zip(
+            sliced_func_filenames, warp_filenames):
+        out_warp_apply = warp_apply(in_file=sliced_func_filename,
+                                    master=sliced_func_filename,
                                     warp=warp_filename,
                                     out_file=fname_presuffix(
-                                        resampled_func_filename, suffix='_qw'))
+                                        sliced_func_filename, suffix='_qw'))
         warped_func_slices.append(out_warp_apply.outputs.out_file)
 
     # Fix the obliquity
-    # XXX why no resampling back before ?
-    for (resampled_registered_anat_filename, warped_func_slice) in zip(
-            resampled_registered_anat_filenames, warped_func_slices):
-        _ = fix_obliquity(warped_func_slice,
-                          resampled_registered_anat_filename)
+    for (sliced_func_filename, warped_func_slice) in zip(
+            sliced_func_filenames, warped_func_slices):
+        _ = fix_obliquity(warped_func_slice, sliced_func_filename)
 
     # Finally, merge all slices !
     out_merge_func = merge(in_files=warped_func_slices, dimension='z')
-    out_merge_anat = merge(in_files=resampled_registered_anat_filenames,
-                           dimension='z')
+#    out_merge_anat = merge(in_files=resampled_registered_anat_filenames,
+#                           dimension='z')
     return (out_merge_func.outputs.merged_file,
-            out_merge_anat.outputs.merged_file)
+            registered_anat_oblique_filename)
