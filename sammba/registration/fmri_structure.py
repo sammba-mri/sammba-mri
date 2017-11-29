@@ -1,9 +1,10 @@
 import os
+from nilearn._utils.compat import _basestring
 
 
-class Mammal(object):
+class FMRIData(object):
     """
-    Encapsulation for subject data, relative to preprocessing.
+    Encapsulation for fMRI data, relative to preprocessing.
 
     Parameters
     ----------
@@ -13,14 +14,14 @@ class Mammal(object):
     anat : str
         Path to anatomical image
 
-    mammal_id : str, optional
-        Mammal id
+    animal_id : str
+        Animal id
     """
 
-    def __init__(self, func=None, anat=None, mammal_id="mam001"):
+    def __init__(self, func=None, anat=None, animal_id=None):
         self.func = func
         self.anat = anat
-        self.mammal_id = mammal_id
+        self.animal_id = animal_id
 
     def _set_items(self, **kwargs):
         for k, v in kwargs.items():
@@ -36,3 +37,11 @@ class Mammal(object):
             if not os.path.isfile(self.anat):
                 raise IOError('anat must be an existing image file,'
                               'you gave {0}'.format(self.anat))
+
+        if not isinstance(self.animal_id, _basestring):
+            raise ValueError('animal_id must be a string, you provided '
+                             '{0}'.format(self.animal_id))
+
+    def _set_animal_id(self, animal_id):
+         setattr(self, k, v)
+                

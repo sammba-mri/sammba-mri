@@ -6,7 +6,7 @@ from sammba.externals.nipype.interfaces import afni, fsl, ants
 from sammba.externals.nipype.utils.filemanip import fname_presuffix
 from sammba.interfaces import RatsMM
 from .utils import fix_obliquity
-from .mammal_data import Mammal
+from .fmri_structure import FMRIData
 
 
 def _coregister_func_and_anat(func_filename, anat_filename, t_r, write_dir,
@@ -454,15 +454,15 @@ def _anat_to_template(anat_filename, head_template_filename, write_dir,
             out_qwarp.outputs.source_warp)
 
 
-def subjects_to_template(subjects, t_r, template_filename, write_dir,
-                         caching=False):
+def fmri_data_to_template(fmri_data, t_r, template_filename, write_dir,
+                          caching=False):
     """ Registration of subject's functional and anatomical images to
     a given template.
 
     Parameters
     ----------
-    subjects : sequence of sammba.registration.Subject
-        Subjects datas, giving paths to its functional and anatomical images.
+    fmri_data : sequence of sammba.registration.FMRIData
+        Animals data, giving paths to their functional and anatomical images.
 
     t_r : float
         Repetition time for the EPI, in seconds.
@@ -478,56 +478,65 @@ def subjects_to_template(subjects, t_r, template_filename, write_dir,
 
     Returns
     -------
-    mammal themselves, each one with attributes `registered_func_` and
-        `registered_anat` added to specify the paths to the functional
-        and anatomical images registered to the template.
+    the same sequence with each animal_data updated: attributes
+        `registered_func_` and
+        `registered_anat_` are added to specify the paths to the functional
+        and anatomical images registered to the template,
+        and `output_dir_` is added to give output directory for each animal.
     """
-    if not hasattr(subjects, "__iter__"):
-            raise ValueError("'subjects' input argument must be an iterable. "
-                             "You provided {0}".format(subjects.__class__))
-    for subject in subjects:
-        if not isinstance(subject, Subject):
-            raise ValueError('Each subject must have type '
-                             'sammba.registration.Mammal. You provided {0} of'
-                             ' type {1}'.format(subject, type(subject)))
-    # Check subjects ids are different
-    subjects_ids = [subject.subject_id for subject in subjects]
-    if len(set(subjects_ids)) != len(subjects_ids):
-        raise ValueError('Subjects ids must be different. You'
-                         ' provided {0}'.format(subjects_ids))
+    if not hasattr(fmri_data, "__iter__"):
+            raise ValueError(
+                "'animals_data' input argument must be an iterable. You "
+                "provided {0}".format(fmri_data.__class__))
 
-    for subject in subjects:
-        subject._check_inputs()
-        subject_output_dir = os.path.abspath(write_dir, subject.subject_id)
-        subject.setattr("output_dir_", subject_output_dir) # XXX do a function for creating new attributes ?
+    for n, data in enumerate(fmri_data):
+        if not isinstance(data, FMRIData):
+            raise ValueError('Each animal data must have type '
+                             'sammba.registration.Animal. You provided {0} of'
+                             ' type {1}'.format(data, type(data)))
+        if data.animal_id is None:
+            setattr(data, "animal_id", 'animal{0:03d}'.format(n + 1))
 
-        if not os.path.isdir(subject.output_dir_):
-            os.makedirs(subject.output_dir_)
+    # Check that ids are different
+    animals_ids = [data.animal_id for data in fmri_data]
+    if len(set(animals_ids)) != len(animals_ids):
+        raise ValueError('Animals ids must be different. You'
+                         ' provided {0}'.format(animals_ids))
 
-        func_filename = subject.func
-        anat_filename = subject.anat
+    for n, animal_data in enumerate(fmri_data):
+        animal_data._check_inputs()
+        animal_output_dir = os.path.join(os.path.abspath(write_dir),
+                                         animal_data.animal_id)
+        setattr(animal_data, "output_dir_", animal_output_dir) # XXX do a function for creating new attributes ?
+
+        if not os.path.isdir(animal_data.output_dir_):
+            os.makedirs(animal_data.output_dir_)
+
+        func_filename = animal_data.func
+        anat_filename = animal_data.anat
         coreg_func_filename, _, func_to_anat_oned_filename = \
-            _coregister_func_and_anat(func_filename, anat_filename,
-                                      subject.output_dir,
+            _coregister_func_and_anat(func_filename, anat_filename, t_r,
+                                      animal_data.output_dir_,
                                       caching=caching)
 
         if template_filename is not None:
             (normalized_anat_filename, anat_to_template_oned_filename,
              anat_to_template_warp_filename) = \
                 _anat_to_template(anat_filename, template_filename,
-                                  subject.output_dir,
+                                  animal_data.output_dir_,
                                   caching=caching)
 
             normalized_func_filename = _func_to_template(
                 coreg_func_filename,
                 template_filename,
-                subject.output_dir,
+                animal_data.output_dir_,
                 func_to_anat_oned_filename,
                 anat_to_template_oned_filename,
                 anat_to_template_warp_filename,
                 caching=caching)
 
-        subject.setattr("registered_func_", normalized_func_filename)
-        subject.setattr("registered_anat_", normalized_anat_filename)
+        setattr(animal_data, "registered_func_", normalized_func_filename)
+        setattr(animal_data, "registered_anat_", normalized_anat_filename)
+        fmri_data[n] = animal_data
 
-    return subjects
+    return fmri_data

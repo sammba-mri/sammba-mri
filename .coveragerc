@@ -3,7 +3,7 @@ branch = True
 source = sammba
 include = 
     */sammba/data_fetchers/*
-    */sammba/preprocessors/*
+    */sammba/registration/*
     */sammba/interfaces/*
 
 omit =
