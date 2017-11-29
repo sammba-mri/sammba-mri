@@ -498,3 +498,98 @@ def anats_to_common(t1_filenames, write_dir, brain_volume=400,
     os.chdir(current_dir)
     return Bunch(registered=warped_files,
                  transforms=warp_files)
+
+
+def anat_to_template(anat_filename, head_template_filename, write_dir,
+                     brain_template_filename=None,
+                     dilated_head_mask_filename=None,
+                     caching=False):
+    if caching:
+        memory = Memory(write_dir)
+        clip_level = memory.cache(afni.ClipLevel)
+        allineate = memory.cache(afni.Allineate)
+        rats = memory.cache(RatsMM)
+        allineate = memory.cache(afni.Allineate)
+        allineate2 = memory.cache(afni.Allineate)
+        unifize = memory.cache(afni.Unifize)
+        threshold = memory.cache(fsl.Threshold)
+        qwarp = memory.cache(afni.Qwarp)
+    else:
+        unifize = afni.Unifize().run
+        clip_level = afni.ClipLevel().run
+        rats = RatsMM().run
+        apply_mask = fsl.ApplyMask().run
+        allineate = afni.Allineate().run
+        allineate2 = afni.Allineate().run  # TODO: remove after fixed bug
+        threshold = fsl.Threshold().run
+        qwarp = afni.Qwarp().run
+
+    os.chdir(write_dir)
+    out_unifize = unifize(in_file=anat_filename,
+                          urad=18.3, outputtype='NIFTI_GZ')
+    unbiased_anat_filename = out_unifize.outputs.out_file
+
+    out_clip_level = clip_level(in_file=unbiased_anat_filename)
+    out_rats = rats(in_file=unbiased_anat_filename,
+                    volume_threshold=400,
+                    intensity_threshold=int(out_clip_level.outputs.clip_val))
+    out_apply_mask = apply_mask(in_file=unbiased_anat_filename,
+                                mask_file=out_rats.outputs.out_file)
+    masked_anat_filename = out_apply_mask.outputs.out_file
+    if brain_template_filename is None:
+        out_clip_level = clip_level(in_file=head_template_filename)
+        out_rats = rats(
+            in_file=head_template_filename,
+            volume_threshold=400,
+            intensity_threshold=int(out_clip_level.outputs.clip_val))
+        brain_template_filename = out_rats.outputs.out_file
+
+    # the actual T1anat to template registration using the brain extracted
+    # image could do in one 3dQwarp step using allineate flags but will
+    # separate as 3dAllineate performs well on brain image, and 3dQwarp well on
+    # whole head
+    affine_transform_filename = fname_presuffix(masked_anat_filename,
+                                                suffix='_shr.aff12.1D',
+                                                use_ext=False)
+    out_allineate = allineate(
+        in_file=masked_anat_filename,
+        reference=head_template_filename,
+        master=brain_template_filename,
+        out_matrix=affine_transform_filename,
+        two_blur=1,
+        cost='nmi',
+        convergence=.005,
+        two_pass=True,
+        center_of_mass='',
+        maxrot=90,
+        warp_type='shift_rotate',
+        out_file=fname_presuffix(masked_anat_filename, suffix='_shr'))
+
+    # Apply the registration to the whole head
+    out_allineate = allineate2(
+        in_file=unbiased_anat_filename,
+        master=head_template_filename,
+        in_matrix=affine_transform_filename,
+        out_file=fname_presuffix(unbiased_anat_filename, suffix='_allineated'))
+    allineated_filename = out_allineate.outputs.out_file
+    # Non-linear registration of affine pre-registered whole head image
+    # to template. Don't initiate straight from the original with an iniwarp
+    # due to weird errors (like it creating an Allin it then can't find)
+    if dilated_head_mask_filename is None:
+        out_threshold = threshold(in_file=head_template_filename,
+                                  thresh=0)
+        dilated_head_mask_filename = out_threshold.outputs.out_file
+
+    out_qwarp = qwarp(
+        in_file=allineated_filename,
+        base_file=head_template_filename,
+        weight=dilated_head_mask_filename,
+        nmi=True,
+        noneg=True,
+        iwarp=True,
+        blur=[0],
+        out_file=fname_presuffix(allineated_filename, suffix='_warped'))
+
+    return Bunch(registered=out_qwarp.outputs.warped_source,
+                 affine_transform=affine_transform_filename,
+                 warp_transform=out_qwarp.outputs.source_warp)

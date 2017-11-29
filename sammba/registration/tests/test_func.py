@@ -4,10 +4,11 @@ import tempfile
 from nose.tools import assert_true
 from nilearn._utils.testing import assert_raises_regex
 from nilearn._utils.niimg_conversions import _check_same_fov
-from sammba.registration import FMRIData, fmri_data_to_template
+from sammba.registration import FMRISession, fmri_sessions_to_template
 from sammba.registration import func
 from sammba.externals.nipype.interfaces import afni
 from sammba import testing_data
+import nibabel
 
 
 def test_coregister_func_and_anat():
@@ -18,16 +19,18 @@ def test_coregister_func_and_anat():
     tempdir = tempfile.mkdtemp()
     if afni.Info().version():
         coreg_func_file, coreg_anat_file, _ = \
-            func._coregister_func_and_anat(func_file, anat_file, 1., tempdir)
-        assert_true(_check_same_fov(coreg_func_file, coreg_anat_file))
+            func._coregister_func_and_anat(func_file, anat_file, 1., tempdir,
+                                           slice_timing=False)
+        assert_true(_check_same_fov(nibabel.load(coreg_func_file),
+                                    nibabel.load(coreg_anat_file)))
 
 
-def test_fmri_data_to_template():
+def test_fmri_sessions_to_template():
     anat_file = os.path.join(os.path.dirname(testing_data.__file__),
                              'anat.nii.gz')
     func_file = os.path.join(os.path.dirname(testing_data.__file__),
                              'func.nii.gz')
-    mammal_data = FMRIData(anat=anat_file, func=func_file)
+    mammal_data = FMRISession(anat=anat_file, func=func_file)
 
     tempdir = tempfile.mkdtemp()
     write_dir = os.path.join(tempdir, 'test_func_dir')
@@ -35,25 +38,25 @@ def test_fmri_data_to_template():
     t_r = 1.
     assert_raises_regex(ValueError,
                         "'animals_data' input argument must be an iterable",
-                        fmri_data_to_template, mammal_data, t_r,
+                        fmri_sessions_to_template, mammal_data, t_r,
                         template_file,
                         write_dir=write_dir)
 
     assert_raises_regex(ValueError,
                         "Each animal data must have type",
-                        fmri_data_to_template, [mammal_data, ''], t_r,
+                        fmri_sessions_to_template, [mammal_data, ''], t_r,
                         template_file,
                         write_dir=write_dir)
 
     assert_raises_regex(ValueError,
                         "Animals ids must be different",
-                        fmri_data_to_template, [mammal_data, mammal_data], t_r,
-                        template_file,
-                        write_dir=write_dir)
+                        fmri_sessions_to_template, [mammal_data, mammal_data],
+                        t_r, template_file, write_dir=write_dir)
 
     if afni.Info().version():
-        registered_data = fmri_data_to_template([mammal_data], t_r,
-                                                template_file, tempdir)
+        registered_data = fmri_sessions_to_template([mammal_data], t_r,
+                                                    template_file, tempdir,
+                                                    slice_timing=False)
         assert_true(os.path.isdir(registered_data.output_dir_))
         assert_true(os.path.isdir(registered_data.registered_func_))
         assert_true(os.path.isdir(registered_data.registered_anat_))

@@ -6,10 +6,13 @@ from sammba.externals.nipype.interfaces import afni, fsl, ants
 from sammba.externals.nipype.utils.filemanip import fname_presuffix
 from sammba.interfaces import RatsMM
 from .utils import fix_obliquity
-from .fmri_structure import FMRIData
+from .fmri_session import FMRISession
+from .t1 import anat_to_template
 
 
 def _coregister_func_and_anat(func_filename, anat_filename, t_r, write_dir,
+                              slice_timing=True,
+                              prior_rigid_body_registration=False,
                               caching=False):
     """
     The functional volume is aligned to the anatomical, first with a rigid body
@@ -63,16 +66,17 @@ def _coregister_func_and_anat(func_filename, anat_filename, t_r, write_dir,
 
     # Correct slice timing
     os.chdir(write_dir)
-    out_tshift = tshift(in_file=func_filename,
-                        outputtype='NIFTI_GZ',
-                        tpattern='altplus',
-                        tr=str(t_r))
-    tshifted_filename = out_tshift.outputs.out_file
+    if slice_timing:
+        out_tshift = tshift(in_file=func_filename,
+                            outputtype='NIFTI_GZ',
+                            tpattern='altplus',
+                            tr=str(t_r))
+        func_filename = out_tshift.outputs.out_file
 
     # Register to the first volume
     # XXX why do you need a thresholded image ?
-    out_clip_level = clip_level(in_file=tshifted_filename)
-    out_threshold = threshold(in_file=tshifted_filename,
+    out_clip_level = clip_level(in_file=func_filename)
+    out_threshold = threshold(in_file=func_filename,
                               thresh=out_clip_level.outputs.clip_val)
     thresholded_filename = out_threshold.outputs.out_file
 
@@ -89,9 +93,9 @@ def _coregister_func_and_anat(func_filename, anat_filename, t_r, write_dir,
     # XXX: bad output: up and down on y-axis
 
     # Apply the registration to the whole head
-    allineated_filename = fname_presuffix(tshifted_filename, suffix='Av')
-    out_allineate = allineate(in_file=tshifted_filename,
-                              master=tshifted_filename,
+    allineated_filename = fname_presuffix(func_filename, suffix='Av')
+    out_allineate = allineate(in_file=func_filename,
+                              master=func_filename,
                               in_matrix=out_volreg.outputs.oned_matrix_save,
                               out_file=allineated_filename)
 
@@ -117,61 +121,65 @@ def _coregister_func_and_anat(func_filename, anat_filename, t_r, write_dir,
     out_unifize = unifize(in_file=anat_filename, outputtype='NIFTI_GZ')
     unbiased_anat_filename = out_unifize.outputs.out_file
 
-    # Mask the mean functional volume outside the brain.
-    out_clip_level = clip_level(in_file=unbiased_func_filename)
-    # XXX bad: brain mask cut
-    out_rats = rats(in_file=unbiased_func_filename,
-                    volume_threshold=400,
-                    intensity_threshold=int(out_clip_level.outputs.clip_val))
-    out_cacl_func = calc(in_file_a=unbiased_func_filename,
-                         in_file_b=out_rats.outputs.out_file,
-                         expr='a*b',
-                         outputtype='NIFTI_GZ')
-
-    # Mask the anatomical volume outside the brain.
-    out_clip_level = clip_level(in_file=unbiased_anat_filename)
-    # XXX bad: brain mask cut
-    out_rats = rats(in_file=unbiased_anat_filename,
-                    volume_threshold=400,
-                    intensity_threshold=int(out_clip_level.outputs.clip_val))
-    out_cacl_anat = calc(in_file_a=unbiased_anat_filename,
-                         in_file_b=out_rats.outputs.out_file,
-                         expr='a*b',
-                         outputtype='NIFTI_GZ')
-
-    # Compute the transformation from functional to anatomical brain
-    # XXX: why in this sense
-    out_allineate = allineate2(
-        in_file=out_cacl_func.outputs.out_file,
-        reference=out_cacl_anat.outputs.out_file,
-        out_matrix=fname_presuffix(out_cacl_func.outputs.out_file,
-                                   suffix='_shr.aff12.1D',
-                                   use_ext=False),
-        center_of_mass='',
-        warp_type='shift_rotate',
-        out_file=fname_presuffix(out_cacl_func.outputs.out_file,
-                                 suffix='_shr'))
-    rigid_transform_file = out_allineate.outputs.out_matrix
-
-    # apply the inverse transformation to register the anatomical to the func
-    catmatvec_out_file = fname_presuffix(rigid_transform_file, suffix='INV')
-    if not os.path.isfile(catmatvec_out_file):
-        _ = catmatvec(in_file=[(rigid_transform_file, 'I')],
-                      oneline=True,
-                      out_file=catmatvec_out_file)
-        # XXX not cached I don't understand why
-    out_allineate = allineate(
-        in_file=unbiased_anat_filename,
-        master=unbiased_func_filename,
-        in_matrix=catmatvec_out_file,
-        out_file=fname_presuffix(unbiased_anat_filename,
-                                 suffix='_shr_in_func_space'))
+    if prior_rigid_body_registration:
+        # Mask the mean functional volume outside the brain.
+        out_clip_level = clip_level(in_file=unbiased_func_filename)
+        # XXX bad: brain mask cut
+        out_rats = rats(in_file=unbiased_func_filename,
+                        volume_threshold=400,
+                        intensity_threshold=int(out_clip_level.outputs.clip_val))
+        out_cacl_func = calc(in_file_a=unbiased_func_filename,
+                             in_file_b=out_rats.outputs.out_file,
+                             expr='a*b',
+                             outputtype='NIFTI_GZ')
+    
+        # Mask the anatomical volume outside the brain.
+        out_clip_level = clip_level(in_file=unbiased_anat_filename)
+        # XXX bad: brain mask cut
+        out_rats = rats(in_file=unbiased_anat_filename,
+                        volume_threshold=400,
+                        intensity_threshold=int(out_clip_level.outputs.clip_val))
+        out_cacl_anat = calc(in_file_a=unbiased_anat_filename,
+                             in_file_b=out_rats.outputs.out_file,
+                             expr='a*b',
+                             outputtype='NIFTI_GZ')
+    
+        # Compute the transformation from functional to anatomical brain
+        # XXX: why in this sense
+        out_allineate = allineate2(
+            in_file=out_cacl_func.outputs.out_file,
+            reference=out_cacl_anat.outputs.out_file,
+            out_matrix=fname_presuffix(out_cacl_func.outputs.out_file,
+                                       suffix='_shr.aff12.1D',
+                                       use_ext=False),
+            center_of_mass='',
+            warp_type='shift_rotate',
+            out_file=fname_presuffix(out_cacl_func.outputs.out_file,
+                                     suffix='_shr'))
+        rigid_transform_file = out_allineate.outputs.out_matrix
+    
+        # apply the inverse transformation to register the anatomical to the func
+        catmatvec_out_file = fname_presuffix(rigid_transform_file, suffix='INV')
+        if not os.path.isfile(catmatvec_out_file):
+            _ = catmatvec(in_file=[(rigid_transform_file, 'I')],
+                          oneline=True,
+                          out_file=catmatvec_out_file)
+            # XXX not cached I don't understand why
+        out_allineate = allineate(
+            in_file=unbiased_anat_filename,
+            master=unbiased_func_filename,
+            in_matrix=catmatvec_out_file,
+            out_file=fname_presuffix(unbiased_anat_filename,
+                                     suffix='_shr_in_func_space'))
+        allineated_anat_filename = out_allineate.outputs.out_file
+    else:
+        allineated_anat_filename = unbiased_anat_filename
 
     # suppanatwarp="$base"_BmBe_shr.aff12.1D
 
     # Non-linear registration
-    # XXX what is the difference between Warp and 3dQwarp?    
-    out_warp = warp(in_file=out_allineate.outputs.out_file,
+    # XXX what is the difference between Warp and 3dQwarp?
+    out_warp = warp(in_file=allineated_anat_filename,
                     oblique_parent=unbiased_func_filename,
                     interp='quintic',
                     gridset=unbiased_func_filename,
@@ -182,6 +190,20 @@ def _coregister_func_and_anat(func_filename, anat_filename, t_r, write_dir,
                                    suffix='_warp.mat', use_ext=False)
     if not os.path.isfile(mat_filename):
         np.savetxt(mat_filename, [out_warp.runtime.stdout], fmt='%s')
+
+    # func to anat tranform
+    transform_filename = fname_presuffix(registered_anat_filename,
+                                         suffix='_func_to_anat.aff12.1D',
+                                         use_ext=False)
+    if prior_rigid_body_registration:
+        _ = catmatvec(in_file=[(mat_filename, 'ONELINE'),
+                               (rigid_transform_file, 'ONELINE')],
+                      oneline=True,
+                      out_file=transform_filename)
+    else:
+        _ = catmatvec(in_file=[(mat_filename, 'ONELINE')],
+                      oneline=True,
+                      out_file=transform_filename)
 
     # 3dWarp doesn't put the obliquity in the header, so do it manually
     # This step generates one file per slice and per time point, so we are
@@ -309,7 +331,7 @@ def _coregister_func_and_anat(func_filename, anat_filename, t_r, write_dir,
 #    out_merge_anat = merge(in_files=resampled_registered_anat_filenames,
 #                           dimension='z')
     return (out_merge_func.outputs.merged_file,
-            registered_anat_oblique_filename)
+            registered_anat_oblique_filename, transform_filename)
 
 
 def _func_to_template(func_coreg_filename, template_filename, write_dir,
@@ -360,108 +382,16 @@ def _func_to_template(func_coreg_filename, template_filename, write_dir,
     return out_warp_apply.outputs.out_file
 
 
-def _anat_to_template(anat_filename, head_template_filename, write_dir,
-                      brain_template_filename=None,
-                      dilated_head_mask_filename=None,
-                      caching=False):
-    if caching:
-        memory = Memory(write_dir)
-        clip_level = memory.cache(afni.ClipLevel)
-        allineate = memory.cache(afni.Allineate)
-        rats = memory.cache(RatsMM)
-        allineate = memory.cache(afni.Allineate)
-        allineate2 = memory.cache(afni.Allineate)
-        unifize = memory.cache(afni.Unifize)
-        threshold = memory.cache(fsl.Threshold)
-        qwarp = memory.cache(afni.Qwarp)
-    else:
-        unifize = afni.Unifize().run
-        clip_level = afni.ClipLevel().run
-        rats = RatsMM().run
-        apply_mask = memory.cache(fsl.ApplyMask)
-        allineate = afni.Allineate().run
-        allineate2 = afni.Allineate().run  # TODO: remove after fixed bug
-        threshold = fsl.Threshold().run
-        qwarp = afni.Qwarp().run
-
-    os.chdir(write_dir)
-    out_unifize = unifize(in_file=anat_filename,
-                          urad=18.3, outputtype='NIFTI_GZ')
-    unbiased_anat_filename = out_unifize.outputs.out_file
-
-    out_clip_level = clip_level(in_file=unbiased_anat_filename)
-    out_rats = rats(in_file=unbiased_anat_filename,
-                    volume_threshold=400,
-                    intensity_threshold=int(out_clip_level.outputs.clip_val))
-    out_apply_mask = apply_mask(in_file=unbiased_anat_filename,
-                                mask_file=out_rats.outputs.out_file)
-    masked_anat_filename = out_apply_mask.outputs.out_file
-    if brain_template_filename is None:
-        out_clip_level = clip_level(in_file=head_template_filename)
-        out_rats = rats(
-            in_file=head_template_filename,
-            volume_threshold=400,
-            intensity_threshold=int(out_clip_level.outputs.clip_val))
-        brain_template_filename = out_rats.outputs.out_file
-
-    # the actual T1anat to template registration using the brain extracted
-    # image could do in one 3dQwarp step using allineate flags but will
-    # separate as 3dAllineate performs well on brain image, and 3dQwarp well on
-    # whole head
-    affine_transform_filename = fname_presuffix(masked_anat_filename,
-                                                suffix='_shr.aff12.1D',
-                                                use_ext=False)
-    out_allineate = allineate(
-        in_file=masked_anat_filename,
-        reference=head_template_filename,
-        master=brain_template_filename,
-        out_matrix=affine_transform_filename,
-        two_blur=1,
-        cost='nmi',
-        convergence=.005,
-        two_pass=True,
-        center_of_mass='',
-        maxrot=90,
-        warp_type='shift_rotate',
-        out_file=fname_presuffix(masked_anat_filename, suffix='_shr'))
-
-    # Apply the registration to the whole head
-    out_allineate = allineate2(
-        in_file=unbiased_anat_filename,
-        master=head_template_filename,
-        in_matrix=affine_transform_filename,
-        out_file=fname_presuffix(unbiased_anat_filename, suffix='_allineated'))
-    allineated_filename = out_allineate.outputs.out_file
-    # Non-linear registration of affine pre-registered whole head image
-    # to template. Don't initiate straight from the original with an iniwarp
-    # due to weird errors (like it creating an Allin it then can't find)
-    if dilated_head_mask_filename is None:
-        out_threshold = threshold(in_file=head_template_filename,
-                                  thresh=0)
-        dilated_head_mask_filename = out_threshold.outputs.out_file
-
-    out_qwarp = qwarp(
-        in_file=allineated_filename,
-        base_file=head_template_filename,
-        weight=dilated_head_mask_filename,
-        nmi=True,
-        noneg=True,
-        iwarp=True,
-        blur=[0],
-        out_file=fname_presuffix(allineated_filename, suffix='_warped'))
-
-    return (out_qwarp.outputs.warped_source, affine_transform_filename,
-            out_qwarp.outputs.source_warp)
-
-
-def fmri_data_to_template(fmri_data, t_r, template_filename, write_dir,
-                          caching=False):
+def fmri_sessions_to_template(sessions_data, t_r, template_filename, write_dir,
+                              prior_rigid_body_registration=False,
+                              slice_timing=True,
+                              caching=False):
     """ Registration of subject's functional and anatomical images to
     a given template.
 
     Parameters
     ----------
-    fmri_data : sequence of sammba.registration.FMRIData
+    sessions_data : sequence of sammba.registration.SessionData
         Animals data, giving paths to their functional and anatomical images.
 
     t_r : float
@@ -484,13 +414,13 @@ def fmri_data_to_template(fmri_data, t_r, template_filename, write_dir,
         and anatomical images registered to the template,
         and `output_dir_` is added to give output directory for each animal.
     """
-    if not hasattr(fmri_data, "__iter__"):
+    if not hasattr(sessions_data, "__iter__"):
             raise ValueError(
                 "'animals_data' input argument must be an iterable. You "
-                "provided {0}".format(fmri_data.__class__))
+                "provided {0}".format(sessions_data.__class__))
 
-    for n, data in enumerate(fmri_data):
-        if not isinstance(data, FMRIData):
+    for n, data in enumerate(sessions_data):
+        if not isinstance(data, FMRISession):
             raise ValueError('Each animal data must have type '
                              'sammba.registration.Animal. You provided {0} of'
                              ' type {1}'.format(data, type(data)))
@@ -498,12 +428,12 @@ def fmri_data_to_template(fmri_data, t_r, template_filename, write_dir,
             setattr(data, "animal_id", 'animal{0:03d}'.format(n + 1))
 
     # Check that ids are different
-    animals_ids = [data.animal_id for data in fmri_data]
+    animals_ids = [data.animal_id for data in sessions_data]
     if len(set(animals_ids)) != len(animals_ids):
         raise ValueError('Animals ids must be different. You'
                          ' provided {0}'.format(animals_ids))
 
-    for n, animal_data in enumerate(fmri_data):
+    for n, animal_data in enumerate(sessions_data):
         animal_data._check_inputs()
         animal_output_dir = os.path.join(os.path.abspath(write_dir),
                                          animal_data.animal_id)
@@ -515,16 +445,18 @@ def fmri_data_to_template(fmri_data, t_r, template_filename, write_dir,
         func_filename = animal_data.func
         anat_filename = animal_data.anat
         coreg_func_filename, _, func_to_anat_oned_filename = \
-            _coregister_func_and_anat(func_filename, anat_filename, t_r,
-                                      animal_data.output_dir_,
-                                      caching=caching)
+            _coregister_func_and_anat(
+                func_filename, anat_filename, t_r, animal_data.output_dir_,
+                prior_rigid_body_registration=prior_rigid_body_registration,
+                slice_timing=slice_timing,
+                caching=caching)
 
         if template_filename is not None:
             (normalized_anat_filename, anat_to_template_oned_filename,
              anat_to_template_warp_filename) = \
-                _anat_to_template(anat_filename, template_filename,
-                                  animal_data.output_dir_,
-                                  caching=caching)
+                anat_to_template(anat_filename, template_filename,
+                                 animal_data.output_dir_,
+                                 caching=caching)
 
             normalized_func_filename = _func_to_template(
                 coreg_func_filename,
@@ -537,6 +469,6 @@ def fmri_data_to_template(fmri_data, t_r, template_filename, write_dir,
 
         setattr(animal_data, "registered_func_", normalized_func_filename)
         setattr(animal_data, "registered_anat_", normalized_anat_filename)
-        fmri_data[n] = animal_data
+        sessions_data[n] = animal_data
 
-    return fmri_data
+    return sessions_data
