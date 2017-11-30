@@ -44,7 +44,18 @@ sammba-MRI API Reference
    :template: function.rst
 
    anats_to_common
+   coregister_fmri_session
    create_pipeline_graph
+
+**Classes**:
+
+.. currentmodule:: sammba.registration
+
+.. autosummary::
+   :toctree: generated/
+   :template: class.rst
+
+   FMRISession
 
 .. _interfaces_ref:
 

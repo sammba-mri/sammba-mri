@@ -7,19 +7,44 @@ from sammba.externals.nipype.utils.filemanip import fname_presuffix
 from sammba.interfaces import RatsMM
 from .utils import fix_obliquity
 from .fmri_session import FMRISession
-from .t1 import anat_to_template
+from .t1 import anats_to_template
 
 
-def _coregister_func_and_anat(func_filename, anat_filename, t_r, write_dir,
-                              slice_timing=True,
-                              prior_rigid_body_registration=False,
-                              caching=False):
+def coregister_fmri_session(session_data, t_r, write_dir,
+                            slice_timing=True,
+                            prior_rigid_body_registration=False,
+                            caching=False):
     """
+    Coregistration of the subject's functional and anatomical images.
     The functional volume is aligned to the anatomical, first with a rigid body
     registration and then on a per-slice basis (only a fine correction, this is
-    mostly for correction of EPI distortion). This pipeline includes
-    slice timing.
+    mostly for correction of EPI distortion).
+
+
+    Parameters
+    ----------
+    sessions_data : sequence of sammba.registration.SessionData
+        Animals data, giving paths to their functional and anatomical images.
+
+    t_r : float
+        Repetition time for the EPI, in seconds.
+
+    write_dir : str
+        Directory to save the output and temporary images.
+
+    caching : bool, optional
+        Wether or not to use caching.
+
+    Returns
+    -------
+    the same sequence with each animal_data updated: attributes
+        `registered_func_` and
+        `registered_anat_` are added to specify the paths to the functional
+        and anatomical images registered to the template,
+        and `output_dir_` is added to give output directory for each animal.
     """
+    func_filename = session_data.func
+    anat_filename = session_data.anat
     if caching:
         memory = Memory(write_dir)
         tshift = memory.cache(afni.TShift)
@@ -64,8 +89,13 @@ def _coregister_func_and_anat(func_filename, anat_filename, t_r, write_dir,
         qwarp = afni.Qwarp().run
         merge = fsl.Merge().run
 
+    session_data._check_inputs()
+    output_dir = os.path.join(os.path.abspath(write_dir),
+                              session_data.animal_id)
+    session_data._set_output_dir_(output_dir)
+    current_dir = os.getcwd()
+    os.chdir(output_dir)
     # Correct slice timing
-    os.chdir(write_dir)
     if slice_timing:
         out_tshift = tshift(in_file=func_filename,
                             outputtype='NIFTI_GZ',
@@ -330,8 +360,12 @@ def _coregister_func_and_anat(func_filename, anat_filename, t_r, write_dir,
     out_merge_func = merge(in_files=warped_func_slices, dimension='z')
 #    out_merge_anat = merge(in_files=resampled_registered_anat_filenames,
 #                           dimension='z')
-    return (out_merge_func.outputs.merged_file,
-            registered_anat_oblique_filename, transform_filename)
+
+    # Update the fmri data
+    setattr(session_data, "coreg_func_", out_merge_func.outputs.merged_file)
+    setattr(session_data, "coreg_anat_", registered_anat_oblique_filename)
+    setattr(session_data, "coreg_transform_", transform_filename)
+    os.chdir(current_dir)
 
 
 def _func_to_template(func_coreg_filename, template_filename, write_dir,
@@ -433,42 +467,54 @@ def fmri_sessions_to_template(sessions_data, t_r, template_filename, write_dir,
         raise ValueError('Animals ids must be different. You'
                          ' provided {0}'.format(animals_ids))
 
+    coreg_func_filenames = []
+    func_to_anat_oned_filenames = []
     for n, animal_data in enumerate(sessions_data):
         animal_data._check_inputs()
         animal_output_dir = os.path.join(os.path.abspath(write_dir),
                                          animal_data.animal_id)
         setattr(animal_data, "output_dir_", animal_output_dir) # XXX do a function for creating new attributes ?
 
+        sessions_data[n] = animal_data
         if not os.path.isdir(animal_data.output_dir_):
             os.makedirs(animal_data.output_dir_)
 
-        func_filename = animal_data.func
-        anat_filename = animal_data.anat
         coreg_func_filename, _, func_to_anat_oned_filename = \
-            _coregister_func_and_anat(
-                func_filename, anat_filename, t_r, animal_data.output_dir_,
+            coregister_fmri_session(
+                animal_data, t_r, write_dir,
                 prior_rigid_body_registration=prior_rigid_body_registration,
                 slice_timing=slice_timing,
                 caching=caching)
+        coreg_func_filenames.append(coreg_func_filename)
+        func_to_anat_oned_filenames.append(func_to_anat_oned_filename)
 
-        if template_filename is not None:
-            (normalized_anat_filename, anat_to_template_oned_filename,
-             anat_to_template_warp_filename) = \
-                anat_to_template(anat_filename, template_filename,
-                                 animal_data.output_dir_,
-                                 caching=caching)
+    anat_filenames = [animal_data.anat for animal_data in sessions_data]
+    (normalized_anat_filenames, anat_to_template_oned_filenames,
+     anat_to_template_warp_filenames) = \
+        anats_to_template(anat_filenames, template_filename,
+                          animal_data.output_dir_,
+                          caching=caching)
+    for n, (animal_data, normalized_anat_filename) in enumerate(zip(
+            sessions_data, normalized_anat_filenames)):
+        setattr(animal_data, "registered_anat_", normalized_anat_filename)
+        sessions_data[n] = animal_data
 
-            normalized_func_filename = _func_to_template(
-                coreg_func_filename,
-                template_filename,
-                animal_data.output_dir_,
-                func_to_anat_oned_filename,
-                anat_to_template_oned_filename,
-                anat_to_template_warp_filename,
-                caching=caching)
+    for n, (animal_data, coreg_func_filename, func_to_anat_oned_filename,
+        anat_to_template_oned_filename,
+        anat_to_template_warp_filename) in enumerate(zip(sessions_data,
+            coreg_func_filenames, func_to_anat_oned_filenames,
+            anat_to_template_oned_filenames,
+            anat_to_template_warp_filenames)):
+        normalized_func_filename = _func_to_template(
+            coreg_func_filename,
+            template_filename,
+            animal_data.output_dir_,
+            func_to_anat_oned_filename,
+            anat_to_template_oned_filename,
+            anat_to_template_warp_filename,
+            caching=caching)
 
         setattr(animal_data, "registered_func_", normalized_func_filename)
-        setattr(animal_data, "registered_anat_", normalized_anat_filename)
         sessions_data[n] = animal_data
 
     return sessions_data

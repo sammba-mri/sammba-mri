@@ -38,3 +38,9 @@ class FMRISession(object):
         if not isinstance(self.animal_id, _basestring):
             raise ValueError('animal_id must be a string, you provided '
                              '{0}'.format(self.animal_id))
+
+    def _set_output_dir_(self, output_dir):
+        setattr(self, 'output_dir_', output_dir)
+        if hasattr(self, 'output_dir_'):
+            if not os.path.isdir(self.output_dir_):
+                os.makedirs(self.output_dir_)

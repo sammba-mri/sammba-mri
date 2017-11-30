@@ -38,7 +38,7 @@ def test_anat_to_template():
 
     # test common space of one image is itself
     if afni.Info().version():
-        register_result = t1.anat_to_template(anat_file, anat_file, tempdir)
+        register_result = t1.anats_to_template(anat_file, anat_file, tempdir)
         transform = np.loadtxt(register_result.affine_transform)
         assert_array_almost_equal(transform,
                                   [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0])
