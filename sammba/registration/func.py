@@ -6,15 +6,46 @@ from sammba.externals.nipype.interfaces import afni, fsl, ants
 from sammba.externals.nipype.utils.filemanip import fname_presuffix
 from sammba.interfaces import RatsMM
 from .utils import fix_obliquity
+from .fmri_session import FMRISession
+from .t1 import anats_to_template
 
 
-def func_to_anat(func_filename, anat_filename, tr, write_dir, caching=False):
+def coregister_fmri_session(session_data, t_r, write_dir,
+                            slice_timing=True,
+                            prior_rigid_body_registration=False,
+                            caching=False):
     """
+    Coregistration of the subject's functional and anatomical images.
     The functional volume is aligned to the anatomical, first with a rigid body
     registration and then on a per-slice basis (only a fine correction, this is
-    mostly for correction of EPI distortion). This pipeline includes
-    slice timing.
+    mostly for correction of EPI distortion).
+
+
+    Parameters
+    ----------
+    session_data : sammba.registration.SessionData
+        Single animal data, giving paths to its functional and anatomical
+        image, as well as it identifier.
+
+    t_r : float
+        Repetition time for the EPI, in seconds.
+
+    write_dir : str
+        Directory to save the output and temporary images.
+
+    caching : bool, optional
+        Wether or not to use caching.
+
+    Returns
+    -------
+    the same sequence with each animal_data updated: attributes
+        `registered_func_` and
+        `registered_anat_` are added to specify the paths to the functional
+        and anatomical images registered to the template,
+        and `output_dir_` is added to give output directory for each animal.
     """
+    func_filename = session_data.func
+    anat_filename = session_data.anat
     if caching:
         memory = Memory(write_dir)
         tshift = memory.cache(afni.TShift)
@@ -59,18 +90,24 @@ def func_to_anat(func_filename, anat_filename, tr, write_dir, caching=False):
         qwarp = afni.Qwarp().run
         merge = fsl.Merge().run
 
+    session_data._check_inputs()
+    output_dir = os.path.join(os.path.abspath(write_dir),
+                              session_data.animal_id)
+    session_data._set_output_dir_(output_dir)
+    current_dir = os.getcwd()
+    os.chdir(output_dir)
     # Correct slice timing
-    os.chdir(write_dir)
-    out_tshift = tshift(in_file=func_filename,
-                        outputtype='NIFTI_GZ',
-                        tpattern='altplus',
-                        tr=str(tr))
-    tshifted_filename = out_tshift.outputs.out_file
+    if slice_timing:
+        out_tshift = tshift(in_file=func_filename,
+                            outputtype='NIFTI_GZ',
+                            tpattern='altplus',
+                            tr=str(t_r))
+        func_filename = out_tshift.outputs.out_file
 
     # Register to the first volume
-    # XXX why do you need a thresholded image ?    
-    out_clip_level = clip_level(in_file=tshifted_filename)
-    out_threshold = threshold(in_file=tshifted_filename,
+    # XXX why do you need a thresholded image ?
+    out_clip_level = clip_level(in_file=func_filename)
+    out_threshold = threshold(in_file=func_filename,
                               thresh=out_clip_level.outputs.clip_val)
     thresholded_filename = out_threshold.outputs.out_file
 
@@ -87,9 +124,9 @@ def func_to_anat(func_filename, anat_filename, tr, write_dir, caching=False):
     # XXX: bad output: up and down on y-axis
 
     # Apply the registration to the whole head
-    allineated_filename = fname_presuffix(tshifted_filename, suffix='Av')
-    out_allineate = allineate(in_file=tshifted_filename,
-                              master=tshifted_filename,
+    allineated_filename = fname_presuffix(func_filename, suffix='Av')
+    out_allineate = allineate(in_file=func_filename,
+                              master=func_filename,
                               in_matrix=out_volreg.outputs.oned_matrix_save,
                               out_file=allineated_filename)
 
@@ -115,49 +152,65 @@ def func_to_anat(func_filename, anat_filename, tr, write_dir, caching=False):
     out_unifize = unifize(in_file=anat_filename, outputtype='NIFTI_GZ')
     unbiased_anat_filename = out_unifize.outputs.out_file
 
-    # Mask the mean functional volume outside the brain.
-    out_clip_level = clip_level(in_file=unbiased_func_filename)
-    # XXX bad: brain mask cut
-    out_rats = rats(in_file=unbiased_func_filename,
-                    volume_threshold=400,
-                    intensity_threshold=int(out_clip_level.outputs.clip_val))
-    out_cacl = calc(in_file_a=unbiased_func_filename,
-                    in_file_b=out_rats.outputs.out_file,
-                    expr='a*b',
-                    outputtype='NIFTI_GZ')
-
-    # Compute the transformation from the functional image to the anatomical
-    # XXX: why in this sense
-    out_allineate = allineate2(
-        in_file=out_cacl.outputs.out_file,
-        reference=unbiased_anat_filename,
-        out_matrix=fname_presuffix(out_cacl.outputs.out_file,
-                                   suffix='_shr.aff12.1D',
-                                   use_ext=False),
-        center_of_mass='',
-        warp_type='shift_rotate',
-        out_file=fname_presuffix(out_cacl.outputs.out_file, suffix='_shr'))
-    rigid_transform_file = out_allineate.outputs.out_matrix
-
-    # apply the inverse transformation to register to the anatomical volume
-    catmatvec_out_file = fname_presuffix(rigid_transform_file, suffix='INV')
-    if not os.path.isfile(catmatvec_out_file):
-        _ = catmatvec(in_file=[(rigid_transform_file, 'I')],
-                      oneline=True,
-                      out_file=catmatvec_out_file)
-        # XXX not cached I don't understand why
-    out_allineate = allineate(
-        in_file=unbiased_anat_filename,
-        master=unbiased_func_filename,
-        in_matrix=catmatvec_out_file,
-        out_file=fname_presuffix(unbiased_anat_filename,
-                                 suffix='_shr_in_func_space'))
+    if prior_rigid_body_registration:
+        # Mask the mean functional volume outside the brain.
+        out_clip_level = clip_level(in_file=unbiased_func_filename)
+        # XXX bad: brain mask cut
+        out_rats = rats(in_file=unbiased_func_filename,
+                        volume_threshold=400,
+                        intensity_threshold=int(out_clip_level.outputs.clip_val))
+        out_cacl_func = calc(in_file_a=unbiased_func_filename,
+                             in_file_b=out_rats.outputs.out_file,
+                             expr='a*b',
+                             outputtype='NIFTI_GZ')
+    
+        # Mask the anatomical volume outside the brain.
+        out_clip_level = clip_level(in_file=unbiased_anat_filename)
+        # XXX bad: brain mask cut
+        out_rats = rats(in_file=unbiased_anat_filename,
+                        volume_threshold=400,
+                        intensity_threshold=int(out_clip_level.outputs.clip_val))
+        out_cacl_anat = calc(in_file_a=unbiased_anat_filename,
+                             in_file_b=out_rats.outputs.out_file,
+                             expr='a*b',
+                             outputtype='NIFTI_GZ')
+    
+        # Compute the transformation from functional to anatomical brain
+        # XXX: why in this sense
+        out_allineate = allineate2(
+            in_file=out_cacl_func.outputs.out_file,
+            reference=out_cacl_anat.outputs.out_file,
+            out_matrix=fname_presuffix(out_cacl_func.outputs.out_file,
+                                       suffix='_shr.aff12.1D',
+                                       use_ext=False),
+            center_of_mass='',
+            warp_type='shift_rotate',
+            out_file=fname_presuffix(out_cacl_func.outputs.out_file,
+                                     suffix='_shr'))
+        rigid_transform_file = out_allineate.outputs.out_matrix
+    
+        # apply the inverse transformation to register the anatomical to the func
+        catmatvec_out_file = fname_presuffix(rigid_transform_file, suffix='INV')
+        if not os.path.isfile(catmatvec_out_file):
+            _ = catmatvec(in_file=[(rigid_transform_file, 'I')],
+                          oneline=True,
+                          out_file=catmatvec_out_file)
+            # XXX not cached I don't understand why
+        out_allineate = allineate(
+            in_file=unbiased_anat_filename,
+            master=unbiased_func_filename,
+            in_matrix=catmatvec_out_file,
+            out_file=fname_presuffix(unbiased_anat_filename,
+                                     suffix='_shr_in_func_space'))
+        allineated_anat_filename = out_allineate.outputs.out_file
+    else:
+        allineated_anat_filename = unbiased_anat_filename
 
     # suppanatwarp="$base"_BmBe_shr.aff12.1D
 
     # Non-linear registration
-    # XXX what is the difference between Warp and 3dQwarp?    
-    out_warp = warp(in_file=out_allineate.outputs.out_file,
+    # XXX what is the difference between Warp and 3dQwarp?
+    out_warp = warp(in_file=allineated_anat_filename,
                     oblique_parent=unbiased_func_filename,
                     interp='quintic',
                     gridset=unbiased_func_filename,
@@ -168,6 +221,20 @@ def func_to_anat(func_filename, anat_filename, tr, write_dir, caching=False):
                                    suffix='_warp.mat', use_ext=False)
     if not os.path.isfile(mat_filename):
         np.savetxt(mat_filename, [out_warp.runtime.stdout], fmt='%s')
+
+    # func to anat tranform
+    transform_filename = fname_presuffix(registered_anat_filename,
+                                         suffix='_func_to_anat.aff12.1D',
+                                         use_ext=False)
+    if prior_rigid_body_registration:
+        _ = catmatvec(in_file=[(mat_filename, 'ONELINE'),
+                               (rigid_transform_file, 'ONELINE')],
+                      oneline=True,
+                      out_file=transform_filename)
+    else:
+        _ = catmatvec(in_file=[(mat_filename, 'ONELINE')],
+                      oneline=True,
+                      out_file=transform_filename)
 
     # 3dWarp doesn't put the obliquity in the header, so do it manually
     # This step generates one file per slice and per time point, so we are
@@ -203,6 +270,7 @@ def func_to_anat(func_filename, anat_filename, tr, write_dir, caching=False):
     # rostral end of some anatomicals)
 
     # The inverse warp frequently fails, Resampling can help it work better
+    # XXX why specifically .1 in voxel_size ?
     voxel_size_z = anat_img.header.get_zooms()[2]
     resampled_registered_anat_filenames = []
     for sliced_registered_anat_filename in sliced_registered_anat_filenames:
@@ -225,8 +293,8 @@ def func_to_anat(func_filename, anat_filename, tr, write_dir, caching=False):
     warp_filenames = []
     for (resampled_bias_corrected_filename,
          resampled_registered_anat_filename) in zip(
-         resampled_bias_corrected_filenames,
-         resampled_registered_anat_filenames):
+            resampled_bias_corrected_filenames,
+            resampled_registered_anat_filenames):
         warped_slice = fname_presuffix(resampled_bias_corrected_filename,
                                        suffix='_qw')
         out_qwarp = qwarp(in_file=resampled_bias_corrected_filename,
@@ -247,19 +315,19 @@ def func_to_anat(func_filename, anat_filename, tr, write_dir, caching=False):
 
     # Resample the mean volume back to the initial resolution,
     voxel_size = nibabel.load(
-        sliced_bias_corrected_filename).header.get_zooms()
+        unbiased_func_filename).header.get_zooms()
     resampled_warped_slices = []
     for warped_slice in warped_slices:
         out_resample = resample(in_file=warped_slice,
-                                voxel_size=voxel_size + (voxel_size[0],),
+                                voxel_size=voxel_size,
                                 outputtype='NIFTI_GZ')
         resampled_warped_slices.append(out_resample.outputs.out_file)
 
     # fix the obliquity
-    for (resampled_registered_anat_filename, resampled_warped_slice) in zip(
-            resampled_registered_anat_filenames, resampled_warped_slices):
+    for (sliced_registered_anat_filename, resampled_warped_slice) in zip(
+            sliced_registered_anat_filenames, resampled_warped_slices):
         _ = fix_obliquity(resampled_warped_slice,
-                          resampled_registered_anat_filename)
+                          sliced_registered_anat_filename)
 
     # Merge all slices !
 #    out_merge_mean = merge(in_files=resampled_warped_slices, dimension='z')
@@ -273,34 +341,181 @@ def func_to_anat(func_filename, anat_filename, tr, write_dir, caching=False):
                                                      suffix='Sl%d' % slice_n))
         sliced_func_filenames.append(out_slicer.outputs.out_file)
 
-    # resample functional slices
-    resampled_func_filenames = []
-    for sliced_func_filename in sliced_func_filenames:
-        out_resample = resample(in_file=sliced_func_filename,
-                                voxel_size=(.1, .1, voxel_size_z),
-                                outputtype='NIFTI_GZ')
-        resampled_func_filenames.append(out_resample.outputs.out_file)
-
     # Apply the precomputed warp slice by slice
     warped_func_slices = []
-    for (resampled_func_filename, warp_filename) in zip(
-            resampled_func_filenames, warp_filenames):
-        out_warp_apply = warp_apply(in_file=resampled_func_filename,
+    for (sliced_func_filename, warp_filename) in zip(
+            sliced_func_filenames, warp_filenames):
+        out_warp_apply = warp_apply(in_file=sliced_func_filename,
+                                    master=sliced_func_filename,
                                     warp=warp_filename,
                                     out_file=fname_presuffix(
-                                        resampled_func_filename, suffix='_qw'))
+                                        sliced_func_filename, suffix='_qw'))
         warped_func_slices.append(out_warp_apply.outputs.out_file)
 
     # Fix the obliquity
-    # XXX why no resampling back before ?
-    for (resampled_registered_anat_filename, warped_func_slice) in zip(
-            resampled_registered_anat_filenames, warped_func_slices):
-        _ = fix_obliquity(warped_func_slice,
-                          resampled_registered_anat_filename)
+    for (sliced_func_filename, warped_func_slice) in zip(
+            sliced_func_filenames, warped_func_slices):
+        _ = fix_obliquity(warped_func_slice, sliced_func_filename)
 
     # Finally, merge all slices !
     out_merge_func = merge(in_files=warped_func_slices, dimension='z')
-    out_merge_anat = merge(in_files=resampled_registered_anat_filenames,
-                           dimension='z')
-    return (out_merge_func.outputs.merged_file,
-            out_merge_anat.outputs.merged_file)
+#    out_merge_anat = merge(in_files=resampled_registered_anat_filenames,
+#                           dimension='z')
+
+    # Update the fmri data
+    setattr(session_data, "coreg_func_", out_merge_func.outputs.merged_file)
+    setattr(session_data, "coreg_anat_", registered_anat_oblique_filename)
+    setattr(session_data, "coreg_transform_", transform_filename)
+    os.chdir(current_dir)
+
+
+def _func_to_template(func_coreg_filename, template_filename, write_dir,
+                      func_to_anat_oned_filename,
+                      anat_to_template_oned_filename,
+                      anat_to_template_warp_filename,
+                      caching=False):
+    """ Applies successive transforms to coregistered functional to put it in
+    template space.
+
+    Parameters
+    ----------
+    coreg_func_filename : str
+        Path to functional volume, coregistered to a common space with the
+        anatomical volume.
+
+    template_filename : str
+        Template to register the functional to.
+
+    func_to_anat_oned_filename : str
+        Path to the affine 1D transform from functional to coregistration
+        space.
+
+    anat_to_template_oned_filename : str
+        Path to the affine 1D transform from anatomical to template space.
+
+    anat_to_template_warp_filename : str
+        Path to the affine 1D transform from anatomical to template space.
+    """
+    if caching:
+        memory = Memory(write_dir)
+        warp_apply = memory.cache(afni.NwarpApply)
+    else:
+        warp_apply = afni.NwarpApply().run
+
+    current_dir = os.getcwd()
+    os.chdir(write_dir)
+    out_warp_apply = warp_apply(in_file=func_coreg_filename,
+                                master=template_filename,
+                                nwarp=[anat_to_template_warp_filename,
+                                       anat_to_template_oned_filename,
+                                       func_to_anat_oned_filename],
+                                out_file=fname_presuffix(
+                                    func_coreg_filename, suffix='_normalized'))
+
+    os.chdir(current_dir)
+
+    return out_warp_apply.outputs.out_file
+
+
+def fmri_sessions_to_template(sessions_data, t_r, template_filename, write_dir,
+                              prior_rigid_body_registration=False,
+                              slice_timing=True,
+                              caching=False):
+    """ Registration of subject's functional and anatomical images to
+    a given template.
+
+    Parameters
+    ----------
+    sessions_data : sequence of sammba.registration.SessionData
+        Animals data, giving paths to their functional and anatomical images.
+
+    t_r : float
+        Repetition time for the EPI, in seconds.
+
+    template_filename : str
+        Template to register the functional to.
+
+    write_dir : str
+        Path to the affine 1D transform from anatomical to template space.
+
+    caching : bool, optional
+        Wether or not to use caching.
+
+    Returns
+    -------
+    the same sequence with each animal_data updated: attributes
+        `registered_func_` and
+        `registered_anat_` are added to specify the paths to the functional
+        and anatomical images registered to the template,
+        and `output_dir_` is added to give output directory for each animal.
+    """
+    if not hasattr(sessions_data, "__iter__"):
+            raise ValueError(
+                "'animals_data' input argument must be an iterable. You "
+                "provided {0}".format(sessions_data.__class__))
+
+    for n, data in enumerate(sessions_data):
+        if not isinstance(data, FMRISession):
+            raise ValueError('Each animal data must have type '
+                             'sammba.registration.Animal. You provided {0} of'
+                             ' type {1}'.format(data, type(data)))
+        if data.animal_id is None:
+            setattr(data, "animal_id", 'animal{0:03d}'.format(n + 1))
+
+    # Check that ids are different
+    animals_ids = [data.animal_id for data in sessions_data]
+    if len(set(animals_ids)) != len(animals_ids):
+        raise ValueError('Animals ids must be different. You'
+                         ' provided {0}'.format(animals_ids))
+
+    coreg_func_filenames = []
+    func_to_anat_oned_filenames = []
+    for n, animal_data in enumerate(sessions_data):
+        animal_data._check_inputs()
+        animal_output_dir = os.path.join(os.path.abspath(write_dir),
+                                         animal_data.animal_id)
+        setattr(animal_data, "output_dir_", animal_output_dir) # XXX do a function for creating new attributes ?
+
+        sessions_data[n] = animal_data
+        if not os.path.isdir(animal_data.output_dir_):
+            os.makedirs(animal_data.output_dir_)
+
+        coreg_func_filename, _, func_to_anat_oned_filename = \
+            coregister_fmri_session(
+                animal_data, t_r, write_dir,
+                prior_rigid_body_registration=prior_rigid_body_registration,
+                slice_timing=slice_timing,
+                caching=caching)
+        coreg_func_filenames.append(coreg_func_filename)
+        func_to_anat_oned_filenames.append(func_to_anat_oned_filename)
+
+    anat_filenames = [animal_data.anat for animal_data in sessions_data]
+    (normalized_anat_filenames, anat_to_template_oned_filenames,
+     anat_to_template_warp_filenames) = \
+        anats_to_template(anat_filenames, template_filename,
+                          animal_data.output_dir_,
+                          caching=caching)
+    for n, (animal_data, normalized_anat_filename) in enumerate(zip(
+            sessions_data, normalized_anat_filenames)):
+        setattr(animal_data, "registered_anat_", normalized_anat_filename)
+        sessions_data[n] = animal_data
+
+    for n, (animal_data, coreg_func_filename, func_to_anat_oned_filename,
+        anat_to_template_oned_filename,
+        anat_to_template_warp_filename) in enumerate(zip(sessions_data,
+            coreg_func_filenames, func_to_anat_oned_filenames,
+            anat_to_template_oned_filenames,
+            anat_to_template_warp_filenames)):
+        normalized_func_filename = _func_to_template(
+            coreg_func_filename,
+            template_filename,
+            animal_data.output_dir_,
+            func_to_anat_oned_filename,
+            anat_to_template_oned_filename,
+            anat_to_template_warp_filename,
+            caching=caching)
+
+        setattr(animal_data, "registered_func_", normalized_func_filename)
+        sessions_data[n] = animal_data
+
+    return sessions_data

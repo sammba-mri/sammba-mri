@@ -29,3 +29,19 @@ def test_anats_to_common():
 
     if os.path.exists(tempdir):
         shutil.rmtree(tempdir)
+
+
+def test_anat_to_template():
+    anat_file = os.path.join(os.path.dirname(testing_data.__file__),
+                             'anat.nii.gz')
+    tempdir = tempfile.mkdtemp()
+
+    # test common space of one image is itself
+    if afni.Info().version():
+        register_result = t1.anats_to_template(anat_file, anat_file, tempdir)
+        transform = np.loadtxt(register_result.affine_transform)
+        assert_array_almost_equal(transform,
+                                  [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0])
+
+    if os.path.exists(tempdir):
+        shutil.rmtree(tempdir)
