@@ -23,8 +23,9 @@ def coregister_fmri_session(session_data, t_r, write_dir,
 
     Parameters
     ----------
-    sessions_data : sequence of sammba.registration.SessionData
-        Animals data, giving paths to their functional and anatomical images.
+    session_data : sammba.registration.SessionData
+        Single animal data, giving paths to its functional and anatomical
+        image, as well as it identifier.
 
     t_r : float
         Repetition time for the EPI, in seconds.
