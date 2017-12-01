@@ -253,6 +253,8 @@ def coregister_fmri_session(session_data, t_r, write_dir,
                             out_file=fname_presuffix(
                                 registered_anat_oblique_filename,
                                 suffix='Sl%d' % slice_n))
+        _ = fix_obliquity(out_slicer.outputs.out_file,
+                          registered_anat_oblique_filename)
         sliced_registered_anat_filenames.append(out_slicer.outputs.out_file)
 
     # Slice mean functional
@@ -264,6 +266,8 @@ def coregister_fmri_session(session_data, t_r, write_dir,
                             keep='{0} {1}'.format(slice_n, slice_n),
                             out_file=fname_presuffix(unbiased_func_filename,
                                                      suffix='Sl%d' % slice_n))
+        _ = fix_obliquity(out_slicer.outputs.out_file,
+                          unbiased_func_filename)
         sliced_bias_corrected_filenames.append(out_slicer.outputs.out_file)
 
     # Below line is to deal with slices where there is no signal (for example
@@ -339,6 +343,8 @@ def coregister_fmri_session(session_data, t_r, write_dir,
                             keep='{0} {1}'.format(slice_n, slice_n),
                             out_file=fname_presuffix(allineated_filename,
                                                      suffix='Sl%d' % slice_n))
+        _ = fix_obliquity(out_slicer.outputs.out_file,
+                          allineated_filename)
         sliced_func_filenames.append(out_slicer.outputs.out_file)
 
     # Apply the precomputed warp slice by slice
