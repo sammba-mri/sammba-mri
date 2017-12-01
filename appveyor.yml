@@ -33,8 +33,8 @@ install:
 
   # Install other sammba-mri dependencies
   - "pip install packaging prov nibabel coverage nose-timer doctest-ignore-unicode"
-  - "python setup.py bdist_wheel"
   - "sudo apt-get install graphviz"
+  - "python setup.py bdist_wheel"
   - ps: "ls dist"
 
   # Install the generated wheel package to test it
