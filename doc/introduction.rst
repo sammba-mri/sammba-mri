@@ -10,7 +10,7 @@ Introduction: SmAll-maMMals BrAin MRI
 What is sammba-MRI: small mammals neuroimaging with python
 ===========================================================
 
-    Sammba-MRI builds **easy-to-use** pipelines to process small mammals brain MRI multimodal images. Examples include (but are not restricted to) mouse models of Alzheimer disease.
+    Sammba-MRI builds **easy-to-use** pipelines to process small mammals brain MRI multimodal images. Examples include (but are not restricted to) mouse models of Alzheimer's disease.
 
 
 Dependencies
