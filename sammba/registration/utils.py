@@ -1,5 +1,6 @@
 import os
 import shutil
+import numpy as np
 import nibabel
 from sammba.externals.nipype.caching import Memory
 from sammba.externals.nipype.utils.filemanip import fname_presuffix
@@ -45,7 +46,7 @@ def _reset_affines(in_file, out_file, overwrite=False, axes_to_permute=None,
         in_file = result.outputs.out_file
 
     img = nibabel.load(in_file)
-    header = img.header
+    header = img.header.copy()
     sform, code = header.get_sform(coded=True)
 
     if axes_to_flip:
@@ -121,6 +122,26 @@ def fix_obliquity(to_fix_filename, reference_filename, caching=False,
         memory.clear_previous_run()
 
     return out_copy.outputs.out_file
+
+
+def _have_same_obliquity(img_filename1, img_filename2):
+    headers_values = []
+    for img_filename in [img_filename1, img_filename2]:
+        img = nibabel.load(img_filename)
+        header = img.header
+        header_values = []
+        for key in ['pixdim', 'qform_code', 'sform_code', 'quatern_b',
+                    'quatern_c', 'quatern_d', 'qoffset_x', 'qoffset_y',
+                    'qoffset_z', 'srow_x', 'srow_y', 'srow_z']:
+            header_values.append(header[key])
+        headers_values.append(header_values)
+    equal_fields = [np.allclose(v1, v2)
+                    for v1, v2 in zip(headers_values[0], headers_values[1])]
+
+    print(headers_values[0])
+    print(headers_values[1])
+    print(equal_fields)
+    return np.alltrue(equal_fields)
 
 
 def create_pipeline_graph(pipeline_name, graph_file,
