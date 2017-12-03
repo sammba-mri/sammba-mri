@@ -2,7 +2,7 @@
 # License: CeCILL-B
 
 import numpy as np
-import nmrglue
+from sammba.externals.nmrglue import varian
 import nibabel
 from .utils import _rotate_affine
 
@@ -25,7 +25,7 @@ def fid_to_nii(fid_directory, save_filename, fftzpsize):
     nii_filename : str
         Paths to the created NIFTI image.
     """
-    dic, data = nmrglue.varian.read(fid_directory, as_2d=1)
+    dic, data = varian.read(fid_directory, as_2d=1)
     pss = np.array([float(value) for value in dic['procpar']['pss']['values']])
     pssorder = pss.argsort()
     pelist = np.array(
