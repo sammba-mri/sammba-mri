@@ -15,7 +15,18 @@ What is sammba-MRI: small mammals neuroimaging with python
 
 Dependencies
 ============
-The required dependencies to use the software are the python packages:
+The required dependencies to use the software are 
+
+the softwares:
+
+* AFNI
+* FSL >= 5.0
+* ANTS
+* `RATS <http://www.iibi.uiowa.edu/content/rats-overview/>`_ for brain
+  extraction
+
+the `DICOM ToolKit (DCMTK) <http://support.dcmtk.org/docs/index.html>`_ package
+as well as different packages:
 
 * Python 2.7
 * setuptools
@@ -35,12 +46,6 @@ The required dependencies to use the software are the python packages:
 * funcsigs
 * click
 
-
-as well as the interfaces:
-
-* AFNI
-* FSL >= 5.0
-* ANTS
 
 If you want to run the tests, you need nose >= 1.2.1 and doctest-ignore-unicode
 

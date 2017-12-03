@@ -4,8 +4,7 @@ import tempfile
 from nose.tools import assert_true
 from nilearn._utils.testing import assert_raises_regex
 from nilearn._utils.niimg_conversions import _check_same_fov
-from sammba.registration import FMRISession, fmri_sessions_to_template
-from sammba.registration import func, FMRISession
+from sammba.registration import FMRISession, func
 from sammba.externals.nipype.interfaces import afni
 from sammba import testing_data
 import nibabel
@@ -43,25 +42,27 @@ def test_fmri_sessions_to_template():
     t_r = 1.
     assert_raises_regex(ValueError,
                         "'animals_data' input argument must be an iterable",
-                        fmri_sessions_to_template, mammal_data, t_r,
+                        func.fmri_sessions_to_template, mammal_data, t_r,
                         template_file,
                         write_dir=write_dir)
 
     assert_raises_regex(ValueError,
                         "Each animal data must have type",
-                        fmri_sessions_to_template, [mammal_data, ''], t_r,
+                        func.fmri_sessions_to_template, [mammal_data, ''], t_r,
                         template_file,
                         write_dir=write_dir)
 
     assert_raises_regex(ValueError,
                         "Animals ids must be different",
-                        fmri_sessions_to_template, [mammal_data, mammal_data],
+                        func.fmri_sessions_to_template,
+                        [mammal_data, mammal_data],
                         t_r, template_file, write_dir=write_dir)
 
     if afni.Info().version():
-        registered_data = fmri_sessions_to_template([mammal_data], t_r,
-                                                    template_file, tempdir,
-                                                    slice_timing=False)
+        registered_data = func.fmri_sessions_to_template([mammal_data], t_r,
+                                                         template_file,
+                                                         tempdir,
+                                                         slice_timing=False)
         assert_true(os.path.isdir(registered_data.output_dir_))
         assert_true(os.path.isdir(registered_data.registered_func_))
         assert_true(os.path.isdir(registered_data.registered_anat_))

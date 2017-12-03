@@ -129,18 +129,15 @@ def _have_same_obliquity(img_filename1, img_filename2):
     for img_filename in [img_filename1, img_filename2]:
         img = nibabel.load(img_filename)
         header = img.header
-        header_values = []
-        for key in ['pixdim', 'qform_code', 'sform_code', 'quatern_b',
-                    'quatern_c', 'quatern_d', 'qoffset_x', 'qoffset_y',
-                    'qoffset_z', 'srow_x', 'srow_y', 'srow_z']:
+        header_values = [header['pixdim'][:4]]
+        # TODO: check that 'qform_code', 'sform_code' can differ
+        for key in ['quatern_b', 'quatern_c', 'quatern_d', 'qoffset_x',
+                    'qoffset_y', 'qoffset_z', 'srow_x', 'srow_y', 'srow_z']:
             header_values.append(header[key])
         headers_values.append(header_values)
     equal_fields = [np.allclose(v1, v2)
                     for v1, v2 in zip(headers_values[0], headers_values[1])]
 
-    print(headers_values[0])
-    print(headers_values[1])
-    print(equal_fields)
     return np.alltrue(equal_fields)
 
 
