@@ -1,7 +1,6 @@
 import os
 import shutil
 import tempfile
-import numpy as np
 from numpy.testing import assert_array_equal, assert_array_almost_equal
 from nose.tools import assert_true, assert_false
 import nibabel
@@ -55,13 +54,13 @@ def test_reset_affines():
         os.removedirs(tempdir)
 
 
-def test_have_same_obliquity():
+def test_check_same_obliquity():
     img_filename1 = os.path.join(os.path.dirname(testing_data.__file__),
                                  'anat.nii.gz')
     img_filename2 = os.path.join(os.path.dirname(testing_data.__file__),
                                  'func.nii.gz')
-    assert_true(utils._have_same_obliquity(img_filename1, img_filename1))
-    assert_false(utils._have_same_obliquity(img_filename1, img_filename2))
+    assert_true(utils._check_same_obliquity(img_filename1, img_filename1))
+    assert_false(utils._check_same_obliquity(img_filename1, img_filename2))
 
 
 def test_fix_obliquity():
@@ -75,9 +74,11 @@ def test_fix_obliquity():
         _ = slicer(in_file=target_filename,
                    keep='0 27',
                    out_file=tmp_filename)
-        assert_false(utils._have_same_obliquity(tmp_filename, target_filename))
+        assert_false(
+            utils._check_same_obliquity(tmp_filename, target_filename))
         utils.fix_obliquity(tmp_filename, target_filename)
-        assert_true(utils._have_same_obliquity(tmp_filename, target_filename))
+        assert_true(
+            utils._check_same_obliquity(tmp_filename, target_filename))
 
     if os.path.exists(tmp_filename):
         os.remove(tmp_filename)

@@ -63,12 +63,17 @@ def _reset_affines(in_file, out_file, overwrite=False, axes_to_permute=None,
 
 
 def fix_obliquity(to_fix_filename, reference_filename, caching=False,
-                  caching_dir=None, clear_memory=False, overwrite=False):
+                  caching_dir=None, clear_memory=False, overwrite=False,
+                  verbose=verbose):
+    if caching_dir is None:
+        caching_dir = os.getcwd()
     if caching:
         memory = Memory(caching_dir)
 
-    if caching_dir is None:
-        caching_dir = os.getcwd()
+    if verbose:
+        terminal_output = 'allatonce'
+    else:
+        terminal_output = 'none'
 
     if overwrite:
         environ = {'AFNI_DECONFLICT': 'OVERWRITE'}
@@ -77,8 +82,12 @@ def fix_obliquity(to_fix_filename, reference_filename, caching=False,
 
     if caching:
         copy = memory.cache(afni.Copy)
+        refit = memory.cache(afni.Refit)
+        copy.interface().set_default_terminal_output(terminal_output)
+        refit.interface().set_default_terminal_output(terminal_output)
     else:
-        copy = afni.Copy().run
+        copy = afni.Copy(terminal_output=terminal_output).run
+        refit = afni.Refit(terminal_output=terminal_output).run
 
     tmp_folder = os.path.join(caching_dir, 'tmp')
     if not os.path.isdir(tmp_folder):
@@ -104,11 +113,6 @@ def fix_obliquity(to_fix_filename, reference_filename, caching=False,
                         environ=environ)
         orig_to_fix_filename = out_copy.outputs.out_file
 
-    if caching:
-        refit = memory.cache(afni.Refit)
-    else:
-        refit = afni.Refit().run
-
     out_refit = refit(in_file=orig_to_fix_filename,
                       atrcopy=(orig_reference_filename,
                                'IJK_TO_DICOM_REAL'))
@@ -124,7 +128,7 @@ def fix_obliquity(to_fix_filename, reference_filename, caching=False,
     return out_copy.outputs.out_file
 
 
-def _have_same_obliquity(img_filename1, img_filename2):
+def _check_same_obliquity(img_filename1, img_filename2):
     headers_values = []
     for img_filename in [img_filename1, img_filename2]:
         img = nibabel.load(img_filename)

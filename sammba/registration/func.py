@@ -604,7 +604,7 @@ def fmri_sessions_to_template(sessions_data, t_r, head_template_filename,
             animal_data, t_r, write_dir, brain_volume,
             prior_rigid_body_registration=prior_rigid_body_registration,
             slice_timing=slice_timing,
-            caching=caching)
+            caching=caching, verbose=verbose)
         sessions_data[n] = animal_data
 
     anat_filenames = [animal_data.anat for animal_data in sessions_data]
@@ -615,7 +615,7 @@ def fmri_sessions_to_template(sessions_data, t_r, head_template_filename,
         brain_volume,
         brain_template_filename=brain_template_filename,
         dilated_head_mask_filename=dilated_head_mask_filename,
-        caching=caching)
+        caching=caching, verbose=verbose)
     for n, (animal_data, normalized_anat_filename) in enumerate(zip(
             sessions_data, anats_registration.registered)):
         setattr(animal_data, "registered_anat_", normalized_anat_filename)
@@ -632,7 +632,7 @@ def fmri_sessions_to_template(sessions_data, t_r, head_template_filename,
             animal_data.coreg_transform_,
             anat_to_template_oned_filename,
             anat_to_template_warp_filename,
-            caching=caching)
+            caching=caching, verbose=verbose)
 
         setattr(animal_data, "registered_func_", normalized_func_filename)
         sessions_data[n] = animal_data
