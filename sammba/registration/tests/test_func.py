@@ -21,7 +21,7 @@ def test_coregister_fmri_session():
     animal_session = FMRISession(anat=anat_file, func=func_file,
                                  animal_id='test_coreg_dir')
     if afni.Info().version():
-        func.coregister_fmri_session(animal_session, 1., tempdir,
+        func.coregister_fmri_session(animal_session, 1., tempdir, 400,
                                      slice_timing=False)
         assert_true(_check_same_fov(nibabel.load(animal_session.coreg_func_),
                                     nibabel.load(animal_session.coreg_anat_)))
@@ -65,6 +65,7 @@ def test_fmri_sessions_to_template():
         registered_data = func.fmri_sessions_to_template([mammal_data], t_r,
                                                          template_file,
                                                          tempdir,
+                                                         400,
                                                          slice_timing=False)
         assert_true(os.path.isdir(registered_data.output_dir_))
         assert_true(os.path.isdir(registered_data.registered_func_))

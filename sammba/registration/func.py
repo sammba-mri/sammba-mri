@@ -7,7 +7,7 @@ from sammba.externals.nipype.utils.filemanip import fname_presuffix
 from sammba.interfaces import RatsMM
 from .utils import fix_obliquity
 from .fmri_session import FMRISession
-from .t1 import anats_to_template
+from .struct import anats_to_template
 
 
 def coregister_fmri_session(session_data, t_r, write_dir, brain_volume,
