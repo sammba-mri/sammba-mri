@@ -10,9 +10,14 @@ import itertools
 import pandas
 import nibabel
 from .utils import _rotate_affine
+import warnings
 
 
-def dcm_to_nii(dcmdump_path, dicom_filename, save_directory, siap_fix=True):
+def dcm_to_nii(dcmdump_path, dicom_filename, save_directory, siap_fix=True,
+               id_in_filename=True, date_in_filename=True,
+               time_in_filename=True, protocol_in_filename=True,
+               paravision_folder_in_filename=True,
+               siap_in_filename=True):
     """ Converts Bruker Paravision enhanced multiframe DICOM files into
     NIfTI-1 format.
 
@@ -42,6 +47,29 @@ def dcm_to_nii(dcmdump_path, dicom_filename, save_directory, siap_fix=True):
         as AP and rostral-caudal as SI. I think they should be the other way
         round
         https://en.wikipedia.org/wiki/Anatomical_terms_of_location#Main_terms
+
+    id_in_filename : bool, optional
+        If True, animal ID is included in the filename of the generated NIFTI.
+
+    date_in_filename : bool, optional
+        If True, acquisition date is included in the filename of the generated
+        NIFTI.
+
+    time_in_filename : bool, optional
+        If True, acquisition time included in the filename of the generated
+        NIFTI.
+
+    protocol_in_filename : bool, optional
+        If True, the protocl acronym is included in the filename of the
+        generated NIFTI.
+
+    paravision_folder_in_filename : bool, optional
+        If True, Paravision folder number is included in the filename
+        of the generated NIFTI.
+
+    siap_in_filename : bool, optional
+        If True, 'fixedSIAP' or 'origSIAP' is included in the filename of the
+        generated NIFTI, to tell whether or not axes were swapped.
 
     Returns
     -------
@@ -310,29 +338,49 @@ def dcm_to_nii(dcmdump_path, dicom_filename, save_directory, siap_fix=True):
         header['pixdim'][4] = TR
     img = nibabel.Nifti1Image(rawarray, affine, header=header)
 
-    bf = 'bf' + dicom_filename.split(splt2)[-5]  # Paravision experiment folder number
+    bf = 'bf' + dicom_filename.split(splt2)[-5]  # Paravision experiment folder
+                                                 # number
     if siap_fix:
         SIAPfixres = 'fixedSIAP'
     else:
         SIAPfixres = 'origSIAP'
     # the joins deal with a problem of DKI recon where one of the patID and
     # protocol seems to be a list
-    nii_basename = (''.join(patID) + '__' +
-                    ''.join(acqdate) + '__' +
-                    ''.join(acqtime) + '__' +
-                    ''.join(protocol) + '__' +
-                    ''.join(SIAPfixres) + '__' +
-                    ''.join(bf) + '.nii.gz')
+    basename_parts = []
+    if id_in_filename:
+        basename_parts.append(''.join(patID))
+    if date_in_filename:
+        basename_parts.append(''.join(acqdate))
+    if time_in_filename:
+        basename_parts.append(''.join(acqtime))
+    if protocol_in_filename:
+        basename_parts.append(''.join(protocol))
+    if siap_in_filename:
+        basename_parts.append(''.join(SIAPfixres))
+    if paravision_folder_in_filename:
+        basename_parts.append(''.join(bf))
+    if not basename_parts:
+        warnings.warn('You choose not to include ID, date, time, protocol, '
+                      'SIAP nor paravision folder number in the NIFTI '
+                      'filename. Using the DICOM basename instead')
+        basename_parts = os.path.basename(dicom_filename)
 
+    basename_no_ext = '_'.join(basename_parts)
+    nii_basename = basename_no_ext + '.nii.gz'
     nii_filename = os.path.join(save_directory, nii_basename)
     img.to_filename(nii_filename)
-    ptbl.to_csv(path_or_buf=os.path.join(save_directory, nii_basename[:-7] +
-                                         '_ptbl.txt'), sep='\t', index=0)
+    txt_basename = basename_no_ext + '_ptbl.txt'
+    ptbl.to_csv(path_or_buf=os.path.join(save_directory, txt_basename),
+                sep='\t', index=0)
     return nii_filename
 
 
 def recursive_dcm_to_nii(dcmdump_path, session_directory, save_directory,
-                         siap_fix=True):
+                         siap_fix=True,
+                         id_in_filename=True, date_in_filename=True,
+                         time_in_filename=True, protocol_in_filename=True,
+                         paravision_folder_in_filename=True,
+                         siap_in_filename=True):
     """ Traverses recursively subdirectories of a given session directory
     and converts all DICOM files to NIFTI files.
 
@@ -370,6 +418,12 @@ def recursive_dcm_to_nii(dcmdump_path, session_directory, save_directory,
                 if basename.endswith('.dcm'):
                     nii_filename = dcm_to_nii(
                         dcmdump_path, os.path.join(root, basename),
-                        save_directory, siap_fix=siap_fix)
+                        save_directory, siap_fix=siap_fix,
+                        id_in_filename=id_in_filename,
+                        date_in_filename=date_in_filename,
+                        time_in_filename=time_in_filename,
+                        protocol_in_filename=protocol_in_filename,
+                        paravision_folder_in_filename=paravision_folder_in_filename,
+                        siap_in_filename=siap_in_filename)
                     nii_filenames.append(nii_filename)
     return nii_filenames

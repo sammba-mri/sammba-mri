@@ -22,8 +22,8 @@ def fid_to_nii(fid_directory, save_filename, fftzpsize):
 
     Returns
     -------
-    nii_filename : str
-        Paths to the created NIFTI image.
+    save_filename : str
+        Path to the created NIFTI image.
     """
     dic, data = varian.read(fid_directory, as_2d=1)
     pss = np.array([float(value) for value in dic['procpar']['pss']['values']])
