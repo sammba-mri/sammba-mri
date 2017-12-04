@@ -3,14 +3,39 @@
 # Author: Nachiket Nadkarni, 2017
 # License: CeCILL-B
 
-import numpy as np
+import fnmatch
 import os
 import subprocess
 import itertools
+import warnings
+import numpy as np
 import pandas
 import nibabel
 from .utils import _rotate_affine
-import warnings
+
+DICOM_EXTENSIONS = [".dcm", ".ima", ".dicom"]
+
+
+def _is_dicom(filename):
+    """
+    Determines, by filename extension, whether `filename` is a DICOM file
+    or not.
+
+    Parameters
+    ----------
+    filename : str
+        Path to file to check.
+
+    Returns
+    -------
+    True if `filename` is a DICOM file, False otherwise.
+    """
+    for ext in DICOM_EXTENSIONS:
+        # XXX: are all DICOMs starting with 'EnIm' ?
+        if filename.lower().endswith(ext) and filename.startswith('EnIm'):
+            return True
+
+    return False
 
 
 def dcm_to_nii(dcmdump_path, dicom_filename, save_directory, siap_fix=True,
@@ -376,11 +401,7 @@ def dcm_to_nii(dcmdump_path, dicom_filename, save_directory, siap_fix=True,
 
 
 def recursive_dcm_to_nii(dcmdump_path, session_directory, save_directory,
-                         siap_fix=True,
-                         id_in_filename=True, date_in_filename=True,
-                         time_in_filename=True, protocol_in_filename=True,
-                         paravision_folder_in_filename=True,
-                         siap_in_filename=True):
+                         filename_patterns=None, **dcm_to_nii_kwargs):
     """ Traverses recursively subdirectories of a given session directory
     and converts all DICOM files to NIFTI files.
 
@@ -393,14 +414,14 @@ def recursive_dcm_to_nii(dcmdump_path, session_directory, save_directory,
         Path to the top directory.
 
     save_directory : str
-        Path to the directory to save the extracteed NIFTI image
+        Path to the directory to save the extracteed NIFTI image.
 
-    siap_fix : bool, optional
-        If True, swaps the superior-inferior and anterior-posterior axes to be
-        how I think they should be. In rodents, Paravision sets dorsal-ventral
-        as AP and rostral-caudal as SI. I think they should be the other way
-        round
-        https://en.wikipedia.org/wiki/Anatomical_terms_of_location#Main_terms
+    filename_patterns : list of str or None, optional
+        If not None, only DICOM files that match one of the given patterns are
+        converted.
+
+    dcm_to_nii_kwargs : extra keyword arguments
+        Extra keyword arguments are passed to sammba.io_conversions.dcm_to_nii
 
     Returns
     -------
@@ -411,19 +432,16 @@ def recursive_dcm_to_nii(dcmdump_path, session_directory, save_directory,
     --------
         sammba.io_conversions.dcm_to_nii
     """
+    if filename_patterns is None:
+        filename_patterns = ['*']
+
     nii_filenames = []
     for root, dirs, files in os.walk(session_directory):
-        for basename in files:
-            if basename.startswith('EnIm'):
-                if basename.endswith('.dcm'):
+        for pattern in filename_patterns:
+            for basename in fnmatch.filter(files, pattern):
+                if _is_dicom(basename):
                     nii_filename = dcm_to_nii(
                         dcmdump_path, os.path.join(root, basename),
-                        save_directory, siap_fix=siap_fix,
-                        id_in_filename=id_in_filename,
-                        date_in_filename=date_in_filename,
-                        time_in_filename=time_in_filename,
-                        protocol_in_filename=protocol_in_filename,
-                        paravision_folder_in_filename=paravision_folder_in_filename,
-                        siap_in_filename=siap_in_filename)
+                        save_directory, **dcm_to_nii_kwargs)
                     nii_filenames.append(nii_filename)
     return nii_filenames
