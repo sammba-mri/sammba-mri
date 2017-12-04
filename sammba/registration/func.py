@@ -13,7 +13,8 @@ from .struct import anats_to_template
 def coregister_fmri_session(session_data, t_r, write_dir, brain_volume,
                             slice_timing=True,
                             prior_rigid_body_registration=False,
-                            caching=False, voxel_size_x=.1, voxel_size_y=.1):
+                            caching=False, voxel_size_x=.1, voxel_size_y=.1,
+                            verbose=True, **environ_kwargs):
     """
     Coregistration of the subject's functional and anatomical images.
     The functional volume is aligned to the anatomical, first with a rigid body
@@ -46,6 +47,13 @@ def coregister_fmri_session(session_data, t_r, write_dir, brain_volume,
     voxel_size_y : float, optional
         Resampling resolution for the y-axis, in mm.
 
+    verbose : bool, optional
+        If True, all steps are verbose. Note that caching implies some
+        verbosity in any case.
+
+    environ_kwargs : extra arguments keywords
+        Extra arguments keywords, passed to interfaces environ variable.
+
     Returns
     -------
     the same sequence with each animal_data updated: attributes
@@ -56,6 +64,16 @@ def coregister_fmri_session(session_data, t_r, write_dir, brain_volume,
     """
     func_filename = session_data.func
     anat_filename = session_data.anat
+
+    environ = {}
+    for (key, value) in environ_kwargs:
+        environ[key] = value
+
+    if verbose:
+        terminal_output = 'allatonce'
+    else:
+        terminal_output = 'none'
+
     if caching:
         memory = Memory(write_dir)
         tshift = memory.cache(afni.TShift)
@@ -77,26 +95,32 @@ def coregister_fmri_session(session_data, t_r, write_dir, brain_volume,
         warp_apply = memory.cache(afni.NwarpApply)
         qwarp = memory.cache(afni.Qwarp)
         merge = memory.cache(fsl.Merge)
+        overwrite = False
+        for step in [tshift, volreg, allineate, allineate2, copy_geom,
+                     tstat, rats, calc, unifize, resample,
+                     slicer, warp_apply, qwarp, merge]:
+            step.interface().set_default_terminal_output(terminal_output)
     else:
-        tshift = afni.TShift().run
+        tshift = afni.TShift(terminal_output=terminal_output).run
         clip_level = afni.ClipLevel().run
-        threshold = fsl.Threshold().run
-        volreg = afni.Volreg().run
-        allineate = afni.Allineate().run
-        allineate2 = afni.Allineate().run  # TODO: remove after fixed bug
-        copy_geom = fsl.CopyGeom().run
-        tstat = afni.TStat().run
-        rats = RatsMM().run
-        calc = afni.Calc().run
-        allineate = afni.Allineate().run
-        unifize = afni.Unifize().run
+        threshold = fsl.Threshold(terminal_output=terminal_output).run
+        volreg = afni.Volreg(terminal_output=terminal_output).run
+        allineate = afni.Allineate(terminal_output=terminal_output).run
+        allineate2 = afni.Allineate(terminal_output=terminal_output).run  # TODO: remove after fixed bug
+        copy_geom = fsl.CopyGeom(terminal_output=terminal_output).run
+        tstat = afni.TStat(terminal_output=terminal_output).run
+        rats = RatsMM(terminal_output=terminal_output).run
+        calc = afni.Calc(terminal_output=terminal_output).run
+        unifize = afni.Unifize(terminal_output=terminal_output).run
         catmatvec = afni.CatMatvec().run
         warp = afni.Warp().run
-        resample = afni.Resample().run
-        slicer = afni.ZCutUp().run
-        warp_apply = afni.NwarpApply().run
-        qwarp = afni.Qwarp().run
-        merge = fsl.Merge().run
+        resample = afni.Resample(terminal_output=terminal_output).run
+        slicer = afni.ZCutUp(terminal_output=terminal_output).run
+        warp_apply = afni.NwarpApply(terminal_output=terminal_output).run
+        qwarp = afni.Qwarp(terminal_output=terminal_output).run
+        merge = fsl.Merge(terminal_output=terminal_output).run
+        environ['AFNI_DECONFLICT'] = 'OVERWRITE'
+        overwrite = True
 
     session_data._check_inputs()
     output_dir = os.path.join(os.path.abspath(write_dir),
@@ -113,7 +137,8 @@ def coregister_fmri_session(session_data, t_r, write_dir, brain_volume,
         out_tshift = tshift(in_file=func_filename,
                             outputtype='NIFTI_GZ',
                             tpattern='altplus',
-                            tr=str(t_r))
+                            tr=str(t_r),
+                            environ=environ)
         func_filename = out_tshift.outputs.out_file
         output_files.append(func_filename)
 
@@ -129,6 +154,7 @@ def coregister_fmri_session(session_data, t_r, write_dir, brain_volume,
     out_volreg = volreg(  # XXX dfile not saved
         in_file=thresholded_filename,
         outputtype='NIFTI_GZ',
+        environ=environ,
         oned_file=fname_presuffix(thresholded_filename,
                                   suffix='Vr.1Dfile.1D', use_ext=False),
         oned_matrix_save=fname_presuffix(thresholded_filename,
@@ -139,7 +165,8 @@ def coregister_fmri_session(session_data, t_r, write_dir, brain_volume,
                               master=func_filename,
                               in_matrix=out_volreg.outputs.oned_matrix_save,
                               out_file=fname_presuffix(func_filename,
-                                                       suffix='Av'))
+                                                       suffix='Av'),
+                              environ=environ)
 
     # 3dAllineate removes the obliquity. This is not a good way to readd it as
     # removes motion correction info in the header if it were an AFNI file...as
@@ -151,7 +178,7 @@ def coregister_fmri_session(session_data, t_r, write_dir, brain_volume,
 
     # Create a (hopefully) nice mean image for use in the registration
     out_tstat = tstat(in_file=allineated_filename, args='-mean',
-                      outputtype='NIFTI_GZ')
+                      outputtype='NIFTI_GZ', environ=environ)
 
     # Update outputs
     output_files.extend([thresholded_filename,
@@ -167,11 +194,12 @@ def coregister_fmri_session(session_data, t_r, write_dir, brain_volume,
     ###########################################
     # Correct the functional average for intensities bias
     out_bias_correct = unifize(in_file=out_tstat.outputs.out_file,
-                               outputtype='NIFTI_GZ')
+                               outputtype='NIFTI_GZ', environ=environ)
     unbiased_func_filename = out_bias_correct.outputs.out_file
 
     # Bias correct the antomical image
-    out_unifize = unifize(in_file=anat_filename, outputtype='NIFTI_GZ')
+    out_unifize = unifize(in_file=anat_filename, outputtype='NIFTI_GZ',
+                          environ=environ)
     unbiased_anat_filename = out_unifize.outputs.out_file
 
     # Update outputs
@@ -190,7 +218,8 @@ def coregister_fmri_session(session_data, t_r, write_dir, brain_volume,
         out_cacl_func = calc(in_file_a=unbiased_func_filename,
                              in_file_b=out_rats_func.outputs.out_file,
                              expr='a*b',
-                             outputtype='NIFTI_GZ')
+                             outputtype='NIFTI_GZ',
+                             environ=environ)
 
         # Mask the anatomical volume outside the brain.
         out_clip_level = clip_level(in_file=unbiased_anat_filename)
@@ -201,7 +230,8 @@ def coregister_fmri_session(session_data, t_r, write_dir, brain_volume,
         out_cacl_anat = calc(in_file_a=unbiased_anat_filename,
                              in_file_b=out_rats_anat.outputs.out_file,
                              expr='a*b',
-                             outputtype='NIFTI_GZ')
+                             outputtype='NIFTI_GZ',
+                             environ=environ)
 
         # Compute the transformation from functional to anatomical brain
         # XXX: why in this sense
@@ -214,7 +244,8 @@ def coregister_fmri_session(session_data, t_r, write_dir, brain_volume,
             center_of_mass='',
             warp_type='shift_rotate',
             out_file=fname_presuffix(out_cacl_func.outputs.out_file,
-                                     suffix='_shr'))
+                                     suffix='_shr'),
+            environ=environ)
         rigid_transform_file = out_allineate.outputs.out_matrix
         output_files.extend([out_rats_func.outputs.out_file,
                              out_cacl_func.outputs.out_file,
@@ -237,7 +268,8 @@ def coregister_fmri_session(session_data, t_r, write_dir, brain_volume,
             master=unbiased_func_filename,
             in_matrix=catmatvec_out_file,
             out_file=fname_presuffix(unbiased_anat_filename,
-                                     suffix='_shr_in_func_space'))
+                                     suffix='_shr_in_func_space'),
+            environ=environ)
         allineated_anat_filename = out_allineate.outputs.out_file
         output_files.append(allineated_anat_filename)
     else:
@@ -254,11 +286,12 @@ def coregister_fmri_session(session_data, t_r, write_dir, brain_volume,
                     interp='quintic',
                     gridset=unbiased_func_filename,
                     outputtype='NIFTI_GZ',
-                    verbose=True)
+                    verbose=True,
+                    environ=environ)
     registered_anat_filename = out_warp.outputs.out_file
     registered_anat_oblique_filename = fix_obliquity(
         registered_anat_filename, unbiased_func_filename,
-        overwrite=False)
+        overwrite=overwrite, verbose=verbose)
 
     # Concatenate all the anat to func tranforms
     mat_filename = fname_presuffix(registered_anat_filename,
@@ -292,9 +325,11 @@ def coregister_fmri_session(session_data, t_r, write_dir, brain_volume,
                             keep='{0} {0}'.format(slice_n),
                             out_file=fname_presuffix(
                                 registered_anat_oblique_filename,
-                                suffix='Sl%d' % slice_n))
+                                suffix='Sl%d' % slice_n),
+                            environ=environ)
         _ = fix_obliquity(out_slicer.outputs.out_file,
-                          registered_anat_oblique_filename)
+                          registered_anat_oblique_filename,
+                          overwrite=overwrite, verbose=verbose)
         sliced_registered_anat_filenames.append(out_slicer.outputs.out_file)
 
     # Slice mean functional
@@ -305,9 +340,11 @@ def coregister_fmri_session(session_data, t_r, write_dir, brain_volume,
         out_slicer = slicer(in_file=unbiased_func_filename,
                             keep='{0} {0}'.format(slice_n),
                             out_file=fname_presuffix(unbiased_func_filename,
-                                                     suffix='Sl%d' % slice_n))
+                                                     suffix='Sl%d' % slice_n),
+                            environ=environ)
         _ = fix_obliquity(out_slicer.outputs.out_file,
-                          unbiased_func_filename)
+                          unbiased_func_filename,
+                          overwrite=overwrite, verbose=verbose)
         sliced_bias_corrected_filenames.append(out_slicer.outputs.out_file)
 
     # Below line is to deal with slices where there is no signal (for example
@@ -321,7 +358,8 @@ def coregister_fmri_session(session_data, t_r, write_dir, brain_volume,
         out_resample = resample(in_file=sliced_registered_anat_filename,
                                 voxel_size=(voxel_size_x, voxel_size_y,
                                             voxel_size_z),
-                                outputtype='NIFTI_GZ')
+                                outputtype='NIFTI_GZ',
+                                environ=environ)
         resampled_registered_anat_filenames.append(
             out_resample.outputs.out_file)
 
@@ -330,7 +368,8 @@ def coregister_fmri_session(session_data, t_r, write_dir, brain_volume,
         out_resample = resample(in_file=sliced_bias_corrected_filename,
                                 voxel_size=(voxel_size_x, voxel_size_y,
                                             voxel_size_z),
-                                outputtype='NIFTI_GZ')
+                                outputtype='NIFTI_GZ',
+                                environ=environ)
         resampled_bias_corrected_filenames.append(
             out_resample.outputs.out_file)
 
@@ -355,7 +394,8 @@ def coregister_fmri_session(session_data, t_r, write_dir, brain_volume,
                                          '-parfix 4 0 -parfix 5 0 -parfix 6 0 '
                                          '-parfix 7 0 -parfix 9 0 '
                                          '-parfix 10 0 -parfix 12 0',
-                          out_file=warped_slice)
+                          out_file=warped_slice,
+                          environ=environ)
         warped_slices.append(out_qwarp.outputs.warped_source)
         warp_filenames.append(out_qwarp.outputs.source_warp)
 
@@ -366,16 +406,18 @@ def coregister_fmri_session(session_data, t_r, write_dir, brain_volume,
     for warped_slice in warped_slices:
         out_resample = resample(in_file=warped_slice,
                                 voxel_size=voxel_size,
-                                outputtype='NIFTI_GZ')
+                                outputtype='NIFTI_GZ',
+                                environ=environ)
         resampled_warped_slices.append(out_resample.outputs.out_file)
 
     # fix the obliquity
     for (sliced_registered_anat_filename, resampled_warped_slice) in zip(
             sliced_registered_anat_filenames, resampled_warped_slices):
-#        if not _have_same_obliquity(resampled_warped_slice,
+#        if not _check_same_obliquity(resampled_warped_slice,
 #                                    sliced_registered_anat_filename):
         _ = fix_obliquity(resampled_warped_slice,
-                          sliced_registered_anat_filename)
+                          sliced_registered_anat_filename,
+                          overwrite=overwrite, verbose=verbose)
 
     # slice functional
     sliced_func_filenames = []
@@ -383,9 +425,11 @@ def coregister_fmri_session(session_data, t_r, write_dir, brain_volume,
         out_slicer = slicer(in_file=allineated_filename,
                             keep='{0} {0}'.format(slice_n),
                             out_file=fname_presuffix(allineated_filename,
-                                                     suffix='Sl%d' % slice_n))
+                                                     suffix='Sl%d' % slice_n),
+                            environ=environ)
         _ = fix_obliquity(out_slicer.outputs.out_file,
-                          allineated_filename)
+                          allineated_filename,
+                          overwrite=overwrite, verbose=verbose)
         sliced_func_filenames.append(out_slicer.outputs.out_file)
 
     # Apply the precomputed warp slice by slice
@@ -396,13 +440,15 @@ def coregister_fmri_session(session_data, t_r, write_dir, brain_volume,
                                     master=sliced_func_filename,
                                     warp=warp_filename,
                                     out_file=fname_presuffix(
-                                        sliced_func_filename, suffix='_qw'))
+                                        sliced_func_filename, suffix='_qw'),
+                                    environ=environ)
         warped_func_slices.append(out_warp_apply.outputs.out_file)
 
     # Fix the obliquity
     for (sliced_func_filename, warped_func_slice) in zip(
             sliced_func_filenames, warped_func_slices):
-        _ = fix_obliquity(warped_func_slice, sliced_func_filename)
+        _ = fix_obliquity(warped_func_slice, sliced_func_filename,
+                          overwrite=overwrite, verbose=verbose)
 
     # Finally, merge all slices !
     out_merge_func = merge(in_files=warped_func_slices, dimension='z')
@@ -475,11 +521,13 @@ def _func_to_template(func_coreg_filename, template_filename, write_dir,
     return out_warp_apply.outputs.out_file
 
 
-def fmri_sessions_to_template(sessions_data, t_r, template_filename, write_dir,
-                              brain_volume,
+def fmri_sessions_to_template(sessions_data, t_r, head_template_filename,
+                              write_dir,
+                              brain_volume, brain_template_filename=None,
+                              dilated_head_mask_filename=None,
                               prior_rigid_body_registration=False,
                               slice_timing=True,
-                              caching=False):
+                              caching=False, verbose=True):
     """ Registration of subject's functional and anatomical images to
     a given template.
 
@@ -491,7 +539,7 @@ def fmri_sessions_to_template(sessions_data, t_r, template_filename, write_dir,
     t_r : float
         Repetition time for the EPI, in seconds.
 
-    template_filename : str
+    head_template_filename : str
         Template to register the functional to.
 
     brain_volume : float
@@ -501,8 +549,20 @@ def fmri_sessions_to_template(sessions_data, t_r, template_filename, write_dir,
     write_dir : str
         Path to the affine 1D transform from anatomical to template space.
 
+    brain_template_filename : str, optional
+        Path to a brain template, passed to
+        sammba.registration.anats_to_template
+
+    dilated_head_mask_filename : str, optional
+        Path to a dilated head maskn, passed to
+        sammba.registration.anats_to_template
+
     caching : bool, optional
         Wether or not to use caching.
+
+    verbose : bool, optional
+        If True, all steps are verbose. Note that caching implies some
+        verbosity in any case.
 
     Returns
     -------
@@ -531,49 +591,45 @@ def fmri_sessions_to_template(sessions_data, t_r, template_filename, write_dir,
         raise ValueError('Animals ids must be different. You'
                          ' provided {0}'.format(animals_ids))
 
-    coreg_func_filenames = []
-    func_to_anat_oned_filenames = []
     for n, animal_data in enumerate(sessions_data):
         animal_data._check_inputs()
+
+        setattr(animal_data, "template_", head_template_filename)
         animal_output_dir = os.path.join(os.path.abspath(write_dir),
                                          animal_data.animal_id)
         setattr(animal_data, "output_dir_", animal_output_dir) # XXX do a function for creating new attributes ?
+        animal_data._set_output_dir_()
 
+        coregister_fmri_session(
+            animal_data, t_r, write_dir, brain_volume,
+            prior_rigid_body_registration=prior_rigid_body_registration,
+            slice_timing=slice_timing,
+            caching=caching)
         sessions_data[n] = animal_data
-        if not os.path.isdir(animal_data.output_dir_):
-            os.makedirs(animal_data.output_dir_)
-
-        coreg_func_filename, _, func_to_anat_oned_filename = \
-            coregister_fmri_session(
-                animal_data, t_r, write_dir, brain_volume,
-                prior_rigid_body_registration=prior_rigid_body_registration,
-                slice_timing=slice_timing,
-                caching=caching)
-        coreg_func_filenames.append(coreg_func_filename)
-        func_to_anat_oned_filenames.append(func_to_anat_oned_filename)
 
     anat_filenames = [animal_data.anat for animal_data in sessions_data]
-    (normalized_anat_filenames, anat_to_template_oned_filenames,
-     anat_to_template_warp_filenames) = \
-        anats_to_template(anat_filenames, template_filename,
-                          animal_data.output_dir_, brain_volume,
-                          caching=caching)
+    anats_registration = anats_to_template(
+        anat_filenames,
+        head_template_filename,
+        animal_data.output_dir_,
+        brain_volume,
+        brain_template_filename=brain_template_filename,
+        dilated_head_mask_filename=dilated_head_mask_filename,
+        caching=caching)
     for n, (animal_data, normalized_anat_filename) in enumerate(zip(
-            sessions_data, normalized_anat_filenames)):
+            sessions_data, anats_registration.registered)):
         setattr(animal_data, "registered_anat_", normalized_anat_filename)
         sessions_data[n] = animal_data
 
-    for n, (animal_data, coreg_func_filename, func_to_anat_oned_filename,
-            anat_to_template_oned_filename,
+    for n, (animal_data, anat_to_template_oned_filename,
             anat_to_template_warp_filename) in enumerate(zip(sessions_data,
-                coreg_func_filenames, func_to_anat_oned_filenames,
-                anat_to_template_oned_filenames,
-                anat_to_template_warp_filenames)):
+                anats_registration.affine_transforms,
+                anats_registration.warp_transforms)):
         normalized_func_filename = _func_to_template(
-            coreg_func_filename,
-            template_filename,
+            animal_data.coreg_func_,
+            head_template_filename,
             animal_data.output_dir_,
-            func_to_anat_oned_filename,
+            animal_data.coreg_transform_,
             anat_to_template_oned_filename,
             anat_to_template_warp_filename,
             caching=caching)
