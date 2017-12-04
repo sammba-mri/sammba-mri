@@ -64,7 +64,7 @@ def _reset_affines(in_file, out_file, overwrite=False, axes_to_permute=None,
 
 def fix_obliquity(to_fix_filename, reference_filename, caching=False,
                   caching_dir=None, clear_memory=False, overwrite=False,
-                  verbose=verbose):
+                  verbose=True):
     if caching_dir is None:
         caching_dir = os.getcwd()
     if caching:

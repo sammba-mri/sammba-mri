@@ -80,10 +80,10 @@ def test_fix_obliquity():
         assert_true(
             utils._check_same_obliquity(tmp_filename, target_filename))
 
-    if os.path.exists(tmp_filename):
-        os.remove(tmp_filename)
-    if os.path.exists(tempdir):
-        os.removedirs(tempdir)
+        if os.path.exists(tmp_filename):
+            os.remove(tmp_filename)
+        if os.path.exists(tempdir):
+            os.removedirs(tempdir)
 
 
 def test_create_pipeline_graph():
