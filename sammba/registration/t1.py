@@ -6,25 +6,25 @@ from sammba.externals.nipype.caching import Memory
 from sklearn.datasets.base import Bunch
 
 
-def anats_to_common(t1_filenames, write_dir, brain_volume=400,
+def anats_to_common(t1_filenames, write_dir, brain_volume,
                     registration_kind='affine',
                     nonlinear_levels=[1, 2, 3],
                     nonlinear_minimal_patch=75,
                     convergence=0.005, caching=False, verbose=0):
-    """ Create common template from native T1 weighted images and achieve
+    """ Create common template from native anatomical images and achieve
     their registration to it.
 
     Parameters
     ----------
     t1_filenames : list of str
-        Paths to the T1 weighted images.
+        Paths to the anatomical images.
 
     write_dir : str
         Path to an existant directory to save output files to.
 
-    brain_volume : float, optional
+    brain_volume : float
         Volumes of the brain as passed to Rats_MM brain extraction tool.
-        Default to 400 for the mouse brain.
+        Typically 400 for mouse and 1600 for rat.
 
     registration_kind : one of {'rigid', 'affine', 'nonlinear'}, optional
         The allowed transform kind.
@@ -501,9 +501,59 @@ def anats_to_common(t1_filenames, write_dir, brain_volume=400,
 
 
 def anats_to_template(anat_filenames, head_template_filename, write_dir,
+                      brain_volume,
                       brain_template_filename=None,
                       dilated_head_mask_filename=None,
+                      convergence=.005,
                       caching=False):
+    """ Registers raw anatomical images to a given template.
+
+    Parameters
+    ----------
+    anat_filenames : list of str
+        Paths to the anatomical images.
+
+    head_template_filename : str
+        Path to the head template.
+
+    write_dir : str
+        Path to an existant directory to save output files to.
+
+    brain_volume : float
+        Volumes of the brain as passed to Rats_MM brain extraction tool.
+        Typically 400 for mouse and 1600 for rat.
+
+    brain_template_filename : str, optional
+        Path to a brain template. Note that this must coincide with the brain
+        from the given head template. If None, the brain is extracted from
+        the template with RATS.
+
+    dilated_head_mask_filename : str, optional
+        Path to a dilated head mask. Note that this must be compliant with the
+        the given head template. If None, the mask is set to the non-zero
+        voxels of the head template.
+
+    caching : bool, optional
+        If True, caching is used for all the registration steps.
+
+    convergence : float, optional
+        Convergence limit, passed to
+
+    Returns
+    -------
+    data : sklearn.datasets.base.Bunch
+        Dictionary-like object, the interest attributes are :
+
+        - 'registered' : list of str.
+                         Paths to registered images. Note that
+                         they have undergone a bias correction step before.
+        - 'affine_transforms' : list of str.
+                                Paths to the affine transforms from the raw
+                                images to the allineated images.
+        - 'warp_transforms' : list of str.
+                              Paths to the transforms from the allineated
+                              images to the final registered images.
+    """
     if caching:
         memory = Memory(write_dir)
         clip_level = memory.cache(afni.ClipLevel)
@@ -524,12 +574,13 @@ def anats_to_template(anat_filenames, head_template_filename, write_dir,
         threshold = fsl.Threshold().run
         qwarp = afni.Qwarp().run
 
+    current_dir = os.getcwd()
     os.chdir(write_dir)
     if brain_template_filename is None:
         out_clip_level = clip_level(in_file=head_template_filename)
         out_rats = rats(
             in_file=head_template_filename,
-            volume_threshold=400,
+            volume_threshold=brain_volume,
             intensity_threshold=int(out_clip_level.outputs.clip_val))
         brain_template_filename = out_rats.outputs.out_file
 
@@ -549,7 +600,7 @@ def anats_to_template(anat_filenames, head_template_filename, write_dir,
         out_clip_level = clip_level(in_file=unbiased_anat_filename)
         out_rats = rats(
             in_file=unbiased_anat_filename,
-            volume_threshold=400,
+            volume_threshold=brain_volume,
             intensity_threshold=int(out_clip_level.outputs.clip_val))
         out_apply_mask = apply_mask(in_file=unbiased_anat_filename,
                                     mask_file=out_rats.outputs.out_file)
@@ -569,7 +620,7 @@ def anats_to_template(anat_filenames, head_template_filename, write_dir,
             out_matrix=affine_transform_filename,
             two_blur=1,
             cost='nmi',
-            convergence=.005,
+            convergence=convergence,
             two_pass=True,
             center_of_mass='',
             maxrot=90,
@@ -601,6 +652,7 @@ def anats_to_template(anat_filenames, head_template_filename, write_dir,
         registered.append(out_qwarp.outputs.warped_source)
         warp_transforms.append(out_qwarp.outputs.source_warp)
 
+    os.chdir(current_dir)
     return Bunch(registered=registered,
                  affine_transforms=affine_transforms,
                  warp_transforms=warp_transforms)

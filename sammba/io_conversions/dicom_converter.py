@@ -3,7 +3,6 @@
 # Author: Nachiket Nadkarni, 2017
 # License: CeCILL-B
 
-import fnmatch
 import os
 import subprocess
 import itertools
@@ -401,7 +400,7 @@ def dcm_to_nii(dcmdump_path, dicom_filename, save_directory, siap_fix=True,
 
 
 def recursive_dcm_to_nii(dcmdump_path, session_directory, save_directory,
-                         filename_patterns=None, **dcm_to_nii_kwargs):
+                         **dcm_to_nii_kwargs):
     """ Traverses recursively subdirectories of a given session directory
     and converts all DICOM files to NIFTI files.
 
@@ -416,10 +415,6 @@ def recursive_dcm_to_nii(dcmdump_path, session_directory, save_directory,
     save_directory : str
         Path to the directory to save the extracteed NIFTI image.
 
-    filename_patterns : list of str or None, optional
-        If not None, only DICOM files that match one of the given patterns are
-        converted.
-
     dcm_to_nii_kwargs : extra keyword arguments
         Extra keyword arguments are passed to sammba.io_conversions.dcm_to_nii
 
@@ -432,16 +427,12 @@ def recursive_dcm_to_nii(dcmdump_path, session_directory, save_directory,
     --------
         sammba.io_conversions.dcm_to_nii
     """
-    if filename_patterns is None:
-        filename_patterns = ['*']
-
     nii_filenames = []
     for root, dirs, files in os.walk(session_directory):
-        for pattern in filename_patterns:
-            for basename in fnmatch.filter(files, pattern):
-                if _is_dicom(basename):
-                    nii_filename = dcm_to_nii(
-                        dcmdump_path, os.path.join(root, basename),
-                        save_directory, **dcm_to_nii_kwargs)
-                    nii_filenames.append(nii_filename)
+        for basename in files:
+            if _is_dicom(basename):
+                nii_filename = dcm_to_nii(
+                    dcmdump_path, os.path.join(root, basename),
+                    save_directory, **dcm_to_nii_kwargs)
+                nii_filenames.append(nii_filename)
     return nii_filenames
