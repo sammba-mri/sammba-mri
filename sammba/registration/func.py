@@ -2,10 +2,10 @@ import os
 import numpy as np
 import nibabel
 from sammba.externals.nipype.caching import Memory
-from sammba.externals.nipype.interfaces import afni, fsl, ants
+from sammba.externals.nipype.interfaces import afni, fsl
 from sammba.externals.nipype.utils.filemanip import fname_presuffix
 from sammba.interfaces import RatsMM
-from .utils import fix_obliquity
+from .utils import fix_obliquity, _have_same_obliquity
 from .fmri_session import FMRISession
 from .t1 import anats_to_template
 
@@ -13,7 +13,7 @@ from .t1 import anats_to_template
 def coregister_fmri_session(session_data, t_r, write_dir,
                             slice_timing=True,
                             prior_rigid_body_registration=False,
-                            caching=False):
+                            caching=False, voxel_size_x=.1, voxel_size_y=.1):
     """
     Coregistration of the subject's functional and anatomical images.
     The functional volume is aligned to the anatomical, first with a rigid body
@@ -36,6 +36,12 @@ def coregister_fmri_session(session_data, t_r, write_dir,
     caching : bool, optional
         Wether or not to use caching.
 
+    voxel_size_x : float, optional
+        Resampling resolution for the x-axis, in mm.
+
+    voxel_size_y : float, optional
+        Resampling resolution for the y-axis, in mm.
+
     Returns
     -------
     the same sequence with each animal_data updated: attributes
@@ -54,7 +60,6 @@ def coregister_fmri_session(session_data, t_r, write_dir,
         volreg = memory.cache(afni.Volreg)
         allineate = memory.cache(afni.Allineate)
         copy_geom = memory.cache(fsl.CopyGeom)
-        bias_correct = memory.cache(ants.N4BiasFieldCorrection)
         tstat = memory.cache(afni.TStat)
         rats = memory.cache(RatsMM)
         calc = memory.cache(afni.Calc)
@@ -76,7 +81,6 @@ def coregister_fmri_session(session_data, t_r, write_dir,
         allineate = afni.Allineate().run
         allineate2 = afni.Allineate().run  # TODO: remove after fixed bug
         copy_geom = fsl.CopyGeom().run
-        bias_correct = ants.N4BiasFieldCorrection().run
         tstat = afni.TStat().run
         rats = RatsMM().run
         calc = afni.Calc().run
@@ -145,8 +149,9 @@ def coregister_fmri_session(session_data, t_r, write_dir,
     averaged_filename = out_tstat.outputs.out_file
 
     # Correct the functional average for intensities bias
-    out_bias_correct = bias_correct(input_image=averaged_filename, dimension=3)
-    unbiased_func_filename = out_bias_correct.outputs.output_image
+    out_bias_correct = unifize(in_file=averaged_filename,
+                               outputtype='NIFTI_GZ')
+    unbiased_func_filename = out_bias_correct.outputs.out_file
 
     # Bias correct the antomical image
     out_unifize = unifize(in_file=anat_filename, outputtype='NIFTI_GZ')
@@ -249,7 +254,7 @@ def coregister_fmri_session(session_data, t_r, write_dir,
     sliced_registered_anat_filenames = []
     for slice_n in range(anat_n_slices):
         out_slicer = slicer(in_file=registered_anat_oblique_filename,
-                            keep='{0} {1}'.format(slice_n, slice_n),
+                            keep='{0} {0}'.format(slice_n),
                             out_file=fname_presuffix(
                                 registered_anat_oblique_filename,
                                 suffix='Sl%d' % slice_n))
@@ -263,9 +268,11 @@ def coregister_fmri_session(session_data, t_r, write_dir,
     n_slices = img.header.get_data_shape()[2]
     for slice_n in range(n_slices):
         out_slicer = slicer(in_file=unbiased_func_filename,
-                            keep='{0} {1}'.format(slice_n, slice_n),
+                            keep='{0} {0}'.format(slice_n),
                             out_file=fname_presuffix(unbiased_func_filename,
                                                      suffix='Sl%d' % slice_n))
+        print(out_slicer.outputs.out_file)
+        print(unbiased_func_filename)
         _ = fix_obliquity(out_slicer.outputs.out_file,
                           unbiased_func_filename)
         sliced_bias_corrected_filenames.append(out_slicer.outputs.out_file)
@@ -279,7 +286,8 @@ def coregister_fmri_session(session_data, t_r, write_dir,
     resampled_registered_anat_filenames = []
     for sliced_registered_anat_filename in sliced_registered_anat_filenames:
         out_resample = resample(in_file=sliced_registered_anat_filename,
-                                voxel_size=(.1, .1, voxel_size_z),
+                                voxel_size=(voxel_size_x, voxel_size_y,
+                                            voxel_size_z),
                                 outputtype='NIFTI_GZ')
         resampled_registered_anat_filenames.append(
             out_resample.outputs.out_file)
@@ -287,7 +295,8 @@ def coregister_fmri_session(session_data, t_r, write_dir,
     resampled_bias_corrected_filenames = []
     for sliced_bias_corrected_filename in sliced_bias_corrected_filenames:
         out_resample = resample(in_file=sliced_bias_corrected_filename,
-                                voxel_size=(.1, .1, voxel_size_z),
+                                voxel_size=(voxel_size_x, voxel_size_y,
+                                            voxel_size_z),
                                 outputtype='NIFTI_GZ')
         resampled_bias_corrected_filenames.append(
             out_resample.outputs.out_file)
@@ -330,8 +339,12 @@ def coregister_fmri_session(session_data, t_r, write_dir,
     # fix the obliquity
     for (sliced_registered_anat_filename, resampled_warped_slice) in zip(
             sliced_registered_anat_filenames, resampled_warped_slices):
-        _ = fix_obliquity(resampled_warped_slice,
-                          sliced_registered_anat_filename)
+        if not _have_same_obliquity(resampled_warped_slice,
+                                    sliced_registered_anat_filename):
+            print(resampled_warped_slice)
+            print(sliced_registered_anat_filename)
+            _ = fix_obliquity(resampled_warped_slice,
+                              sliced_registered_anat_filename)
 
     # Merge all slices !
 #    out_merge_mean = merge(in_files=resampled_warped_slices, dimension='z')
@@ -340,7 +353,7 @@ def coregister_fmri_session(session_data, t_r, write_dir,
     sliced_func_filenames = []
     for slice_n in range(n_slices):
         out_slicer = slicer(in_file=allineated_filename,
-                            keep='{0} {1}'.format(slice_n, slice_n),
+                            keep='{0} {0}'.format(slice_n),
                             out_file=fname_presuffix(allineated_filename,
                                                      suffix='Sl%d' % slice_n))
         _ = fix_obliquity(out_slicer.outputs.out_file,

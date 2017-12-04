@@ -15,20 +15,17 @@ What is sammba-MRI: small mammals neuroimaging with python
 
 Dependencies
 ============
-The required dependencies to use the software are 
+The required dependencies to use the package are 
 
 the softwares:
 
 * AFNI
 * FSL >= 5.0
-* ANTS
 * `RATS <http://www.iibi.uiowa.edu/content/rats-overview/>`_ for brain
   extraction
 
-the `DICOM ToolKit (DCMTK) <http://support.dcmtk.org/docs/index.html>`_ package
-as well as different packages:
+as well as the python packages:
 
-* Python 2.7
 * setuptools
 * Numpy >= 1.6.2
 * SciPy >= 0.11
@@ -46,8 +43,10 @@ as well as different packages:
 * funcsigs
 * click
 
-
 If you want to run the tests, you need nose >= 1.2.1 and doctest-ignore-unicode
+
+If you want to convert DICOM files to NIFTI files, you will need the
+`DICOM ToolKit (DCMTK) <http://support.dcmtk.org/docs/index.html>`_ package
 
 
 Installation
@@ -101,12 +100,3 @@ You should see the FSL GUI with the version number in the header.
 
     # AFNI
     export PATH=/usr/lib/afni/bin:$PATH
-
-**Configuring ANTs**: Add the following line to your .bashrc file so that your system knows where to find the ANTs binaries::
-
-    # ANTs
-    export PATH=/usr/local/antsbin/bin:$PATH
-    export ANTSPATH=/usr/local/antsbin/bin/
-
-
-

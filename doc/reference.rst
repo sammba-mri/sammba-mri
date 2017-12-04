@@ -65,6 +65,8 @@ sammba-MRI API Reference
    :template: function.rst
 
    anats_to_common
+   anats_to_template
+   fmri_session_to_template
    coregister_fmri_session
    create_pipeline_graph
 

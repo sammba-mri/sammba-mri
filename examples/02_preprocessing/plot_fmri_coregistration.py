@@ -1,8 +1,8 @@
 """
-fMRI registration
-=================
+Functional and anatomical coregistration
+========================================
 
-Standard functional preprocessing and registration of functional image to
+Standard functional preprocessing and registration of functional image to the
 anatomical.
 
 """

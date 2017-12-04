@@ -5,6 +5,7 @@ from nose.tools import assert_true
 from nilearn._utils.testing import assert_raises_regex
 from nilearn._utils.niimg_conversions import _check_same_fov
 from sammba.registration import FMRISession, func
+from sammba.registration.utils import _have_same_obliquity
 from sammba.externals.nipype.interfaces import afni
 from sammba import testing_data
 import nibabel
@@ -24,6 +25,8 @@ def test_coregister_fmri_session():
                                      slice_timing=False)
         assert_true(_check_same_fov(nibabel.load(animal_session.coreg_func_),
                                     nibabel.load(animal_session.coreg_anat_)))
+        assert_true(_have_same_obliquity(animal_session.coreg_anat_,
+                                         animal_session.coreg_func_))
 
     if os.path.exists(tempdir):
         shutil.rmtree(tempdir)
