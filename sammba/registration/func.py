@@ -531,28 +531,45 @@ def _func_to_template(func_coreg_filename, template_filename, write_dir,
     if caching:
         memory = Memory(write_dir)
         warp_apply = memory.cache(afni.NwarpApply)
+        catmatvec = memory.cache(afni.CatMatVec)
+        allineate = memory.cache(afni.Allineate)
+        allineate.interface().set_default_terminal_output(terminal_output)
         warp_apply.interface().set_default_terminal_output(terminal_output)
     else:
+        catmatvec = afni.CatMatVec().run
+        allineate = afni.Allineate(terminal_output=terminal_output).run
         warp_apply = afni.NwarpApply(terminal_output=terminal_output).run
+        
 
     current_dir = os.getcwd()
     os.chdir(write_dir)
+    normalized_filename = fname_presuffix(func_coreg_filename,
+                                          suffix='_normalized')
     if anat_to_template_warp_filename:
-        nwarp = [anat_to_template_warp_filename,
-                 anat_to_template_oned_filename,
-                 func_to_anat_oned_filename]
+        nwarp = "'{0} {1} {2}'".format(anat_to_template_warp_filename,
+                                       anat_to_template_oned_filename,
+                                       func_to_anat_oned_filename)
+        out_warp_apply = warp_apply(
+            in_file=func_coreg_filename,
+            master=template_filename,
+            nwarp=nwarp,
+            out_file=normalized_filename)
     else:
-        nwarp = [anat_to_template_oned_filename,
-                 func_to_anat_oned_filename]
-    out_warp_apply = warp_apply(in_file=func_coreg_filename,
-                                master=template_filename,
-                                nwarp=nwarp,
-                                out_file=fname_presuffix(
-                                    func_coreg_filename, suffix='_normalized'))
+        catmatvec_out_file = fname_presuffix(func_coreg_filename,
+                                             suffix='_func_to_template')
+        _ = catmatvec(in_file=[(anat_to_template_oned_filename, 'ONELINE'),
+                               (func_to_anat_oned_filename, 'ONELINE')],
+                      oneline=True,
+                      out_file=catmatvec_out_file)
+        out_allineate = allineate(
+            in_file=func_coreg_filename,
+            master=template_filename,
+            in_matrix=catmatvec_out_file,
+            out_file=normalized_filename)
 
     os.chdir(current_dir)
 
-    return out_warp_apply.outputs.out_file
+    return normalized_filename
 
 
 def fmri_sessions_to_template(sessions, t_r, head_template_filename,
