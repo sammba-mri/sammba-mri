@@ -5,12 +5,15 @@ from nilearn._utils.compat import _basestring
 class FMRISession(object):
     """
     Encapsulation for fMRI data, relative to preprocessing.
+
     Parameters
     ----------
     func : str
         Path to the functional 4D image
+
     anat : str
         Path to anatomical image
+
     animal_id : str
         Animal id
     """

@@ -65,8 +65,8 @@ def coregister_fmri_session(session_data, t_r, write_dir, brain_volume,
     func_filename = session_data.func
     anat_filename = session_data.anat
 
-    environ = {}
-    for (key, value) in environ_kwargs:
+    environ = {'AFNI_DECONFLICT': 'OVERWRITE'}
+    for (key, value) in environ_kwargs.items():
         environ[key] = value
 
     if verbose:
@@ -119,7 +119,6 @@ def coregister_fmri_session(session_data, t_r, write_dir, brain_volume,
         warp_apply = afni.NwarpApply(terminal_output=terminal_output).run
         qwarp = afni.Qwarp(terminal_output=terminal_output).run
         merge = fsl.Merge(terminal_output=terminal_output).run
-        environ['AFNI_DECONFLICT'] = 'OVERWRITE'
         overwrite = True
 
     session_data._check_inputs()
@@ -185,7 +184,7 @@ def coregister_fmri_session(session_data, t_r, write_dir, brain_volume,
                          out_volreg.outputs.oned_file,
                          out_volreg.outputs.oned_matrix_save,
                          out_volreg.outputs.out_file,
-                         out_allineate.outputs.out_file,
+                         out_volreg.outputs.md1d_file,
                          allineated_filename,
                          out_tstat.outputs.out_file])
 
@@ -384,7 +383,7 @@ def coregister_fmri_session(session_data, t_r, write_dir, brain_volume,
                                        suffix='_qw')
         out_qwarp = qwarp(in_file=resampled_bias_corrected_filename,
                           base_file=resampled_registered_anat_filename,
-                          iwarp=True,
+                          iwarp=True,  # XXX: is this necessary
                           noneg=True,
                           blur=[0],
                           nmi=True,
@@ -398,6 +397,12 @@ def coregister_fmri_session(session_data, t_r, write_dir, brain_volume,
                           environ=environ)
         warped_slices.append(out_qwarp.outputs.warped_source)
         warp_filenames.append(out_qwarp.outputs.source_warp)
+        output_files.append(out_qwarp.outputs.base_warp)
+        # There are files geenrated by the allineate option
+        output_files.extend([
+            fname_presuffix(resampled_bias_corrected_filename, suffix='_Allin'),
+            fname_presuffix(resampled_bias_corrected_filename,
+                            suffix='_Allin.aff12.1D', use_ext=False)])
 
     # Resample the mean volume back to the initial resolution,
     voxel_size = nibabel.load(
@@ -413,8 +418,6 @@ def coregister_fmri_session(session_data, t_r, write_dir, brain_volume,
     # fix the obliquity
     for (sliced_registered_anat_filename, resampled_warped_slice) in zip(
             sliced_registered_anat_filenames, resampled_warped_slices):
-#        if not _check_same_obliquity(resampled_warped_slice,
-#                                    sliced_registered_anat_filename):
         _ = fix_obliquity(resampled_warped_slice,
                           sliced_registered_anat_filename,
                           overwrite=overwrite, verbose=verbose)
@@ -470,7 +473,10 @@ def coregister_fmri_session(session_data, t_r, write_dir, brain_volume,
                         warped_func_slices)
     if not caching:
         for out_file in output_files:
-            os.remove(out_file)
+            if os.path.isfile(out_file):
+                os.remove(out_file)
+            else:
+                print(out_file)
 
 
 def _func_to_template(func_coreg_filename, template_filename, write_dir,
@@ -508,11 +514,17 @@ def _func_to_template(func_coreg_filename, template_filename, write_dir,
 
     current_dir = os.getcwd()
     os.chdir(write_dir)
+    if anat_to_template_warp_filename:
+        nwarp = [anat_to_template_warp_filename,
+                 anat_to_template_oned_filename,
+                 func_to_anat_oned_filename]
+    else:
+        nwarp = [anat_to_template_warp_filename,
+                 anat_to_template_oned_filename,
+                 func_to_anat_oned_filename]
     out_warp_apply = warp_apply(in_file=func_coreg_filename,
                                 master=template_filename,
-                                nwarp=[anat_to_template_warp_filename,
-                                       anat_to_template_oned_filename,
-                                       func_to_anat_oned_filename],
+                                nwarp=nwarp,
                                 out_file=fname_presuffix(
                                     func_coreg_filename, suffix='_normalized'))
 
@@ -521,20 +533,21 @@ def _func_to_template(func_coreg_filename, template_filename, write_dir,
     return out_warp_apply.outputs.out_file
 
 
-def fmri_sessions_to_template(sessions_data, t_r, head_template_filename,
+def fmri_sessions_to_template(sessions, t_r, head_template_filename,
                               write_dir,
                               brain_volume, brain_template_filename=None,
                               dilated_head_mask_filename=None,
                               prior_rigid_body_registration=False,
                               slice_timing=True,
+                              registration_kind='rigid',
                               caching=False, verbose=True):
     """ Registration of subject's functional and anatomical images to
     a given template.
 
     Parameters
     ----------
-    sessions_data : sequence of sammba.registration.SessionData
-        Animals data, giving paths to their functional and anatomical images.
+    sessions : sequence of sammba.registration.FMRISession
+        fMRI sessions to register.
 
     t_r : float
         Repetition time for the EPI, in seconds.
@@ -572,12 +585,12 @@ def fmri_sessions_to_template(sessions_data, t_r, head_template_filename,
         and anatomical images registered to the template,
         and `output_dir_` is added to give output directory for each animal.
     """
-    if not hasattr(sessions_data, "__iter__"):
+    if not hasattr(sessions, "__iter__"):
             raise ValueError(
                 "'animals_data' input argument must be an iterable. You "
-                "provided {0}".format(sessions_data.__class__))
+                "provided {0}".format(sessions.__class__))
 
-    for n, data in enumerate(sessions_data):
+    for n, data in enumerate(sessions):
         if not isinstance(data, FMRISession):
             raise ValueError('Each animal data must have type '
                              'sammba.registration.Animal. You provided {0} of'
@@ -586,28 +599,28 @@ def fmri_sessions_to_template(sessions_data, t_r, head_template_filename,
             setattr(data, "animal_id", 'animal{0:03d}'.format(n + 1))
 
     # Check that ids are different
-    animals_ids = [data.animal_id for data in sessions_data]
+    animals_ids = [data.animal_id for data in sessions]
     if len(set(animals_ids)) != len(animals_ids):
         raise ValueError('Animals ids must be different. You'
                          ' provided {0}'.format(animals_ids))
 
-    for n, animal_data in enumerate(sessions_data):
+    for n, animal_data in enumerate(sessions):
         animal_data._check_inputs()
 
         setattr(animal_data, "template_", head_template_filename)
         animal_output_dir = os.path.join(os.path.abspath(write_dir),
                                          animal_data.animal_id)
-        setattr(animal_data, "output_dir_", animal_output_dir) # XXX do a function for creating new attributes ?
-        animal_data._set_output_dir_()
+        # XXX do a function for creating new attributes ?
+        animal_data._set_output_dir_(animal_output_dir)
 
         coregister_fmri_session(
             animal_data, t_r, write_dir, brain_volume,
             prior_rigid_body_registration=prior_rigid_body_registration,
             slice_timing=slice_timing,
             caching=caching, verbose=verbose)
-        sessions_data[n] = animal_data
+        sessions[n] = animal_data
 
-    anat_filenames = [animal_data.anat for animal_data in sessions_data]
+    anat_filenames = [animal_data.anat for animal_data in sessions]
     anats_registration = anats_to_template(
         anat_filenames,
         head_template_filename,
@@ -615,16 +628,17 @@ def fmri_sessions_to_template(sessions_data, t_r, head_template_filename,
         brain_volume,
         brain_template_filename=brain_template_filename,
         dilated_head_mask_filename=dilated_head_mask_filename,
+        registration_kind=registration_kind,
         caching=caching, verbose=verbose)
     for n, (animal_data, normalized_anat_filename) in enumerate(zip(
-            sessions_data, anats_registration.registered)):
+            sessions, anats_registration.registered)):
         setattr(animal_data, "registered_anat_", normalized_anat_filename)
-        sessions_data[n] = animal_data
+        sessions[n] = animal_data
 
     for n, (animal_data, anat_to_template_oned_filename,
-            anat_to_template_warp_filename) in enumerate(zip(sessions_data,
-                anats_registration.affine_transforms,
-                anats_registration.warp_transforms)):
+            anat_to_template_warp_filename) in enumerate(zip(sessions,
+                anats_registration.pre_transforms,
+                anats_registration.transforms)):
         normalized_func_filename = _func_to_template(
             animal_data.coreg_func_,
             head_template_filename,
@@ -635,6 +649,6 @@ def fmri_sessions_to_template(sessions_data, t_r, head_template_filename,
             caching=caching, verbose=verbose)
 
         setattr(animal_data, "registered_func_", normalized_func_filename)
-        sessions_data[n] = animal_data
+        sessions[n] = animal_data
 
-    return sessions_data
+    return sessions

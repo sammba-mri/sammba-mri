@@ -63,7 +63,7 @@ def _reset_affines(in_file, out_file, overwrite=False, axes_to_permute=None,
 
 
 def fix_obliquity(to_fix_filename, reference_filename, caching=False,
-                  caching_dir=None, clear_memory=False, overwrite=False,
+                  caching_dir=None, overwrite=False,
                   verbose=True):
     if caching_dir is None:
         caching_dir = os.getcwd()
@@ -121,9 +121,10 @@ def fix_obliquity(to_fix_filename, reference_filename, caching=False,
                     environ={'AFNI_DECONFLICT': 'OVERWRITE'},
                     out_file=to_fix_filename)
 
-    if clear_memory:
+    if overwrite:
         shutil.rmtree(tmp_folder)
-        memory.clear_previous_run()
+        if caching:
+            memory.clear_previous_run()
 
     return out_copy.outputs.out_file
 

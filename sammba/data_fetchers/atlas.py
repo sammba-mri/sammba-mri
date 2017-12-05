@@ -5,22 +5,26 @@ from nilearn.datasets.utils import _get_dataset_dir, _fetch_files
 from .utils import _get_dataset_descr
 
 
-def fetch_atlas_dorr_2008(data_dir=None, url=None, resume=True, verbose=1,
-                          down_sampled=True):
+def fetch_atlas_dorr_2008(image_format='nifti', data_dir=None, url=None,
+                          resume=True, verbose=1, down_sampled=True):
     """Download and load Dorr et al. atlas and average (dated 2008)
 
     Parameters
     ----------
-    data_dir: string, optional
+    image_format : one of {'nifti', 'minc'}, optional
+        Format to download
+
+    data_dir : str, optional
         Path of the data directory. Use to forec data storage in a non-
         standard location. Default: None (meaning: default)
+
     url: string, optional
         Download URL of the dataset. Overwrite the default URL.
 
-    resume: bool
+    resume : bool
         whether to resumed download of a partly-downloaded file.
 
-    verbose: int
+    verbose : int
         verbosity level (0 means no message).
 
     Returns
@@ -28,15 +32,15 @@ def fetch_atlas_dorr_2008(data_dir=None, url=None, resume=True, verbose=1,
     data: sklearn.datasets.base.Bunch
         dictionary-like object, contains:
 
-        - 't2': str, path to nifti file containing the T2 weighted average.
+        - 't2' : str, path to nifti file containing the T2 weighted average.
 
-        - 'maps': str, path to nifti file containing regions definition.
+        - 'maps' : str, path to nifti file containing regions definition.
 
-        - 'names': str list containing the names of the regions.
+        - 'names' : str list containing the names of the regions.
 
-        - 'values': int list containing the label value of each region.
+        - 'values' : int list containing the label value of each region.
 
-        - 'description': description about the atlas and the template.
+        - 'description' : description about the atlas and the template.
 
     References
     ----------
@@ -50,12 +54,26 @@ def fetch_atlas_dorr_2008(data_dir=None, url=None, resume=True, verbose=1,
 
     Licence: Unknown
     """
+    if image_format not in ['nifti', 'minc']:
+        raise ValueError("Images format must be 'nifti' or 'minc', you "
+                         "entered {0}".format(image_format))
+
     if url is None:
-        url = ['http://www.mouseimaging.ca/mnc/C57Bl6j_mouse_atlas/',
-               'http://www.mouseimaging.ca/mnc/C57Bl6j_mouse_atlas/',
-               'http://www.mouseimaging.ca/research/C57Bl6j_mouse_atlas/']
-    files = ['male-female-mouse-atlas.mnc', 'c57_fixed_labels_resized.mnc',
-             'c57_brain_atlas_labels.csv']
+        if image_format == 'minc':
+            url = ['http://www.mouseimaging.ca/mnc/C57Bl6j_mouse_atlas/',
+                   'http://www.mouseimaging.ca/mnc/C57Bl6j_mouse_atlas/',
+                   'http://www.mouseimaging.ca/research/C57Bl6j_mouse_atlas/']
+        else:
+            url = ['http://repo.mouseimaging.ca/repo/Dorr_2008_nifti/',
+                   'http://repo.mouseimaging.ca/repo/Dorr_2008_nifti/',
+                   'http://www.mouseimaging.ca/research/C57Bl6j_mouse_atlas/']
+
+    if image_format == 'minc':
+        files = ['male-female-mouse-atlas.mnc', 'c57_fixed_labels_resized.mnc',
+                 'c57_brain_atlas_labels.csv']
+    else:
+        files = ['Dorr_2008_average.nii.gz', 'Dorr_2008_labels.nii.gz',
+                 'c57_brain_atlas_labels.csv']
 
     files = [(f, u + f, {}) for f, u in zip(files, url)]
 

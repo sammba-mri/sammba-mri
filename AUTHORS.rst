@@ -31,8 +31,6 @@ and
 RATS reference papers
 ---------------------
 sammba-MRI relies on RATS software for brain extraction. If you preprocess your
-data with sammba-MRI, you are obliged to reference these two papers.
-
-Oguz I, Zhang H, Rumple A, Sonka M. RATS: Rapid Automatic Tissue Segmentation in rodent brain MRI. Journal of neuroscience methods (2014) vol. 221 pp. 175 - 182. http://www.sciencedirect.com/science/article/pii/S0165027013003440
-
-Yin Y, Zhang X, Williams R, Wu X, Anderson D, Sonka M. LOGISMOS - Layered Optimal Graph Image Segmentation of Multiple Objects and Surfaces: cartilage segmentation in the knee joint. IEEE Transactions on Medical Imaging (2010) vol. 29 (12) pp. 2023-37. http://ieeexplore.ieee.org/xpl/articleDetails.jsp?arnumber=5512662
+data with sammba-MRI, you are obliged to 
+`cite RATS reference papers.
+<http://www.iibi.uiowa.edu/content/rats-rapid-automatic-tissue-segmentation-rodent-brain-mri>`_

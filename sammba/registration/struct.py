@@ -471,8 +471,9 @@ def anats_to_common(t1_filenames, write_dir, brain_volume,
             out_tcat = tcat(
                 in_files=warped_files,
                 out_file=os.path.join(
-                    write_dir, 'warped_{0}iters_hetemplate_filenameads.nii.gz'.format(n_iter +
-                                                                     3)))
+                    write_dir,
+                    'warped_{0}iters_hetemplate_filenameads.nii.gz'.format(
+                        n_iter + 3)))
             out_tstat_warp_head = tstat(in_file=out_tcat.outputs.out_file,
                                         outputtype='NIFTI_GZ')
 
@@ -503,7 +504,8 @@ def anats_to_common(t1_filenames, write_dir, brain_volume,
 
 
 def anats_to_template(anat_filenames, head_template_filename, write_dir,
-                      brain_volume, brain_template_filename=None,
+                      brain_volume, registration_kind='rigid',
+                      brain_template_filename=None,
                       dilated_head_mask_filename=None, convergence=.005,
                       caching=False, verbose=True):
     """ Registers raw anatomical images to a given template.
@@ -522,6 +524,9 @@ def anats_to_template(anat_filenames, head_template_filename, write_dir,
     brain_volume : float
         Volumes of the brain as passed to Rats_MM brain extraction tool.
         Typically 400 for mouse and 1600 for rat.
+
+    registration_kind : one of {'rigid', 'affine', 'nonlinear'}, optional
+        The allowed transform kind.
 
     brain_template_filename : str, optional
         Path to a brain template. Note that this must coincide with the brain
@@ -559,6 +564,12 @@ def anats_to_template(anat_filenames, head_template_filename, write_dir,
                               Paths to the transforms from the allineated
                               images to the final registered images.
     """
+    registration_kinds = ['rigid', 'affine', 'nonlinear']
+    if registration_kind not in registration_kinds:
+        raise ValueError(
+            'Registration kind must be one of {0}, you entered {1}'.format(
+                registration_kinds, registration_kind))
+
     environ = {}
     if verbose:
         terminal_output = 'allatonce'
@@ -569,6 +580,7 @@ def anats_to_template(anat_filenames, head_template_filename, write_dir,
         memory = Memory(write_dir)
         clip_level = memory.cache(afni.ClipLevel)
         rats = memory.cache(RatsMM)
+        apply_mask = memory.cache(fsl.ApplyMask)
         allineate = memory.cache(afni.Allineate)
         allineate2 = memory.cache(afni.Allineate)
         unifize = memory.cache(afni.Unifize)
@@ -604,8 +616,7 @@ def anats_to_template(anat_filenames, head_template_filename, write_dir,
         dilated_head_mask_filename = out_threshold.outputs.out_file
 
     affine_transforms = []
-    warp_transforms = []
-    registered = []
+    allineated_filenames = []
     for anat_filename in anat_filenames:
         out_unifize = unifize(in_file=anat_filename, environ=environ,
                               urad=18.3, outputtype='NIFTI_GZ')
@@ -649,9 +660,19 @@ def anats_to_template(anat_filenames, head_template_filename, write_dir,
             master=head_template_filename,
             in_matrix=affine_transform_filename,
             out_file=fname_presuffix(unbiased_anat_filename,
-                                     suffix='_allineated'),
+                                     suffix='_shift_rotated'),
             environ=environ)
-        allineated_filename = out_allineate.outputs.out_file
+        allineated_filenames.append(out_allineate.outputs.out_file)
+
+    if registration_kind == 'rigid':
+        os.chdir(current_dir)
+        return Bunch(registered=allineated_filenames,
+                     transforms=None,
+                     pre_transforms=affine_transforms)
+
+    warp_transforms = []
+    registered = []
+    for allineated_filename in allineated_filenames:
         # Non-linear registration of affine pre-registered whole head image
         # to template. Don't initiate straight from the original with an
         # iniwarp due to weird errors (like it creating an Allin it then can't
@@ -670,6 +691,7 @@ def anats_to_template(anat_filenames, head_template_filename, write_dir,
         warp_transforms.append(out_qwarp.outputs.source_warp)
 
     os.chdir(current_dir)
+    # XXX can't we just catenate the affine to the warp?
     return Bunch(registered=registered,
-                 affine_transforms=affine_transforms,
-                 warp_transforms=warp_transforms)
+                 transforms=warp_transforms,
+                 pre_transforms=affine_transforms)
