@@ -60,7 +60,7 @@ Next install the remaining python dependencies using conda::
 
 Some dependencies are only available through pip::
 
-    pip install packaging prov
+    pip install packaging prov patsy
 
 Finally, you need `graphviz <http://www.graphviz.org/>`_::
 

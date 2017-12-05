@@ -548,11 +548,10 @@ def _func_to_template(func_coreg_filename, template_filename, write_dir,
         nwarp = "'{0} {1} {2}'".format(anat_to_template_warp_filename,
                                        anat_to_template_oned_filename,
                                        func_to_anat_oned_filename)
-        _ = warp_apply(
-            in_file=func_coreg_filename,
-            master=template_filename,
-            nwarp=nwarp,
-            out_file=normalized_filename)
+        _ = warp_apply(in_file=func_coreg_filename,
+                       master=template_filename,
+                       nwarp=nwarp,
+                       out_file=normalized_filename)
     else:
         catmatvec_out_file = fname_presuffix(func_coreg_filename,
                                              suffix='_func_to_templ.aff12.1D',
@@ -561,14 +560,12 @@ def _func_to_template(func_coreg_filename, template_filename, write_dir,
                                (func_to_anat_oned_filename, 'ONELINE')],
                       oneline=True,
                       out_file=catmatvec_out_file)
-        _ = allineate(
-            in_file=func_coreg_filename,
-            master=template_filename,
-            in_matrix=catmatvec_out_file,
-            out_file=normalized_filename)
+        _ = allineate(in_file=func_coreg_filename,
+                      master=template_filename,
+                      in_matrix=catmatvec_out_file,
+                      out_file=normalized_filename)
 
     os.chdir(current_dir)
-
     return normalized_filename
 
 
