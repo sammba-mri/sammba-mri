@@ -531,12 +531,12 @@ def _func_to_template(func_coreg_filename, template_filename, write_dir,
     if caching:
         memory = Memory(write_dir)
         warp_apply = memory.cache(afni.NwarpApply)
-        catmatvec = memory.cache(afni.CatMatVec)
+        catmatvec = memory.cache(afni.CatMatvec)
         allineate = memory.cache(afni.Allineate)
         allineate.interface().set_default_terminal_output(terminal_output)
         warp_apply.interface().set_default_terminal_output(terminal_output)
     else:
-        catmatvec = afni.CatMatVec().run
+        catmatvec = afni.CatMatvec().run
         allineate = afni.Allineate(terminal_output=terminal_output).run
         warp_apply = afni.NwarpApply(terminal_output=terminal_output).run
         
