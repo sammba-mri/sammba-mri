@@ -1,5 +1,4 @@
 import os
-import shutil
 import tempfile
 from nose.tools import assert_true, assert_equal
 from nilearn._utils.testing import assert_raises_regex
@@ -23,7 +22,7 @@ def test_coregister_fmri_session():
     if afni.Info().version():
         tempdir = tempfile.mkdtemp()
         func.coregister_fmri_session(animal_session, 1., tempdir, 400,
-                                     slice_timing=False)
+                                     slice_timing=False, verbose=False)
         assert_true(_check_same_fov(nibabel.load(animal_session.coreg_func_),
                                     nibabel.load(animal_session.coreg_anat_)))
         assert_true(_check_same_obliquity(animal_session.coreg_anat_,
@@ -34,7 +33,7 @@ def test_coregister_fmri_session():
         os.remove(animal_session.coreg_transform_)
         os.remove(animal_session.coreg_anat_)
         os.remove(animal_session.coreg_func_)
-        os.remove(tempdir)
+        os.removedirs(tempdir)
 
         # Check environement variables setting
         tempdir = tempfile.mkdtemp(suffix='$')
@@ -44,7 +43,8 @@ def test_coregister_fmri_session():
                             tempdir, 400, slice_timing=False)
         func.coregister_fmri_session(
             animal_session, 1., tempdir, 400, slice_timing=False,
-            environ_kwargs={'AFNI_ALLOW_ARBITRARY_FILENAMES': 'YES'})
+            AFNI_ALLOW_ARBITRARY_FILENAMES='YES',
+            verbose=False)
         assert_true(_check_same_fov(nibabel.load(animal_session.coreg_func_),
                                     nibabel.load(animal_session.coreg_anat_)))
         assert_true(_check_same_obliquity(animal_session.coreg_anat_,
@@ -55,7 +55,7 @@ def test_coregister_fmri_session():
         os.remove(animal_session.coreg_transform_)
         os.remove(animal_session.coreg_anat_)
         os.remove(animal_session.coreg_func_)
-        os.remove(tempdir)
+        os.removedirs(tempdir)
 
 
 def test_fmri_sessions_to_template():
@@ -90,10 +90,11 @@ def test_fmri_sessions_to_template():
                                                          template_file,
                                                          tempdir,
                                                          brain_volume,
-                                                         slice_timing=False)
+                                                         slice_timing=False,
+                                                         verbose=False)
         assert_true(os.path.isdir(registered_data.output_dir_))
         assert_true(os.path.isfile(registered_data.registered_func_))
         assert_true(os.path.isfile(registered_data.registered_anat_))
 
     if os.path.exists(tempdir):
-        shutil.rmtree(tempdir)
+        os.removedirs(tempdir)

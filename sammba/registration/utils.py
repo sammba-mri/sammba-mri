@@ -159,8 +159,7 @@ def create_pipeline_graph(pipeline_name, graph_file,
     graph_file : str.
         Path to save the graph image to.
 
-    graph_kind : one of {'orig', 'hierarchical', 'flat', 'exec', 'colored'},
-        optional.
+    graph_kind : one of {'orig', 'hierarchical', 'flat', 'exec', 'colored'}, optional.
         The kind of the graph, passed to
         sammba.externals.nipype.pipeline.workflows.Workflow().write_graph
     """

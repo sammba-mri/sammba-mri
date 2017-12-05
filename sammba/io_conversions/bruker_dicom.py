@@ -423,9 +423,9 @@ def recursive_dcm_to_nii(dcmdump_path, session_directory, save_directory,
     nii_filenames : list of str
         List of paths to the created NIFTI images.
 
-    Note
-    ----
-        see also sammba.io_conversions.dcm_to_nii
+    See also
+    --------
+    sammba.io_conversions.dcm_to_nii
     """
     nii_filenames = []
     for root, dirs, files in os.walk(session_directory):

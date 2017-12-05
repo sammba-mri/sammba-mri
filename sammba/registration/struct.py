@@ -6,7 +6,7 @@ from sammba.externals.nipype.caching import Memory
 from sklearn.datasets.base import Bunch
 
 
-def anats_to_common(t1_filenames, write_dir, brain_volume,
+def anats_to_common(anat_filenames, write_dir, brain_volume,
                     registration_kind='affine',
                     nonlinear_levels=[1, 2, 3],
                     nonlinear_minimal_patch=75,
@@ -16,7 +16,7 @@ def anats_to_common(t1_filenames, write_dir, brain_volume,
 
     Parameters
     ----------
-    t1_filenames : list of str
+    anat_filenames : list of str
         Paths to the anatomical images.
 
     write_dir : str
@@ -53,10 +53,10 @@ def anats_to_common(t1_filenames, write_dir, brain_volume,
     data : sklearn.datasets.base.Bunch
         Dictionary-like object, the interest attributes are :
 
-        - 'registered' : list of str.
+        - `registered` : list of str.
                          Paths to registered images. Note that
                          they have undergone a bias correction step before.
-        - 'transforms' : list of str.
+        - `transforms` : list of str.
                          Paths to the transforms from the raw
                          images to the registered images.
     """
@@ -121,12 +121,12 @@ def anats_to_common(t1_filenames, write_dir, brain_volume,
     ###########################################################################
     # First copy anatomical files, to make sure they are never changed
     # and they have different names across individuals
-    copied_t1_filenames = []
-    for n, anat_file in enumerate(t1_filenames):
+    copied_anat_filenames = []
+    for n, anat_file in enumerate(anat_filenames):
         suffixed_file = fname_presuffix(anat_file, suffix='_{}'.format(n))
         out_file = os.path.join(write_dir, os.path.basename(suffixed_file))
         out_copy = copy(in_file=anat_file, out_file=out_file)
-        copied_t1_filenames.append(out_copy.outputs.out_file)
+        copied_anat_filenames.append(out_copy.outputs.out_file)
 
     ###########################################################################
     # Register using center of mass
@@ -135,7 +135,7 @@ def anats_to_common(t1_filenames, write_dir, brain_volume,
     #
     # First we loop through anatomical scans and correct intensities for bias.
     unifized_files = []
-    for n, anat_file in enumerate(copied_t1_filenames):
+    for n, anat_file in enumerate(copied_anat_filenames):
         out_unifize = unifize(in_file=anat_file, outputtype='NIFTI_GZ')
         unifized_files.append(out_unifize.outputs.out_file)
 
@@ -178,7 +178,7 @@ def anats_to_common(t1_filenames, write_dir, brain_volume,
     out_tstat = tstat(in_file=out_tcat.outputs.out_file, outputtype='NIFTI_GZ')
 
     ###########################################################################
-    # to create an empty template, with origin placed at CoM
+    # to create an empty template, with origicopied_t1_filenamesn placed at CoM
     out_undump = undump(in_file=out_tstat.outputs.out_file,
                         outputtype='NIFTI_GZ')
     out_refit = refit(in_file=out_undump.outputs.out_file,
@@ -535,8 +535,8 @@ def anats_to_template(anat_filenames, head_template_filename, write_dir,
 
     dilated_head_mask_filename : str, optional
         Path to a dilated head mask. Note that this must be compliant with the
-        the given head template. If None, the mask is set to the non-zero
-        voxels of the head template.
+        the given head template. If None, the mask is set to the non-background
+        voxels of the head template after one dilation.
 
     caching : bool, optional
         If True, caching is used for all the registration steps.
@@ -554,15 +554,15 @@ def anats_to_template(anat_filenames, head_template_filename, write_dir,
     data : sklearn.datasets.base.Bunch
         Dictionary-like object, the interest attributes are :
 
-        - 'registered' : list of str.
+        - `registered` : list of str.
                          Paths to registered images. Note that
                          they have undergone a bias correction step before.
-        - 'affine_transforms' : list of str.
-                                Paths to the affine transforms from the raw
-                                images to the allineated images.
-        - 'warp_transforms' : list of str.
-                              Paths to the transforms from the allineated
-                              images to the final registered images.
+        - `pre_transforms` : list of str.
+                             Paths to the affine transforms from the raw
+                             images to the images allineated to the template.
+        - `transforms` : list of str.
+                         Paths to the transforms from the allineated
+                         images to the final registered images.
     """
     registration_kinds = ['rigid', 'affine', 'nonlinear']
     if registration_kind not in registration_kinds:
@@ -581,12 +581,13 @@ def anats_to_template(anat_filenames, head_template_filename, write_dir,
         clip_level = memory.cache(afni.ClipLevel)
         rats = memory.cache(RatsMM)
         apply_mask = memory.cache(fsl.ApplyMask)
+        mask_tool = memory.cache(afni.MaskTool)
         allineate = memory.cache(afni.Allineate)
         allineate2 = memory.cache(afni.Allineate)
         unifize = memory.cache(afni.Unifize)
         threshold = memory.cache(fsl.Threshold)
         qwarp = memory.cache(afni.Qwarp)
-        for step in [rats,  allineate, allineate2,
+        for step in [rats,  allineate, allineate2, apply_mask, mask_tool,
                      unifize, threshold, qwarp]:
             step.interface().set_default_terminal_output(terminal_output)
     else:
@@ -594,6 +595,7 @@ def anats_to_template(anat_filenames, head_template_filename, write_dir,
         clip_level = afni.ClipLevel().run
         rats = RatsMM(terminal_output=terminal_output).run
         apply_mask = fsl.ApplyMask(terminal_output=terminal_output).run
+        mask_tool = afni.MaskTool(terminal_output=terminal_output).run
         allineate = afni.Allineate(terminal_output=terminal_output).run
         allineate2 = afni.Allineate(terminal_output=terminal_output).run  # TODO: remove after fixed bug
         threshold = fsl.Threshold(terminal_output=terminal_output).run
@@ -602,6 +604,7 @@ def anats_to_template(anat_filenames, head_template_filename, write_dir,
 
     current_dir = os.getcwd()
     os.chdir(write_dir)
+    intermediate_files = []
     if brain_template_filename is None:
         out_clip_level = clip_level(in_file=head_template_filename)
         out_rats = rats(
@@ -611,9 +614,14 @@ def anats_to_template(anat_filenames, head_template_filename, write_dir,
         brain_template_filename = out_rats.outputs.out_file
 
     if dilated_head_mask_filename is None:
+        out_clip_level = clip_level(in_file=head_template_filename)
         out_threshold = threshold(in_file=head_template_filename,
-                                  thresh=0)
-        dilated_head_mask_filename = out_threshold.outputs.out_file
+                                  thresh=out_clip_level.outputs.clip_val)
+        out_mask_tool = mask_tool(in_file=out_threshold.outputs.out_file,
+                                  dilate_inputs='1',
+                                  outputtype='NIFTI_GZ', environ=environ)
+        dilated_head_mask_filename = out_mask_tool.outputs.out_file
+        intermediate_files.append(out_threshold.outputs.out_file)
 
     affine_transforms = []
     allineated_filenames = []
@@ -655,19 +663,25 @@ def anats_to_template(anat_filenames, head_template_filename, write_dir,
         affine_transforms.append(affine_transform_filename)
 
         # Apply the registration to the whole head
-        out_allineate = allineate2(
+        out_allineate2 = allineate2(
             in_file=unbiased_anat_filename,
             master=head_template_filename,
             in_matrix=affine_transform_filename,
             out_file=fname_presuffix(unbiased_anat_filename,
                                      suffix='_shift_rotated'),
             environ=environ)
-        allineated_filenames.append(out_allineate.outputs.out_file)
+        allineated_filenames.append(out_allineate2.outputs.out_file)
+        intermediate_files.extend([unbiased_anat_filename,
+                                   masked_anat_filename,
+                                   out_allineate.outputs.out_file])
 
     if registration_kind == 'rigid':
         os.chdir(current_dir)
+        if not caching:
+            for intermediate_file in intermediate_files:
+                os.remove(intermediate_file)
         return Bunch(registered=allineated_filenames,
-                     transforms=None,
+                     transforms=[None] * len(allineated_filenames),
                      pre_transforms=affine_transforms)
 
     warp_transforms = []
@@ -689,8 +703,13 @@ def anats_to_template(anat_filenames, head_template_filename, write_dir,
             environ=environ)
         registered.append(out_qwarp.outputs.warped_source)
         warp_transforms.append(out_qwarp.outputs.source_warp)
+        intermediate_files.append(out_qwarp.outputs.base_warp)
 
     os.chdir(current_dir)
+    if not caching:
+        for intermediate_file in intermediate_files:
+            os.remove(intermediate_file)
+
     # XXX can't we just catenate the affine to the warp?
     return Bunch(registered=registered,
                  transforms=warp_transforms,

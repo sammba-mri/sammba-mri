@@ -38,14 +38,19 @@ def coregister_fmri_session(session_data, t_r, write_dir, brain_volume,
         Volumes of the brain as passed to Rats_MM brain extraction tool.
         Typically 400 for mouse and 1600 for rat.
 
-    caching : bool, optional
-        Wether or not to use caching.
+    prior_rigid_body_registration : bool, optional
+        If True, a rigid-body registration of the anat to the func is performed
+        prior to the warp. Useful if the images headers have missing/wrong
+        information.
 
     voxel_size_x : float, optional
         Resampling resolution for the x-axis, in mm.
 
     voxel_size_y : float, optional
         Resampling resolution for the y-axis, in mm.
+
+    caching : bool, optional
+        Wether or not to use caching.
 
     verbose : bool, optional
         If True, all steps are verbose. Note that caching implies some
@@ -56,11 +61,16 @@ def coregister_fmri_session(session_data, t_r, write_dir, brain_volume,
 
     Returns
     -------
-    the same sequence with each animal_data updated: attributes
-        `registered_func_` and
-        `registered_anat_` are added to specify the paths to the functional
-        and anatomical images registered to the template,
-        and `output_dir_` is added to give output directory for each animal.
+    the same sequence with each animal_data updated: the following attributes
+    are added
+        - `output_dir_` : str
+                          Path to the output directory.
+        - `coreg_func_` : str
+                          Path to paths to the coregistered functional image.
+        - `coreg_anat_` : str
+                          Path to paths to the coregistered functional image.
+        - `coreg_transform_` : str
+                               Path to the transform from anat to func.
     """
     func_filename = session_data.func
     anat_filename = session_data.anat
@@ -300,7 +310,7 @@ def coregister_fmri_session(session_data, t_r, write_dir, brain_volume,
         output_files.append(mat_filename)
 
     transform_filename = fname_presuffix(registered_anat_filename,
-                                         suffix='_func_to_anat.aff12.1D',
+                                         suffix='_anat_to_func.aff12.1D',
                                          use_ext=False)
     if prior_rigid_body_registration:
         _ = catmatvec(in_file=[(mat_filename, 'ONELINE'),
@@ -400,8 +410,8 @@ def coregister_fmri_session(session_data, t_r, write_dir, brain_volume,
         output_files.append(out_qwarp.outputs.base_warp)
         # There are files geenrated by the allineate option
         output_files.extend([
-            fname_presuffix(resampled_bias_corrected_filename, suffix='_Allin'),
-            fname_presuffix(resampled_bias_corrected_filename,
+            fname_presuffix(out_qwarp.outputs.warped_source, suffix='_Allin'),
+            fname_presuffix(out_qwarp.outputs.warped_source,
                             suffix='_Allin.aff12.1D', use_ext=False)])
 
     # Resample the mean volume back to the initial resolution,
@@ -482,8 +492,8 @@ def coregister_fmri_session(session_data, t_r, write_dir, brain_volume,
 def _func_to_template(func_coreg_filename, template_filename, write_dir,
                       func_to_anat_oned_filename,
                       anat_to_template_oned_filename,
-                      anat_to_template_warp_filename,
-                      caching=False):
+                      anat_to_template_warp_filename=None,
+                      caching=False, verbose=True):
     """ Applies successive transforms to coregistered functional to put it in
     template space.
 
@@ -503,14 +513,27 @@ def _func_to_template(func_coreg_filename, template_filename, write_dir,
     anat_to_template_oned_filename : str
         Path to the affine 1D transform from anatomical to template space.
 
-    anat_to_template_warp_filename : str
+    anat_to_template_warp_filename : str or None, optional
         Path to the affine 1D transform from anatomical to template space.
+
+    caching : bool, optional
+        Wether or not to use caching.
+
+    verbose : bool, optional
+        If True, all steps are verbose. Note that caching implies some
+        verbosity in any case.
     """
+    if verbose:
+        terminal_output = 'allatonce'
+    else:
+        terminal_output = 'none'
+
     if caching:
         memory = Memory(write_dir)
         warp_apply = memory.cache(afni.NwarpApply)
+        warp_apply.interface().set_default_terminal_output(terminal_output)
     else:
-        warp_apply = afni.NwarpApply().run
+        warp_apply = afni.NwarpApply(terminal_output=terminal_output).run
 
     current_dir = os.getcwd()
     os.chdir(write_dir)
@@ -519,8 +542,7 @@ def _func_to_template(func_coreg_filename, template_filename, write_dir,
                  anat_to_template_oned_filename,
                  func_to_anat_oned_filename]
     else:
-        nwarp = [anat_to_template_warp_filename,
-                 anat_to_template_oned_filename,
+        nwarp = [anat_to_template_oned_filename,
                  func_to_anat_oned_filename]
     out_warp_apply = warp_apply(in_file=func_coreg_filename,
                                 master=template_filename,
@@ -570,6 +592,10 @@ def fmri_sessions_to_template(sessions, t_r, head_template_filename,
         Path to a dilated head maskn, passed to
         sammba.registration.anats_to_template
 
+    registration_kind : one of {'rigid', 'nonlinear'}, optional
+        The allowed anat to template registration kind, passed to
+        sammba.registration.anats_to_template
+
     caching : bool, optional
         Wether or not to use caching.
 
@@ -579,11 +605,27 @@ def fmri_sessions_to_template(sessions, t_r, head_template_filename,
 
     Returns
     -------
-    the same sequence with each animal_data updated: attributes
-        `registered_func_` and
-        `registered_anat_` are added to specify the paths to the functional
-        and anatomical images registered to the template,
-        and `output_dir_` is added to give output directory for each animal.
+    the same sequence with each animal_data updated: the following attributes
+    are added
+        - `template_` : str
+                       Path to the given registration template.
+        - `output_dir_` : str
+                          Path to the output directory for each animal.
+        - `coreg_func_` : str
+                          Path to the coregistered functional image.
+        - `coreg_anat_` : str
+                          Path to the coregistered anatomical image.
+        - `coreg_transform_` : str
+                               Path to the transform from anat to func.
+        - `registered_func_` : str
+                               Path to the functional registered to template.
+        - `registered_anat_` : str
+                               Path to the anatomical registered to template.
+
+    See also
+    --------
+    sammba.registration.coregister_fmri_session,
+    sammba.registration.anats_to_template
     """
     if not hasattr(sessions, "__iter__"):
             raise ValueError(
@@ -603,15 +645,13 @@ def fmri_sessions_to_template(sessions, t_r, head_template_filename,
     if len(set(animals_ids)) != len(animals_ids):
         raise ValueError('Animals ids must be different. You'
                          ' provided {0}'.format(animals_ids))
-
     for n, animal_data in enumerate(sessions):
         animal_data._check_inputs()
-
-        setattr(animal_data, "template_", head_template_filename)
         animal_output_dir = os.path.join(os.path.abspath(write_dir),
                                          animal_data.animal_id)
-        # XXX do a function for creating new attributes ?
         animal_data._set_output_dir_(animal_output_dir)
+        # XXX do a function for creating new attributes ?
+        setattr(animal_data, "template_", head_template_filename)
 
         coregister_fmri_session(
             animal_data, t_r, write_dir, brain_volume,

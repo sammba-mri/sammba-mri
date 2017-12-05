@@ -21,7 +21,6 @@ Citing nilearn and nipype
 -------------------------
 
 Sammba-MRI heavily depends on nilearn and nipype. Please read
-
 `how to cite nilearn
 <http://nilearn.github.io/authors.html#citing-nilearn>`_
 and

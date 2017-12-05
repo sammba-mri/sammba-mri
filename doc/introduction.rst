@@ -56,7 +56,7 @@ First install Anaconda and nilearn as explained in `nilearn installation page <h
 
 Next install the remaining python dependencies using conda::
 
-    conda install pandas configparser future traits simplejson networkx packaging funcsigs
+    conda install pandas configparser future traits simplejson networkx funcsigs
 
 Some dependencies are only available through pip::
 
