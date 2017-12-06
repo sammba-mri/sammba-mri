@@ -504,9 +504,10 @@ def anats_to_common(anat_filenames, write_dir, brain_volume,
 
 
 def anats_to_template(anat_filenames, head_template_filename, write_dir,
-                      brain_volume, registration_kind='rigid',
+                      brain_volume,
                       brain_template_filename=None,
                       dilated_head_mask_filename=None, convergence=.005,
+                      maxlev=None,
                       caching=False, verbose=True):
     """ Registers raw anatomical images to a given template.
 
@@ -525,9 +526,6 @@ def anats_to_template(anat_filenames, head_template_filename, write_dir,
         Volumes of the brain as passed to Rats_MM brain extraction tool.
         Typically 400 for mouse and 1600 for rat.
 
-    registration_kind : one of {'rigid', 'affine', 'nonlinear'}, optional
-        The allowed transform kind.
-
     brain_template_filename : str, optional
         Path to a brain template. Note that this must coincide with the brain
         from the given head template. If None, the brain is extracted from
@@ -544,6 +542,11 @@ def anats_to_template(anat_filenames, head_template_filename, write_dir,
     convergence : float, optional
         Convergence limit, passed to
         sammba.externals.nipype.interfaces.afni.Allineate
+
+    maxlev : int or None, optional
+        If not None, maximal level for the nonlinear warping. Passed to
+        sammba.externals.nipype.interfaces.afni.Qwarp.
+        Lower implies faster but possibly lower precision.
 
     verbose : bool, optional
         If True, all steps are verbose. Note that caching implies some
@@ -564,12 +567,6 @@ def anats_to_template(anat_filenames, head_template_filename, write_dir,
                          Paths to the transforms from the allineated
                          images to the final registered images.
     """
-    registration_kinds = ['rigid', 'affine', 'nonlinear']
-    if registration_kind not in registration_kinds:
-        raise ValueError(
-            'Registration kind must be one of {0}, you entered {1}'.format(
-                registration_kinds, registration_kind))
-
     environ = {}
     if verbose:
         terminal_output = 'allatonce'
@@ -618,7 +615,7 @@ def anats_to_template(anat_filenames, head_template_filename, write_dir,
         out_threshold = threshold(in_file=head_template_filename,
                                   thresh=out_clip_level.outputs.clip_val)
         out_mask_tool = mask_tool(in_file=out_threshold.outputs.out_file,
-                                  dilate_inputs='1',
+                                  dilate_inputs='3',
                                   outputtype='NIFTI_GZ', environ=environ)
         dilated_head_mask_filename = out_mask_tool.outputs.out_file
         intermediate_files.append(out_threshold.outputs.out_file)
@@ -675,15 +672,7 @@ def anats_to_template(anat_filenames, head_template_filename, write_dir,
                                    masked_anat_filename,
                                    out_allineate.outputs.out_file])
 
-    if registration_kind == 'rigid':
-        os.chdir(current_dir)
-        if not caching:
-            for intermediate_file in intermediate_files:
-                os.remove(intermediate_file)
-        return Bunch(registered=allineated_filenames,
-                     transforms=[None] * len(allineated_filenames),
-                     pre_transforms=affine_transforms)
-
+    intermediate_files.extend(allineated_filenames)
     warp_transforms = []
     registered = []
     for allineated_filename in allineated_filenames:
@@ -691,24 +680,39 @@ def anats_to_template(anat_filenames, head_template_filename, write_dir,
         # to template. Don't initiate straight from the original with an
         # iniwarp due to weird errors (like it creating an Allin it then can't
         # find)
-        out_qwarp = qwarp(
-            in_file=allineated_filename,
-            base_file=head_template_filename,
-            weight=dilated_head_mask_filename,
-            nmi=True,
-            noneg=True,
-            iwarp=True,
-            blur=[0],
-            out_file=fname_presuffix(allineated_filename, suffix='_warped'),
-            environ=environ)
+        # XXX what is the need to the iwarp ?
+        if maxlev is not None:
+            out_qwarp = qwarp(
+                in_file=allineated_filename,
+                base_file=head_template_filename,
+                weight=dilated_head_mask_filename,
+                nmi=True,
+                noneg=True,
+                blur=[0],
+                maxlev=maxlev,
+                out_file=fname_presuffix(allineated_filename,
+                                         suffix='_warped'),
+                environ=environ)
+        else:
+            out_qwarp = qwarp(
+                in_file=allineated_filename,
+                base_file=head_template_filename,
+                weight=dilated_head_mask_filename,
+                nmi=True,
+                noneg=True,
+                blur=[0],
+                out_file=fname_presuffix(allineated_filename,
+                                         suffix='_warped'),
+                environ=environ)
+
         registered.append(out_qwarp.outputs.warped_source)
         warp_transforms.append(out_qwarp.outputs.source_warp)
-        intermediate_files.append(out_qwarp.outputs.base_warp)
 
     os.chdir(current_dir)
     if not caching:
         for intermediate_file in intermediate_files:
-            os.remove(intermediate_file)
+            if os.path.isfile(intermediate_file):
+                os.remove(intermediate_file)
 
     # XXX can't we just catenate the affine to the warp?
     return Bunch(registered=registered,

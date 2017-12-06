@@ -412,6 +412,8 @@ def coregister_fmri_session(session_data, t_r, write_dir, brain_volume,
         output_files.extend([
             fname_presuffix(out_qwarp.outputs.warped_source, suffix='_Allin'),
             fname_presuffix(out_qwarp.outputs.warped_source,
+                            suffix='_Allin.nii', use_ext=False),
+            fname_presuffix(out_qwarp.outputs.warped_source,
                             suffix='_Allin.aff12.1D', use_ext=False)])
 
     # Resample the mean volume back to the initial resolution,
@@ -485,14 +487,12 @@ def coregister_fmri_session(session_data, t_r, write_dir, brain_volume,
         for out_file in output_files:
             if os.path.isfile(out_file):
                 os.remove(out_file)
-            else:
-                print(out_file)
 
 
 def _func_to_template(func_coreg_filename, template_filename, write_dir,
                       func_to_anat_oned_filename,
                       anat_to_template_oned_filename,
-                      anat_to_template_warp_filename=None,
+                      anat_to_template_warp_filename,
                       caching=False, verbose=True):
     """ Applies successive transforms to coregistered functional to put it in
     template space.
@@ -513,8 +513,8 @@ def _func_to_template(func_coreg_filename, template_filename, write_dir,
     anat_to_template_oned_filename : str
         Path to the affine 1D transform from anatomical to template space.
 
-    anat_to_template_warp_filename : str or None, optional
-        Path to the affine 1D transform from anatomical to template space.
+    anat_to_template_warp_filename : str
+        Path to the warp transform from anatomical to template space.
 
     caching : bool, optional
         Wether or not to use caching.
@@ -531,40 +531,21 @@ def _func_to_template(func_coreg_filename, template_filename, write_dir,
     if caching:
         memory = Memory(write_dir)
         warp_apply = memory.cache(afni.NwarpApply)
-        catmatvec = memory.cache(afni.CatMatvec)
-        allineate = memory.cache(afni.Allineate)
-        allineate.interface().set_default_terminal_output(terminal_output)
         warp_apply.interface().set_default_terminal_output(terminal_output)
     else:
-        catmatvec = afni.CatMatvec().run
-        allineate = afni.Allineate(terminal_output=terminal_output).run
         warp_apply = afni.NwarpApply(terminal_output=terminal_output).run
 
     current_dir = os.getcwd()
     os.chdir(write_dir)
     normalized_filename = fname_presuffix(func_coreg_filename,
                                           suffix='_normalized')
-    if anat_to_template_warp_filename:
-        nwarp = "'{0} {1} {2}'".format(anat_to_template_warp_filename,
-                                       anat_to_template_oned_filename,
-                                       func_to_anat_oned_filename)
-        _ = warp_apply(in_file=func_coreg_filename,
-                       master=template_filename,
-                       nwarp=nwarp,
-                       out_file=normalized_filename)
-    else:
-        catmatvec_out_file = fname_presuffix(func_coreg_filename,
-                                             suffix='_func_to_templ.aff12.1D',
-                                             use_ext=False)
-        _ = catmatvec(in_file=[(anat_to_template_oned_filename, 'ONELINE'),
-                               (func_to_anat_oned_filename, 'ONELINE')],
-                      oneline=True,
-                      out_file=catmatvec_out_file)
-        _ = allineate(in_file=func_coreg_filename,
-                      master=template_filename,
-                      in_matrix=catmatvec_out_file,
-                      out_file=normalized_filename)
-
+    warp = "'{0} {1} {2}'".format(anat_to_template_warp_filename,
+                                  anat_to_template_oned_filename,
+                                  func_to_anat_oned_filename)
+    _ = warp_apply(in_file=func_coreg_filename,
+                   master=template_filename,
+                   warp=warp,
+                   out_file=normalized_filename)
     os.chdir(current_dir)
     return normalized_filename
 
@@ -575,7 +556,7 @@ def fmri_sessions_to_template(sessions, t_r, head_template_filename,
                               dilated_head_mask_filename=None,
                               prior_rigid_body_registration=False,
                               slice_timing=True,
-                              registration_kind='rigid',
+                              maxlev=2,
                               caching=False, verbose=True):
     """ Registration of subject's functional and anatomical images to
     a given template.
@@ -603,11 +584,11 @@ def fmri_sessions_to_template(sessions, t_r, head_template_filename,
         sammba.registration.anats_to_template
 
     dilated_head_mask_filename : str, optional
-        Path to a dilated head maskn, passed to
+        Path to a dilated head mask, passed to
         sammba.registration.anats_to_template
 
-    registration_kind : one of {'rigid', 'nonlinear'}, optional
-        The allowed anat to template registration kind, passed to
+    maxlev : int or None, optional
+        Maximal level for the warp when registering anat to template. Passed to
         sammba.registration.anats_to_template
 
     caching : bool, optional
@@ -682,7 +663,7 @@ def fmri_sessions_to_template(sessions, t_r, head_template_filename,
         brain_volume,
         brain_template_filename=brain_template_filename,
         dilated_head_mask_filename=dilated_head_mask_filename,
-        registration_kind=registration_kind,
+        maxlev=maxlev,
         caching=caching, verbose=verbose)
     for n, (animal_data, normalized_anat_filename) in enumerate(zip(
             sessions, anats_registration.registered)):

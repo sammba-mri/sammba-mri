@@ -1,18 +1,27 @@
 import json
 import numpy as np
+import os
+import nibabel
 from sklearn.datasets.base import Bunch
+from nilearn import image
 from nilearn.datasets.utils import _get_dataset_dir, _fetch_files
 from .utils import _get_dataset_descr
+from sammba.externals.nipype.utils.filemanip import fname_presuffix
+from nilearn._utils.niimg_conversions import check_niimg
 
 
-def fetch_atlas_dorr_2008(image_format='nifti', data_dir=None, url=None,
-                          resume=True, verbose=1, down_sampled=True):
+def fetch_atlas_dorr_2008(image_format='nifti', downsample='30',
+                          data_dir=None, url=None,
+                          resume=True, verbose=1):
     """Download and load Dorr et al. atlas and average (dated 2008)
 
     Parameters
     ----------
     image_format : one of {'nifti', 'minc'}, optional
         Format to download
+
+    downsample : one of {'30', '100'}, optional
+        Downsampling resolution in microns.
 
     data_dir : str, optional
         Path of the data directory. Use to forec data storage in a non-
@@ -57,6 +66,10 @@ def fetch_atlas_dorr_2008(image_format='nifti', data_dir=None, url=None,
     if image_format not in ['nifti', 'minc']:
         raise ValueError("Images format must be 'nifti' or 'minc', you "
                          "entered {0}".format(image_format))
+
+    if downsample not in ['30', '100']:
+        raise ValueError("'downsample' must be '30' or '100', you "
+                         "provided {0}".format(downsample))
 
     if url is None:
         if image_format == 'minc':
@@ -103,6 +116,19 @@ def fetch_atlas_dorr_2008(image_format='nifti', data_dir=None, url=None,
     labels, indices = zip(*rois)
     t2 = files_[0]
     maps = files_[1]
+    if downsample == '100':
+        t2_img = nibabel.load(t2)
+        maps_img = check_niimg(maps, dtype=int)
+        t2 = fname_presuffix(t2, suffix='_100um')
+        maps = fname_presuffix(maps, suffix='_100um')
+        if not os.path.isfile(t2):
+            target_affine = np.eye(3) * .1
+            t2_img = image.resample_img(t2_img, target_affine)
+            t2_img.to_filename(t2)
+        if not os.path.isfile(maps):
+            maps_img = image.resample_img(maps_img, target_affine,
+                                          interpolation='nearest')
+            maps_img.to_filename(maps)
 
     params = dict(t2=t2, maps=maps,
                   names=np.array(labels)[np.argsort(indices)],
@@ -113,7 +139,7 @@ def fetch_atlas_dorr_2008(image_format='nifti', data_dir=None, url=None,
 
 
 def fetch_atlas_waxholm_rat_2014(data_dir=None, url=None, resume=True,
-                                 verbose=1, downsample='2',
+                                 verbose=1, downsample='117',
                                  symmetric_split=False):
     """Download and load Pape et al. rat atlas (dated 2014), downsampled
        by the Scalable Brain Atlas.
@@ -124,8 +150,8 @@ def fetch_atlas_waxholm_rat_2014(data_dir=None, url=None, resume=True,
         Path of the data directory. Use to forec data storage in a non-
         standard location. Default: None (meaning: default)
 
-    downsample : one of {'2', '3'}, optional
-        Downsampling version, corresponding to resolutions 78 or 117 microns.
+    downsample : one of {'78', '117', '200'}, optional
+        Downsampling resolution in microns.
 
     url : string, optional
         Download URL of the dataset. Overwrite the default URL.
@@ -182,23 +208,34 @@ def fetch_atlas_waxholm_rat_2014(data_dir=None, url=None, resume=True,
     Creative Commons Attribution-NonCommercial-ShareAlike 4.0
     International
     """
-    if downsample not in ['2', '3']:
-        raise ValueError(
-            "'downsample' must be '2' or '3', you provided".format(downsample))
+    downsamples = ['78', '117', '200']
+    if downsample not in downsamples:
+        raise ValueError("'downsample' must be  one of {0}, you provided "
+                         "{1}".format(downsamples, downsample))
+
+    if downsample in ['78', '200']:
+        downsample_version = '2'
+    else:
+        downsample_version = '3'
+
     if url is None:
         base_url = 'https://scalablebrainatlas.incf.org/'
         downsampled_atlas = 'WHS_SD_rat_atlas_v1.01_' +\
-                            'downsample{0}.nii.gz'.format(downsample)
+                            'downsample{0}.nii.gz'.format(downsample_version)
         downsampled_t2star = 'WHS_SD_rat_T2star_v1.01_' +\
-                             'downsample{0}.nii.gz'.format(downsample)
+                             'downsample{0}.nii.gz'.format(downsample_version)
         url = [base_url + 'templates/PLCJB14/source/' + downsampled_t2star,
                base_url + 'templates/PLCJB14/source/' + downsampled_atlas,
                base_url + 'services/labelmapper.php?' +
                'template=PLCJB14&to=acr&format=json']
 
-    files = [downsampled_t2star, downsampled_atlas, 'WHS_SD_rat_labels.json']
-
-    opts = [{}, {}, {'move': 'WHS_SD_rat_labels.json'}]
+    atlas_basename = 'WHS_SD_rat_atlas_v1_01_' +\
+                     'downsample{0}.nii.gz'.format(downsample_version)
+    t2star_basename = 'WHS_SD_rat_T2star_v1_01_' +\
+                      'downsample{0}.nii.gz'.format(downsample_version)
+    files = [t2star_basename, atlas_basename, 'WHS_SD_rat_labels.json']
+    opts = [{'move': t2star_basename}, {'move': atlas_basename},
+            {'move': 'WHS_SD_rat_labels.json'}]
     files = [(f, u, opt) for (f, u, opt) in zip(files, url, opts)]
 
     dataset_name = 'waxholm_rat_2014'
@@ -222,7 +259,23 @@ def fetch_atlas_waxholm_rat_2014(data_dir=None, url=None, resume=True,
     if symmetric_split:
         raise NotImplementedError('Not yet implemented')
 
-    params = dict(t2star=files_[0], maps=files_[1], labels=labels,
+    t2star = files_[0]
+    maps = files_[1]
+    if downsample == '200':
+        t2star_img = nibabel.load(t2star)
+        maps_img = nibabel.load(maps)
+        t2star = t2star.replace('downsample2', '200um')
+        maps = maps.replace('downsample2', '200um')
+        if not os.path.isfile(t2star):
+            target_affine = np.eye(3) * .2
+            t2star_img = image.resample_img(t2star_img, target_affine)
+            t2star_img.to_filename(t2star)
+        if not os.path.isfile(maps):
+            maps_img = image.resample_img(maps_img, target_affine,
+                                          interpolation='nearest')
+            maps_img.to_filename(maps)
+
+    params = dict(t2star=t2star, maps=maps, labels=labels,
                   description=fdescr)
 
     return Bunch(**params)
