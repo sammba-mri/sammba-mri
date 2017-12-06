@@ -6,25 +6,25 @@ from sammba.externals.nipype.caching import Memory
 from sklearn.datasets.base import Bunch
 
 
-def anats_to_common(t1_filenames, write_dir, brain_volume=400,
+def anats_to_common(anat_filenames, write_dir, brain_volume,
                     registration_kind='affine',
                     nonlinear_levels=[1, 2, 3],
                     nonlinear_minimal_patch=75,
-                    convergence=0.005, caching=False, verbose=0):
-    """ Create common template from native T1 weighted images and achieve
+                    convergence=0.005, caching=False, verbose=False):
+    """ Create common template from native anatomical images and achieve
     their registration to it.
 
     Parameters
     ----------
-    t1_filenames : list of str
-        Paths to the T1 weighted images.
+    anat_filenames : list of str
+        Paths to the anatomical images.
 
     write_dir : str
         Path to an existant directory to save output files to.
 
-    brain_volume : float, optional
+    brain_volume : float
         Volumes of the brain as passed to Rats_MM brain extraction tool.
-        Default to 400 for the mouse brain.
+        Typically 400 for mouse and 1600 for rat.
 
     registration_kind : one of {'rigid', 'affine', 'nonlinear'}, optional
         The allowed transform kind.
@@ -42,19 +42,21 @@ def anats_to_common(t1_filenames, write_dir, brain_volume=400,
 
     convergence : float, optional
         Convergence limit, passed to
+        sammba.externals.nipype.interfaces.afni.Allineate
 
     verbose : bool, optional
-        If True, all steps are verbose.
+        If True, all steps are verbose. Note that caching implies some
+        verbosity in any case.
 
     Returns
     -------
     data : sklearn.datasets.base.Bunch
         Dictionary-like object, the interest attributes are :
 
-        - 'registered' : list of str.
+        - `registered` : list of str.
                          Paths to registered images. Note that
                          they have undergone a bias correction step before.
-        - 'transforms' : list of str.
+        - `transforms` : list of str.
                          Paths to the transforms from the raw
                          images to the registered images.
     """
@@ -89,10 +91,10 @@ def anats_to_common(t1_filenames, write_dir, brain_volume=400,
         qwarp = memory.cache(afni.Qwarp)
         nwarp_cat = memory.cache(afni.NwarpCat)
         warp_apply = memory.cache(afni.NwarpApply)
-        for func in [copy, unifize, rats, apply_mask, refit,
+        for step in [copy, unifize, rats, apply_mask, refit,
                      tcat, tstat, undump, resample, allineate, allineate2,
                      mask_tool, catmatvec, qwarp, nwarp_cat, warp_apply]:
-            func.interface().set_default_terminal_output(terminal_output)
+            step.interface().set_default_terminal_output(terminal_output)
     else:
         copy = afni.Copy(terminal_output=terminal_output).run
         unifize = afni.Unifize(terminal_output=terminal_output).run
@@ -119,12 +121,12 @@ def anats_to_common(t1_filenames, write_dir, brain_volume=400,
     ###########################################################################
     # First copy anatomical files, to make sure they are never changed
     # and they have different names across individuals
-    copied_t1_filenames = []
-    for n, anat_file in enumerate(t1_filenames):
+    copied_anat_filenames = []
+    for n, anat_file in enumerate(anat_filenames):
         suffixed_file = fname_presuffix(anat_file, suffix='_{}'.format(n))
         out_file = os.path.join(write_dir, os.path.basename(suffixed_file))
         out_copy = copy(in_file=anat_file, out_file=out_file)
-        copied_t1_filenames.append(out_copy.outputs.out_file)
+        copied_anat_filenames.append(out_copy.outputs.out_file)
 
     ###########################################################################
     # Register using center of mass
@@ -133,7 +135,7 @@ def anats_to_common(t1_filenames, write_dir, brain_volume=400,
     #
     # First we loop through anatomical scans and correct intensities for bias.
     unifized_files = []
-    for n, anat_file in enumerate(copied_t1_filenames):
+    for n, anat_file in enumerate(copied_anat_filenames):
         out_unifize = unifize(in_file=anat_file, outputtype='NIFTI_GZ')
         unifized_files.append(out_unifize.outputs.out_file)
 
@@ -176,7 +178,7 @@ def anats_to_common(t1_filenames, write_dir, brain_volume=400,
     out_tstat = tstat(in_file=out_tcat.outputs.out_file, outputtype='NIFTI_GZ')
 
     ###########################################################################
-    # to create an empty template, with origin placed at CoM
+    # to create an empty template, with origicopied_t1_filenamesn placed at CoM
     out_undump = undump(in_file=out_tstat.outputs.out_file,
                         outputtype='NIFTI_GZ')
     out_refit = refit(in_file=out_undump.outputs.out_file,
@@ -469,8 +471,9 @@ def anats_to_common(t1_filenames, write_dir, brain_volume=400,
             out_tcat = tcat(
                 in_files=warped_files,
                 out_file=os.path.join(
-                    write_dir, 'warped_{0}iters_heads.nii.gz'.format(n_iter +
-                                                                     3)))
+                    write_dir,
+                    'warped_{0}iters_hetemplate_filenameads.nii.gz'.format(
+                        n_iter + 3)))
             out_tstat_warp_head = tstat(in_file=out_tcat.outputs.out_file,
                                         outputtype='NIFTI_GZ')
 
@@ -501,55 +504,133 @@ def anats_to_common(t1_filenames, write_dir, brain_volume=400,
 
 
 def anats_to_template(anat_filenames, head_template_filename, write_dir,
+                      brain_volume,
                       brain_template_filename=None,
-                      dilated_head_mask_filename=None,
-                      caching=False):
+                      dilated_head_mask_filename=None, convergence=.005,
+                      maxlev=None,
+                      caching=False, verbose=True):
+    """ Registers raw anatomical images to a given template.
+
+    Parameters
+    ----------
+    anat_filenames : list of str
+        Paths to the anatomical images.
+
+    head_template_filename : str
+        Path to the head template.
+
+    write_dir : str
+        Path to an existant directory to save output files to.
+
+    brain_volume : float
+        Volumes of the brain as passed to Rats_MM brain extraction tool.
+        Typically 400 for mouse and 1600 for rat.
+
+    brain_template_filename : str, optional
+        Path to a brain template. Note that this must coincide with the brain
+        from the given head template. If None, the brain is extracted from
+        the template with RATS.
+
+    dilated_head_mask_filename : str, optional
+        Path to a dilated head mask. Note that this must be compliant with the
+        the given head template. If None, the mask is set to the non-background
+        voxels of the head template after one dilation.
+
+    caching : bool, optional
+        If True, caching is used for all the registration steps.
+
+    convergence : float, optional
+        Convergence limit, passed to
+        sammba.externals.nipype.interfaces.afni.Allineate
+
+    maxlev : int or None, optional
+        If not None, maximal level for the nonlinear warping. Passed to
+        sammba.externals.nipype.interfaces.afni.Qwarp.
+        Lower implies faster but possibly lower precision.
+
+    verbose : bool, optional
+        If True, all steps are verbose. Note that caching implies some
+        verbosity in any case.
+
+    Returns
+    -------
+    data : sklearn.datasets.base.Bunch
+        Dictionary-like object, the interest attributes are :
+
+        - `registered` : list of str.
+                         Paths to registered images. Note that
+                         they have undergone a bias correction step before.
+        - `pre_transforms` : list of str.
+                             Paths to the affine transforms from the raw
+                             images to the images allineated to the template.
+        - `transforms` : list of str.
+                         Paths to the transforms from the allineated
+                         images to the final registered images.
+    """
+    environ = {}
+    if verbose:
+        terminal_output = 'allatonce'
+    else:
+        terminal_output = 'none'
+
     if caching:
         memory = Memory(write_dir)
         clip_level = memory.cache(afni.ClipLevel)
-        allineate = memory.cache(afni.Allineate)
         rats = memory.cache(RatsMM)
+        apply_mask = memory.cache(fsl.ApplyMask)
+        mask_tool = memory.cache(afni.MaskTool)
         allineate = memory.cache(afni.Allineate)
         allineate2 = memory.cache(afni.Allineate)
         unifize = memory.cache(afni.Unifize)
         threshold = memory.cache(fsl.Threshold)
         qwarp = memory.cache(afni.Qwarp)
+        for step in [rats,  allineate, allineate2, apply_mask, mask_tool,
+                     unifize, threshold, qwarp]:
+            step.interface().set_default_terminal_output(terminal_output)
     else:
-        unifize = afni.Unifize().run
+        unifize = afni.Unifize(terminal_output=terminal_output).run
         clip_level = afni.ClipLevel().run
-        rats = RatsMM().run
-        apply_mask = fsl.ApplyMask().run
-        allineate = afni.Allineate().run
-        allineate2 = afni.Allineate().run  # TODO: remove after fixed bug
-        threshold = fsl.Threshold().run
-        qwarp = afni.Qwarp().run
+        rats = RatsMM(terminal_output=terminal_output).run
+        apply_mask = fsl.ApplyMask(terminal_output=terminal_output).run
+        mask_tool = afni.MaskTool(terminal_output=terminal_output).run
+        allineate = afni.Allineate(terminal_output=terminal_output).run
+        allineate2 = afni.Allineate(terminal_output=terminal_output).run  # TODO: remove after fixed bug
+        threshold = fsl.Threshold(terminal_output=terminal_output).run
+        qwarp = afni.Qwarp(terminal_output=terminal_output).run
+        environ['AFNI_DECONFLICT'] = 'OVERWRITE'
 
+    current_dir = os.getcwd()
     os.chdir(write_dir)
+    intermediate_files = []
     if brain_template_filename is None:
         out_clip_level = clip_level(in_file=head_template_filename)
         out_rats = rats(
             in_file=head_template_filename,
-            volume_threshold=400,
+            volume_threshold=brain_volume,
             intensity_threshold=int(out_clip_level.outputs.clip_val))
         brain_template_filename = out_rats.outputs.out_file
 
     if dilated_head_mask_filename is None:
+        out_clip_level = clip_level(in_file=head_template_filename)
         out_threshold = threshold(in_file=head_template_filename,
-                                  thresh=0)
-        dilated_head_mask_filename = out_threshold.outputs.out_file
+                                  thresh=out_clip_level.outputs.clip_val)
+        out_mask_tool = mask_tool(in_file=out_threshold.outputs.out_file,
+                                  dilate_inputs='3',
+                                  outputtype='NIFTI_GZ', environ=environ)
+        dilated_head_mask_filename = out_mask_tool.outputs.out_file
+        intermediate_files.append(out_threshold.outputs.out_file)
 
     affine_transforms = []
-    warp_transforms = []
-    registered = []
+    allineated_filenames = []
     for anat_filename in anat_filenames:
-        out_unifize = unifize(in_file=anat_filename,
+        out_unifize = unifize(in_file=anat_filename, environ=environ,
                               urad=18.3, outputtype='NIFTI_GZ')
         unbiased_anat_filename = out_unifize.outputs.out_file
 
         out_clip_level = clip_level(in_file=unbiased_anat_filename)
         out_rats = rats(
             in_file=unbiased_anat_filename,
-            volume_threshold=400,
+            volume_threshold=brain_volume,
             intensity_threshold=int(out_clip_level.outputs.clip_val))
         out_apply_mask = apply_mask(in_file=unbiased_anat_filename,
                                     mask_file=out_rats.outputs.out_file)
@@ -569,38 +650,71 @@ def anats_to_template(anat_filenames, head_template_filename, write_dir,
             out_matrix=affine_transform_filename,
             two_blur=1,
             cost='nmi',
-            convergence=.005,
+            convergence=convergence,
             two_pass=True,
             center_of_mass='',
             maxrot=90,
             warp_type='shift_rotate',
-            out_file=fname_presuffix(masked_anat_filename, suffix='_shr'))
+            out_file=fname_presuffix(masked_anat_filename, suffix='_shr'),
+            environ=environ)
         affine_transforms.append(affine_transform_filename)
 
         # Apply the registration to the whole head
-        out_allineate = allineate2(
+        out_allineate2 = allineate2(
             in_file=unbiased_anat_filename,
             master=head_template_filename,
             in_matrix=affine_transform_filename,
             out_file=fname_presuffix(unbiased_anat_filename,
-                                     suffix='_allineated'))
-        allineated_filename = out_allineate.outputs.out_file
+                                     suffix='_shift_rotated'),
+            environ=environ)
+        allineated_filenames.append(out_allineate2.outputs.out_file)
+        intermediate_files.extend([unbiased_anat_filename,
+                                   masked_anat_filename,
+                                   out_allineate.outputs.out_file])
+
+    intermediate_files.extend(allineated_filenames)
+    warp_transforms = []
+    registered = []
+    for allineated_filename in allineated_filenames:
         # Non-linear registration of affine pre-registered whole head image
         # to template. Don't initiate straight from the original with an
         # iniwarp due to weird errors (like it creating an Allin it then can't
         # find)
-        out_qwarp = qwarp(
-            in_file=allineated_filename,
-            base_file=head_template_filename,
-            weight=dilated_head_mask_filename,
-            nmi=True,
-            noneg=True,
-            iwarp=True,
-            blur=[0],
-            out_file=fname_presuffix(allineated_filename, suffix='_warped'))
+        # XXX what is the need to the iwarp ?
+        if maxlev is not None:
+            out_qwarp = qwarp(
+                in_file=allineated_filename,
+                base_file=head_template_filename,
+                weight=dilated_head_mask_filename,
+                nmi=True,
+                noneg=True,
+                blur=[0],
+                maxlev=maxlev,
+                out_file=fname_presuffix(allineated_filename,
+                                         suffix='_warped'),
+                environ=environ)
+        else:
+            out_qwarp = qwarp(
+                in_file=allineated_filename,
+                base_file=head_template_filename,
+                weight=dilated_head_mask_filename,
+                nmi=True,
+                noneg=True,
+                blur=[0],
+                out_file=fname_presuffix(allineated_filename,
+                                         suffix='_warped'),
+                environ=environ)
+
         registered.append(out_qwarp.outputs.warped_source)
         warp_transforms.append(out_qwarp.outputs.source_warp)
 
+    os.chdir(current_dir)
+    if not caching:
+        for intermediate_file in intermediate_files:
+            if os.path.isfile(intermediate_file):
+                os.remove(intermediate_file)
+
+    # XXX can't we just catenate the affine to the warp?
     return Bunch(registered=registered,
-                 affine_transforms=affine_transforms,
-                 warp_transforms=warp_transforms)
+                 transforms=warp_transforms,
+                 pre_transforms=affine_transforms)

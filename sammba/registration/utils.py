@@ -1,5 +1,6 @@
 import os
 import shutil
+import numpy as np
 import nibabel
 from sammba.externals.nipype.caching import Memory
 from sammba.externals.nipype.utils.filemanip import fname_presuffix
@@ -45,7 +46,7 @@ def _reset_affines(in_file, out_file, overwrite=False, axes_to_permute=None,
         in_file = result.outputs.out_file
 
     img = nibabel.load(in_file)
-    header = img.header
+    header = img.header.copy()
     sform, code = header.get_sform(coded=True)
 
     if axes_to_flip:
@@ -62,12 +63,17 @@ def _reset_affines(in_file, out_file, overwrite=False, axes_to_permute=None,
 
 
 def fix_obliquity(to_fix_filename, reference_filename, caching=False,
-                  caching_dir=None, clear_memory=False, overwrite=False):
+                  caching_dir=None, overwrite=False,
+                  verbose=True):
+    if caching_dir is None:
+        caching_dir = os.getcwd()
     if caching:
         memory = Memory(caching_dir)
 
-    if caching_dir is None:
-        caching_dir = os.getcwd()
+    if verbose:
+        terminal_output = 'allatonce'
+    else:
+        terminal_output = 'none'
 
     if overwrite:
         environ = {'AFNI_DECONFLICT': 'OVERWRITE'}
@@ -76,8 +82,12 @@ def fix_obliquity(to_fix_filename, reference_filename, caching=False,
 
     if caching:
         copy = memory.cache(afni.Copy)
+        refit = memory.cache(afni.Refit)
+        copy.interface().set_default_terminal_output(terminal_output)
+        refit.interface().set_default_terminal_output(terminal_output)
     else:
-        copy = afni.Copy().run
+        copy = afni.Copy(terminal_output=terminal_output).run
+        refit = afni.Refit(terminal_output=terminal_output).run
 
     tmp_folder = os.path.join(caching_dir, 'tmp')
     if not os.path.isdir(tmp_folder):
@@ -103,11 +113,6 @@ def fix_obliquity(to_fix_filename, reference_filename, caching=False,
                         environ=environ)
         orig_to_fix_filename = out_copy.outputs.out_file
 
-    if caching:
-        refit = memory.cache(afni.Refit)
-    else:
-        refit = afni.Refit().run
-
     out_refit = refit(in_file=orig_to_fix_filename,
                       atrcopy=(orig_reference_filename,
                                'IJK_TO_DICOM_REAL'))
@@ -116,11 +121,29 @@ def fix_obliquity(to_fix_filename, reference_filename, caching=False,
                     environ={'AFNI_DECONFLICT': 'OVERWRITE'},
                     out_file=to_fix_filename)
 
-    if clear_memory:
+    if overwrite:
         shutil.rmtree(tmp_folder)
-        memory.clear_previous_run()
+        if caching:
+            memory.clear_previous_run()
 
     return out_copy.outputs.out_file
+
+
+def _check_same_obliquity(img_filename1, img_filename2):
+    headers_values = []
+    for img_filename in [img_filename1, img_filename2]:
+        img = nibabel.load(img_filename)
+        header = img.header
+        header_values = [header['pixdim'][:4]]
+        # TODO: check that 'qform_code', 'sform_code' can differ
+        for key in ['quatern_b', 'quatern_c', 'quatern_d', 'qoffset_x',
+                    'qoffset_y', 'qoffset_z', 'srow_x', 'srow_y', 'srow_z']:
+            header_values.append(header[key])
+        headers_values.append(header_values)
+    equal_fields = [np.allclose(v1, v2)
+                    for v1, v2 in zip(headers_values[0], headers_values[1])]
+
+    return np.alltrue(equal_fields)
 
 
 def create_pipeline_graph(pipeline_name, graph_file,
@@ -136,8 +159,7 @@ def create_pipeline_graph(pipeline_name, graph_file,
     graph_file : str.
         Path to save the graph image to.
 
-    graph_kind : one of {'orig', 'hierarchical', 'flat', 'exec', 'colored'},
-        optional.
+    graph_kind : one of {'orig', 'hierarchical', 'flat', 'exec', 'colored'}, optional.
         The kind of the graph, passed to
         sammba.externals.nipype.pipeline.workflows.Workflow().write_graph
     """

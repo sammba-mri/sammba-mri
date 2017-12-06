@@ -15,9 +15,17 @@ What is sammba-MRI: small mammals neuroimaging with python
 
 Dependencies
 ============
-The required dependencies to use the software are the python packages:
+The required dependencies to use the package are 
 
-* Python 2.7
+the softwares:
+
+* AFNI
+* FSL >= 5.0
+* `RATS <http://www.iibi.uiowa.edu/content/rats-overview/>`_ for brain
+  extraction
+
+as well as the python packages:
+
 * setuptools
 * Numpy >= 1.6.2
 * SciPy >= 0.11
@@ -35,14 +43,10 @@ The required dependencies to use the software are the python packages:
 * funcsigs
 * click
 
-
-as well as the interfaces:
-
-* AFNI
-* FSL >= 5.0
-* ANTS
-
 If you want to run the tests, you need nose >= 1.2.1 and doctest-ignore-unicode
+
+If you want to convert DICOM files to NIFTI files, you will need the
+`DICOM ToolKit (DCMTK) <http://support.dcmtk.org/docs/index.html>`_ package
 
 
 Installation
@@ -52,11 +56,11 @@ First install Anaconda and nilearn as explained in `nilearn installation page <h
 
 Next install the remaining python dependencies using conda::
 
-    conda install pandas configparser future traits simplejson networkx packaging funcsigs
+    conda install pandas configparser future traits simplejson networkx funcsigs
 
 Some dependencies are only available through pip::
 
-    pip install packaging prov
+    pip install packaging prov patsy
 
 Finally, you need `graphviz <http://www.graphviz.org/>`_::
 
@@ -96,12 +100,3 @@ You should see the FSL GUI with the version number in the header.
 
     # AFNI
     export PATH=/usr/lib/afni/bin:$PATH
-
-**Configuring ANTs**: Add the following line to your .bashrc file so that your system knows where to find the ANTs binaries::
-
-    # ANTs
-    export PATH=/usr/local/antsbin/bin:$PATH
-    export ANTSPATH=/usr/local/antsbin/bin/
-
-
-

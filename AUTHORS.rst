@@ -21,9 +21,15 @@ Citing nilearn and nipype
 -------------------------
 
 Sammba-MRI heavily depends on nilearn and nipype. Please read
-
 `how to cite nilearn
 <http://nilearn.github.io/authors.html#citing-nilearn>`_
 and
 `nipype reference paper
 <https://www.ncbi.nlm.nih.gov/pubmed/21897815>`_
+
+RATS reference papers
+---------------------
+sammba-MRI relies on RATS software for brain extraction. If you preprocess your
+data with sammba-MRI, you are obliged to 
+`cite RATS reference papers.
+<http://www.iibi.uiowa.edu/content/rats-rapid-automatic-tissue-segmentation-rodent-brain-mri>`_

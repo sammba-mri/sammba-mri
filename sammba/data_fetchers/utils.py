@@ -1,3 +1,4 @@
+# Copied from nilearn.datasets.utils
 import os
 
 
