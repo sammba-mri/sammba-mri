@@ -1,5 +1,5 @@
 =============
-Giving credit
+Contributors and Acknowledgements
 =============
 
 .. include:: ../AUTHORS.rst
