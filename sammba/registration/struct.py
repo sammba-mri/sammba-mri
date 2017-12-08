@@ -8,6 +8,7 @@ from sklearn.datasets.base import Bunch
 
 def anats_to_common(anat_filenames, write_dir, brain_volume,
                     registration_kind='affine',
+                    bias_correct_first=True,
                     bias_correction_radius=18.3,
                     bottom_percentile=70.,
                     top_percentile=80.,
@@ -31,6 +32,9 @@ def anats_to_common(anat_filenames, write_dir, brain_volume,
 
     registration_kind : one of {'rigid', 'affine', 'nonlinear'}, optional
         The allowed transform kind.
+
+    bias_correct_first : bool, optional
+        If True, bias correction is done prior to brain extraction.
 
     bias_correction_radius : float, optional
         Radius of the ball used to create a local white matter intensity volume
@@ -161,20 +165,30 @@ def anats_to_common(anat_filenames, write_dir, brain_volume,
                               outputtype='NIFTI_GZ')
         unifized_files.append(out_unifize.outputs.out_file)
 
+    brain_mask_files = []
+    if bias_correct_first:
+        brain_extraction_in_files = unifized_files
+    else:
+        brain_extraction_in_files = copied_anat_filenames
+
+    for n, brain_extraction_in_file in enumerate(brain_extraction_in_files):
+        out_clip_level = clip_level(in_file=brain_extraction_in_file)
+        out_rats = rats(
+            in_file=brain_extraction_in_file,
+            volume_threshold=brain_volume,
+            intensity_threshold=int(out_clip_level.outputs.clip_val),
+            terminal_output=terminal_output)
+        brain_mask_files.append(out_rats.outputs.out_file)
+
     ###########################################################################
     # Second extract brains, aided by an approximate guessed brain volume,
     # and set the NIfTI image centre (as defined in the header) to the CoM
     # of the extracted brain.
     brain_files = []
-    for unifized_file in unifized_files:
-        out_clip_level = clip_level(in_file=unifized_file)
-        out_rats = rats(
-            in_file=unifized_file,
-            volume_threshold=brain_volume,
-            intensity_threshold=int(out_clip_level.outputs.clip_val),
-            terminal_output=terminal_output)
+    for (brain_mask_file, unifized_file) in zip(brain_mask_files,
+                                                unifized_files):
         out_apply_mask = apply_mask(in_file=unifized_file,
-                                    mask_file=out_rats.outputs.out_file)
+                                    mask_file=brain_mask_file)
         out_center_mass = center_mass(
             in_file=out_apply_mask.outputs.out_file,
             cm_file=fname_presuffix(unifized_file, suffix='_cm.txt',
