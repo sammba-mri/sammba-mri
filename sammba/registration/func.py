@@ -34,9 +34,9 @@ def coregister_fmri_session(session_data, t_r, write_dir, brain_volume,
     write_dir : str
         Directory to save the output and temporary images.
 
-    brain_volume : float
+    brain_volume : int
         Volumes of the brain as passed to Rats_MM brain extraction tool.
-        Typically 400 for mouse and 1600 for rat.
+        Typically 400 for mouse and 1800 for rat.
 
     prior_rigid_body_registration : bool, optional
         If True, a rigid-body registration of the anat to the func is performed
@@ -572,9 +572,9 @@ def fmri_sessions_to_template(sessions, t_r, head_template_filename,
     head_template_filename : str
         Template to register the functional to.
 
-    brain_volume : float
+    brain_volume : int
         Volumes of the brain as passed to Rats_MM brain extraction tool.
-        Typically 400 for mouse and 1600 for rat.
+        Typically 400 for mouse and 1800 for rat.
 
     write_dir : str
         Path to the affine 1D transform from anatomical to template space.

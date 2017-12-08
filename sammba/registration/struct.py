@@ -8,6 +8,9 @@ from sklearn.datasets.base import Bunch
 
 def anats_to_common(anat_filenames, write_dir, brain_volume,
                     registration_kind='affine',
+                    bias_correction_radius=18.3,
+                    bottom_percentile=70.,
+                    top_percentile=80.,
                     nonlinear_levels=[1, 2, 3],
                     nonlinear_minimal_patch=75,
                     convergence=0.005, caching=False, verbose=False):
@@ -22,12 +25,27 @@ def anats_to_common(anat_filenames, write_dir, brain_volume,
     write_dir : str
         Path to an existant directory to save output files to.
 
-    brain_volume : float
+    brain_volume : int
         Volumes of the brain as passed to Rats_MM brain extraction tool.
-        Typically 400 for mouse and 1600 for rat.
+        Typically 400 for mouse and 1800 for rat.
 
     registration_kind : one of {'rigid', 'affine', 'nonlinear'}, optional
         The allowed transform kind.
+
+    bias_correction_radius : float, optional
+        Radius of the ball used to create a local white matter intensity volume
+        for bias correction, in voxels. Passed to
+        sammba.externals.nipype.interfaces.Unifize
+
+    bottom_percentile : float, optional
+        Lower fraction of the histogram of intensities to be used
+        for local white matter map creation. Passed to
+        sammba.externals.nipype.interfaces.Unifize
+
+    top_percentile : float, optional
+        Upper fraction of the histogram of intensities to be used
+        for local white matter map creation. Passed to
+        sammba.externals.nipype.interfaces.Unifize
 
     nonlinear_levels : list of int, optional
         Maximal levels for each nonlinear warping iteration. Passed iteratively
@@ -136,7 +154,11 @@ def anats_to_common(anat_filenames, write_dir, brain_volume,
     # First we loop through anatomical scans and correct intensities for bias.
     unifized_files = []
     for n, anat_file in enumerate(copied_anat_filenames):
-        out_unifize = unifize(in_file=anat_file, outputtype='NIFTI_GZ')
+        out_unifize = unifize(in_file=anat_file,
+                              rbt=(bias_correction_radius,
+                                   bottom_percentile,
+                                   top_percentile),
+                              outputtype='NIFTI_GZ')
         unifized_files.append(out_unifize.outputs.out_file)
 
     ###########################################################################
@@ -522,7 +544,7 @@ def anats_to_template(anat_filenames, head_template_filename, write_dir,
     write_dir : str
         Path to an existant directory to save output files to.
 
-    brain_volume : float
+    brain_volume : int
         Volumes of the brain as passed to Rats_MM brain extraction tool.
         Typically 400 for mouse and 1600 for rat.
 
