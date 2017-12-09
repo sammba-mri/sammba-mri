@@ -15,7 +15,7 @@ from .utils import _rotate_affine
 def _is_dicom(filename):
     """
     Determines by name and extension if a file is an Enhanced Multiframe DICOM 
-	or not. So this just means checking if the path conforms to EnIm*.dcm.
+    or not. So this just means checking if the path conforms to EnIm*.dcm.
 
     Parameters
     ----------
@@ -26,13 +26,13 @@ def _is_dicom(filename):
     -------
     True if `filename` is a DICOM file, False otherwise.
     """
-	
-	# properly testing to see if a file is a DICOM or not is probably beyond the 
-	# scope of this module, but if we are to do it at all, a good idea seems to
-	# be that used by dcmtk's dcmftest:
-	# "All files specified on the command line are checked for the presence of 
-	# the DICOM "magic word" 'DICM' at byte position 128. No attempt is made to 
-	# parse the complete data set."
+    
+    # properly testing to see if a file is a DICOM or not is probably beyond the 
+    # scope of this module, but if we are to do it at all, a good idea seems to
+    # be that used by dcmtk's dcmftest:
+    # "All files specified on the command line are checked for the presence of 
+    # the DICOM "magic word" 'DICM' at byte position 128. No attempt is made to 
+    # parse the complete data set."
 
     if filename.startswith('EnIm') and filename.endswith('.dcm'):
             return True
@@ -131,15 +131,15 @@ def dcm_to_nii(dcmdump_path, dicom_filename, save_directory, siap_fix=True,
 
     # read dicom_filename header/metadata using dcmdump
     # +L ensures long tags are fully printed
-	# -M prevents 'very long values' from being read in, which vastly improves 
-	# performance in at least one case (my windows 10 laptop). the same machine
-	# running the code within a WSSL bash shell was far faster; not sure where 
-	# the nt bottleneck is
-	# universal_newlines=TRUE should keep output format consistent across python 
-	# 2 and 3, plus posix and nt
+    # -M prevents 'very long values' from being read in, which vastly improves 
+    # performance in at least one case (my windows 10 laptop). the same machine
+    # running the code within a WSSL bash shell was far faster; not sure where 
+    # the nt bottleneck is
+    # universal_newlines=TRUE should keep output format consistent across python 
+    # 2 and 3, plus posix and nt
     dcmdump_output = subprocess.check_output([dcmdump_path, dicom_filename,
                                               '+L', '-M'],
-											 universal_newlines=True)
+                                             universal_newlines=True)
 
     # fields that are likely to be empty or multiple are awkward to dynamically
     # declare, so do it here rather than in the parser loop below
@@ -358,7 +358,7 @@ def dcm_to_nii(dcmdump_path, dicom_filename, save_directory, siap_fix=True,
     img = nibabel.Nifti1Image(rawarray, affine, header=header)
 
     bf = 'bf' + dicom_filename.split(os.sep)[-5]  # Paravision experiment folder 
-												  # number
+                                                  # number
     if siap_fix:
         SIAPfixres = 'fixedSIAP'
     else:
