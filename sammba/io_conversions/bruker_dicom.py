@@ -12,13 +12,10 @@ import pandas
 import nibabel
 from .utils import _rotate_affine
 
-DICOM_EXTENSIONS = [".dcm", ".ima", ".dicom"]
-
-
 def _is_dicom(filename):
     """
-    Determines, by filename extension, whether `filename` is a DICOM file
-    or not.
+    Determines by name and extension if a file is an Enhanced Multiframe DICOM 
+	or not. So this just means checking if the path conforms to EnIm*.dcm.
 
     Parameters
     ----------
@@ -29,9 +26,15 @@ def _is_dicom(filename):
     -------
     True if `filename` is a DICOM file, False otherwise.
     """
-    for ext in DICOM_EXTENSIONS:
-        # XXX: are all DICOMs starting with 'EnIm' ?
-        if filename.lower().endswith(ext) and filename.startswith('EnIm'):
+	
+	# properly testing to see if a file is a DICOM or not is probably beyond the 
+	# scope of this module, but if we are to do it at all, a good idea seems to
+	# be that used by dcmtk's dcmftest:
+	# "All files specified on the command line are checked for the presence of 
+	# the DICOM "magic word" 'DICM' at byte position 128. No attempt is made to 
+	# parse the complete data set."
+
+    if filename.startswith('EnIm') and filename.endswith('.dcm'):
             return True
 
     return False
@@ -120,21 +123,6 @@ def dcm_to_nii(dcmdump_path, dicom_filename, save_directory, siap_fix=True,
     no error-checking. There are a lot of circumstances where this converter
     will fail or be sub-optimal.
     """
-    # valstart and splt1 are parameters used to determine how to parse dcmdump
-    # output, which differs according to the os. for unix these are
-    # respectively 15 and \\, for windows 17 and \\\\. splt2 splits the
-    # dicom_filename path to help determine the experiment folder/number,
-    # which is always 3 levels higher.
-    # file/folder separators differ according to os, with unix being
-    # / and windows \\.
-    if os.name == 'nt':
-        valstart = 17
-        splt1 = '\\\\'
-        splt2 = '\\'  # TODO: may be replaced by os.sep
-    if os.name == 'posix':
-        valstart = 15
-        splt1 = '\\'
-        splt2 = '/'
 
     # regularise/standardise input paths
     input_paths = [dcmdump_path, dicom_filename, save_directory]
@@ -143,8 +131,15 @@ def dcm_to_nii(dcmdump_path, dicom_filename, save_directory, siap_fix=True,
 
     # read dicom_filename header/metadata using dcmdump
     # +L ensures long tags are fully printed
+	# -M prevents 'very long values' from being read in, which vastly improves 
+	# performance in at least one case (my windows 10 laptop). the same machine
+	# running the code within a WSSL bash shell was far faster; not sure where 
+	# the nt bottleneck is
+	# universal_newlines=TRUE should keep output format consistent across python 
+	# 2 and 3, plus posix and nt
     dcmdump_output = subprocess.check_output([dcmdump_path, dicom_filename,
-                                              '+L'])
+                                              '+L', '-M'],
+											 universal_newlines=True)
 
     # fields that are likely to be empty or multiple are awkward to dynamically
     # declare, so do it here rather than in the parser loop below
@@ -186,12 +181,12 @@ def dcm_to_nii(dcmdump_path, dicom_filename, save_directory, siap_fix=True,
         if len(pline) >= 11:
             if pline[0] == '(' and pline[5] == ',' and pline[10] == ')':
                 tag = pline[0:11]
-                val = pline[:pline.rfind('#')].rstrip()[valstart:]
+                val = pline[:pline.rfind('#')].rstrip()[15:]
                 # remove [] that dcmdump delimits strings with
                 if val[0] == '[':
                     val = val[1:-1]
 
-                vals = val.split(splt1)
+                vals = val.split('\\') # \\ should work on both posix and nt
                 # turn single value lists into single values
                 if type(vals) == list:
                     if len(vals) == 1:
@@ -362,8 +357,8 @@ def dcm_to_nii(dcmdump_path, dicom_filename, save_directory, siap_fix=True,
         header['pixdim'][4] = TR
     img = nibabel.Nifti1Image(rawarray, affine, header=header)
 
-    bf = 'bf' + dicom_filename.split(splt2)[-5]  # Paravision experiment folder
-                                                 # number
+    bf = 'bf' + dicom_filename.split(os.sep)[-5]  # Paravision experiment folder 
+												  # number
     if siap_fix:
         SIAPfixres = 'fixedSIAP'
     else:
