@@ -8,7 +8,7 @@ from sklearn.datasets.base import Bunch
 
 def anats_to_common(anat_filenames, write_dir, brain_volume,
                     registration_kind='affine',
-                    brain_from_biased=False,
+                    brain_from_raw=False,
                     nonlinear_levels=[1, 2, 3],
                     nonlinear_minimal_patch=75,
                     convergence=0.005, caching=False, verbose=False):
@@ -30,8 +30,8 @@ def anats_to_common(anat_filenames, write_dir, brain_volume,
     registration_kind : one of {'rigid', 'affine', 'nonlinear'}, optional
         The allowed transform kind.
 
-    brain_from_biased : bool, optional
-        If True, brain extration is done prior to bias correction.
+    brain_from_raw : bool, optional
+        If True, brain extration is done on raw image, prior to bias correction.
 
     nonlinear_levels : list of int, optional
         Maximal levels for each nonlinear warping iteration. Passed iteratively
@@ -143,7 +143,7 @@ def anats_to_common(anat_filenames, write_dir, brain_volume,
         out_unifize = unifize(in_file=anat_file, outputtype='NIFTI_GZ')
         unifized_files.append(out_unifize.outputs.out_file)
 
-    if brain_from_biased:
+    if brain_from_raw:
         brain_extraction_in_files = copied_anat_filenames
     else:
         brain_extraction_in_files = unifized_files
@@ -519,7 +519,7 @@ def anats_to_common(anat_filenames, write_dir, brain_volume,
 
 def anats_to_template(anat_filenames, head_template_filename, write_dir,
                       brain_volume,
-                      brain_from_biased=False,
+                      brain_from_raw=False,
                       brain_template_filename=None,
                       dilated_head_mask_filename=None, convergence=.005,
                       maxlev=None,
@@ -541,8 +541,8 @@ def anats_to_template(anat_filenames, head_template_filename, write_dir,
         Volumes of the brain as passed to Rats_MM brain extraction tool.
         Typically 400 for mouse and 1600 for rat.
 
-    brain_from_biased : bool, optional
-        If True, brain extration is done prior to bias correction.
+    brain_from_raw : bool, optional
+        If True, brain extration is done on raw image, prior to bias correction.
 
     brain_template_filename : str, optional
         Path to a brain template. Note that this must coincide with the brain
@@ -644,7 +644,7 @@ def anats_to_template(anat_filenames, head_template_filename, write_dir,
                               urad=18.3, outputtype='NIFTI_GZ')
         unbiased_anat_filenames.append(out_unifize.outputs.out_file)
 
-    if brain_from_biased:
+    if brain_from_raw:
         brain_extraction_in_files = anat_filenames
     else:
         brain_extraction_in_files = unbiased_anat_filenames
