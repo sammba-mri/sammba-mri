@@ -191,7 +191,6 @@ def coregister_fmri_session(session_data, t_r, write_dir, brain_volume,
 
     # Update outputs
     output_files.extend([thresholded_filename,
-                         out_volreg.outputs.oned_file,
                          out_volreg.outputs.oned_matrix_save,
                          out_volreg.outputs.out_file,
                          out_volreg.outputs.md1d_file,
