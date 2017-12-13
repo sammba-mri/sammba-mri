@@ -11,8 +11,7 @@ def anats_to_common(anat_filenames, write_dir, brain_volume,
                     nonlinear_levels=[1, 2, 3],
                     nonlinear_minimal_patch=75,
                     convergence=0.005, caching=False, verbose=False,
-                    unifize_kwargs=None,
-                    brain_extraction_unifize_kwargs=None):
+                    unifize_kwargs=None, brain_extraction_unifize_kwargs=None):
     """ Create common template from native anatomical images and achieve
     their registration to it.
 
@@ -533,11 +532,11 @@ def anats_to_common(anat_filenames, write_dir, brain_volume,
 
 def anats_to_template(anat_filenames, head_template_filename, write_dir,
                       brain_volume,
-                      brain_from_raw=False,
                       brain_template_filename=None,
                       dilated_head_mask_filename=None, convergence=.005,
                       maxlev=None,
-                      caching=False, verbose=True):
+                      caching=False, verbose=True, unifize_kwargs=None,
+                      brain_extraction_unifize_kwargs=None):
     """ Registers raw anatomical images to a given template.
 
     Parameters
@@ -554,9 +553,6 @@ def anats_to_template(anat_filenames, head_template_filename, write_dir,
     brain_volume : int
         Volumes of the brain as passed to Rats_MM brain extraction tool.
         Typically 400 for mouse and 1600 for rat.
-
-    brain_from_raw : bool, optional
-        If True, brain extration is done on raw image, prior to bias correction.
 
     brain_template_filename : str, optional
         Path to a brain template. Note that this must coincide with the brain
@@ -583,6 +579,14 @@ def anats_to_template(anat_filenames, head_template_filename, write_dir,
     verbose : bool, optional
         If True, all steps are verbose. Note that caching implies some
         verbosity in any case.
+
+    unifize_kwargs : dict, optional
+        Is passed to sammba.externals.nipype.interfaces.afni.Unifize, to
+        control bias correction of the template.
+
+    brain_extraction_unifize_kwargs : dict, optional
+        Is passed to sammba.externals.nipype.interfaces.afni.Unifize, to tune
+        the seperate bias correction step done prior to brain extraction.
 
     Returns
     -------
@@ -652,16 +656,15 @@ def anats_to_template(anat_filenames, head_template_filename, write_dir,
         dilated_head_mask_filename = out_mask_tool.outputs.out_file
         intermediate_files.append(out_threshold.outputs.out_file)
 
-    unbiased_anat_filenames = []
-    for anat_filename in anat_filenames:
-        out_unifize = unifize(in_file=anat_filename, environ=environ,
-                              urad=18.3, outputtype='NIFTI_GZ')
-        unbiased_anat_filenames.append(out_unifize.outputs.out_file)
+    if brain_extraction_unifize_kwargs is None:
+        brain_extraction_unifize_kwargs = {'cl_frac': .2}
 
-    if brain_from_raw:
-        brain_extraction_in_files = anat_filenames
-    else:
-        brain_extraction_in_files = unbiased_anat_filenames
+    brain_extraction_in_files = []
+    for anat_filename in anat_filenames:
+        out_unifize = unifize(in_file=anat_filename, outputtype='NIFTI_GZ',
+                              environ=environ,
+                              **brain_extraction_unifize_kwargs)
+        brain_extraction_in_files.append(out_unifize.outputs.out_file)
 
     brain_mask_files = []
     for brain_extraction_in_file in brain_extraction_in_files:
@@ -671,6 +674,16 @@ def anats_to_template(anat_filenames, head_template_filename, write_dir,
             volume_threshold=brain_volume,
             intensity_threshold=int(out_clip_level.outputs.clip_val))
         brain_mask_files.append(out_rats.outputs.out_file)
+
+    if unifize_kwargs is None:
+        unifize_kwargs = {'cl_frac': .2}
+
+    unbiased_anat_filenames = []
+    for anat_filename in anat_filenames:
+        out_unifize = unifize(in_file=anat_filename, environ=environ,
+                              urad=18.3, outputtype='NIFTI_GZ',
+                              **unifize_kwargs)
+        unbiased_anat_filenames.append(out_unifize.outputs.out_file)
 
     affine_transforms = []
     allineated_filenames = []
