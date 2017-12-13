@@ -4,7 +4,7 @@ from nose.tools import assert_true, assert_equal
 import nibabel
 from nilearn._utils.testing import assert_raises_regex
 from nilearn._utils.niimg_conversions import _check_same_fov
-from sammba.registration import func
+from sammba.registration import fmri_session
 from sammba import testing_data
 from sammba.registration.utils import _check_same_obliquity
 from sammba.externals.nipype.interfaces import afni
@@ -26,26 +26,26 @@ def test_fmri_session_check_inputs():
     func_file = os.path.join(os.path.dirname(testing_data.__file__),
                              'func.nii.gz')
 
-    data = FMRISession(anat='', func=func_file, animal_id='animal001')
+    data = fmri_session.FMRISession(anat='', func=func_file, animal_id='animal001')
     assert_raises_regex(IOError, "anat must be an existing image file",
                         data._check_inputs)
 
-    data = FMRISession(anat=anat_file, func='', animal_id='animal001')
+    data = fmri_session.FMRISession(anat=anat_file, func='', animal_id='animal001')
     assert_raises_regex(IOError, "func must be an existing image file",
                         data._check_inputs)
 
-    data = FMRISession(anat=anat_file, func=func_file)
+    data = fmri_session.FMRISession(anat=anat_file, func=func_file)
     assert_raises_regex(ValueError, "animal_id must be a string",
                         data._check_inputs)
 
 
-def test_coregister_fmri_session():
+def test_coregister():
     anat_file = os.path.join(os.path.dirname(testing_data.__file__),
                              'anat.nii.gz')
     func_file = os.path.join(os.path.dirname(testing_data.__file__),
                              'func.nii.gz')
 
-    animal_session = FMRISession(anat=anat_file, func=func_file,
+    animal_session = fmri_session.FMRISession(anat=anat_file, func=func_file,
                                  animal_id='test_coreg_dir')
 
     if afni.Info().version():
@@ -87,12 +87,12 @@ def test_coregister_fmri_session():
         os.removedirs(tempdir)
 
 
-def test_fmri_sessions_to_template():
+def test_register_to_template():
     anat_file = os.path.join(os.path.dirname(testing_data.__file__),
                              'anat.nii.gz')
     func_file = os.path.join(os.path.dirname(testing_data.__file__),
                              'func.nii.gz')
-    mammal_data = FMRISession(anat=anat_file, func=func_file)
+    mammal_data = fmri_session.FMRISession(anat=anat_file, func=func_file)
 
     tempdir = tempfile.mkdtemp()
     template_file = anat_file
@@ -100,8 +100,8 @@ def test_fmri_sessions_to_template():
     brain_volume = 400
     assert_raises_regex(ValueError,
                         "'animals_data' input argument must be an iterable",
-                        func.fmri_sessions_to_template, mammal_data, t_r,
-                        template_file, tempdir, brain_volume)
+                        fmri_session.register_to_template, t_r, brain_volume,
+                        template_file, tempdir)
 
     assert_raises_regex(ValueError,
                         "Each animal data must have type",
