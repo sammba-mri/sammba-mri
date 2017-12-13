@@ -43,9 +43,9 @@ if not os.path.exists(write_dir):
 # -------------------------------------
 from sammba.registration import coregister_fmri_session
 
-coregister_fmri_session(animal_session, 1., write_dir, 400,
-                        slice_timing=True,
-                        prior_rigid_body_registration=True)
+animal_session.coregister(t_r=1., write_dir=write_dir, brain_volume=400,
+                          slice_timing=True,
+                          prior_rigid_body_registration=True)
 
 ###############################################################################
 # Check out the results

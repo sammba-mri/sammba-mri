@@ -713,6 +713,8 @@ def anats_to_template(anat_filenames, head_template_filename, write_dir,
         # find)
         # XXX what is the need to the iwarp ?
         if maxlev is not None:
+            print(allineated_filename)
+            print(head_template_filename)
             out_qwarp = qwarp(
                 in_file=allineated_filename,
                 base_file=head_template_filename,
