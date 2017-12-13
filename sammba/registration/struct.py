@@ -8,10 +8,11 @@ from sklearn.datasets.base import Bunch
 
 def anats_to_common(anat_filenames, write_dir, brain_volume,
                     registration_kind='affine',
-                    brain_from_raw=False,
                     nonlinear_levels=[1, 2, 3],
                     nonlinear_minimal_patch=75,
-                    convergence=0.005, caching=False, verbose=False):
+                    convergence=0.005, caching=False, verbose=False,
+                    unifize_kwargs=None,
+                    brain_extraction_unifize_kwargs=None):
     """ Create common template from native anatomical images and achieve
     their registration to it.
 
@@ -29,9 +30,6 @@ def anats_to_common(anat_filenames, write_dir, brain_volume,
 
     registration_kind : one of {'rigid', 'affine', 'nonlinear'}, optional
         The allowed transform kind.
-
-    brain_from_raw : bool, optional
-        If True, brain extration is done on raw image, prior to bias correction.
 
     nonlinear_levels : list of int, optional
         Maximal levels for each nonlinear warping iteration. Passed iteratively
@@ -51,6 +49,14 @@ def anats_to_common(anat_filenames, write_dir, brain_volume,
     verbose : bool, optional
         If True, all steps are verbose. Note that caching implies some
         verbosity in any case.
+
+    unifize_kwargs : dict, optional
+        Is passed to sammba.externals.nipype.interfaces.afni.Unifize, to tune
+        bias correction done prior to registration.
+
+    brain_extraction_unifize_kwargs : dict, optional
+        Is passed to sammba.externals.nipype.interfaces.afni.Unifize, to tune
+        bias correction done prior to brain extraction step.
 
     Returns
     -------
@@ -138,15 +144,14 @@ def anats_to_common(anat_filenames, write_dir, brain_volume,
     # An initial coarse registration is done using brain centre of mass (CoM).
     #
     # First we loop through anatomical scans and correct intensities for bias.
-    unifized_files = []
-    for n, anat_file in enumerate(copied_anat_filenames):
-        out_unifize = unifize(in_file=anat_file, outputtype='NIFTI_GZ')
-        unifized_files.append(out_unifize.outputs.out_file)
+    if brain_extraction_unifize_kwargs is None:
+        brain_extraction_unifize_kwargs = {'clfrac': .2}
 
-    if brain_from_raw:
-        brain_extraction_in_files = copied_anat_filenames
-    else:
-        brain_extraction_in_files = unifized_files
+    brain_extraction_in_files = []
+    for n, anat_file in enumerate(copied_anat_filenames):
+        out_unifize = unifize(in_file=anat_file, outputtype='NIFTI_GZ',
+                              **brain_extraction_unifize_kwargs)
+        brain_extraction_in_files.append(out_unifize.outputs.out_file)
 
     brain_mask_files = []
     for n, brain_extraction_in_file in enumerate(brain_extraction_in_files):
@@ -162,6 +167,15 @@ def anats_to_common(anat_filenames, write_dir, brain_volume,
     # Second extract brains, aided by an approximate guessed brain volume,
     # and set the NIfTI image centre (as defined in the header) to the CoM
     # of the extracted brain.
+    if unifize_kwargs is None:
+        unifize_kwargs = {'clfrac': .2}
+
+    unifized_files = []
+    for n, anat_file in enumerate(copied_anat_filenames):
+        out_unifize = unifize(in_file=anat_file, outputtype='NIFTI_GZ',
+                              **unifize_kwargs)
+        unifized_files.append(out_unifize.outputs.out_file)
+
     brain_files = []
     for (brain_mask_file, unifized_file) in zip(brain_mask_files,
                                                 unifized_files):
