@@ -51,12 +51,12 @@ def anats_to_common(anat_filenames, write_dir, brain_volume,
         verbosity in any case.
 
     unifize_kwargs : dict, optional
-        Is passed to sammba.externals.nipype.interfaces.afni.Unifize, to tune
-        bias correction done prior to registration.
+        Is passed to sammba.externals.nipype.interfaces.afni.Unifize, to
+        control bias correction of the template.
 
     brain_extraction_unifize_kwargs : dict, optional
         Is passed to sammba.externals.nipype.interfaces.afni.Unifize, to tune
-        bias correction done prior to brain extraction step.
+        the seperate bias correction step done prior to brain extraction.
 
     Returns
     -------
@@ -145,7 +145,7 @@ def anats_to_common(anat_filenames, write_dir, brain_volume,
     #
     # First we loop through anatomical scans and correct intensities for bias.
     if brain_extraction_unifize_kwargs is None:
-        brain_extraction_unifize_kwargs = {'clfrac': .2}
+        brain_extraction_unifize_kwargs = {'cl_frac': .2}
 
     brain_extraction_in_files = []
     for n, anat_file in enumerate(copied_anat_filenames):
@@ -168,7 +168,7 @@ def anats_to_common(anat_filenames, write_dir, brain_volume,
     # and set the NIfTI image centre (as defined in the header) to the CoM
     # of the extracted brain.
     if unifize_kwargs is None:
-        unifize_kwargs = {'clfrac': .2}
+        unifize_kwargs = {'cl_frac': .2}
 
     unifized_files = []
     for n, anat_file in enumerate(copied_anat_filenames):
