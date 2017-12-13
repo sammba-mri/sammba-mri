@@ -144,7 +144,7 @@ def anats_to_common(anat_filenames, write_dir, brain_volume,
     #
     # First we loop through anatomical scans and correct intensities for bias.
     if brain_extraction_unifize_kwargs is None:
-        brain_extraction_unifize_kwargs = {'cl_frac': .2}
+        brain_extraction_unifize_kwargs = {}
 
     brain_extraction_in_files = []
     for n, anat_file in enumerate(copied_anat_filenames):
@@ -657,7 +657,7 @@ def anats_to_template(anat_filenames, head_template_filename, write_dir,
         intermediate_files.append(out_threshold.outputs.out_file)
 
     if brain_extraction_unifize_kwargs is None:
-        brain_extraction_unifize_kwargs = {'cl_frac': .2}
+        brain_extraction_unifize_kwargs = {}
 
     brain_extraction_in_files = []
     for anat_filename in anat_filenames:
@@ -676,7 +676,7 @@ def anats_to_template(anat_filenames, head_template_filename, write_dir,
         brain_mask_files.append(out_rats.outputs.out_file)
 
     if unifize_kwargs is None:
-        unifize_kwargs = {'cl_frac': .2}
+        unifize_kwargs = {}
 
     unbiased_anat_filenames = []
     for anat_filename in anat_filenames:
