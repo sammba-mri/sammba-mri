@@ -36,6 +36,6 @@ as well as the interfaces:
 Installation
 ============
 
-For the moment process-asl is available as a development version. You can download the source code with the command::
+For the moment SaMmBa-MRI is available as a development version. You can download the source code with the command::
 
     git clone https://github.com/sammba-mri/sammba-mri

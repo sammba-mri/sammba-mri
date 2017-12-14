@@ -8,12 +8,10 @@ from sklearn.datasets.base import Bunch
 
 def anats_to_common(anat_filenames, write_dir, brain_volume,
                     registration_kind='affine',
-                    bias_correction_radius=18.3,
-                    bottom_percentile=70.,
-                    top_percentile=80.,
                     nonlinear_levels=[1, 2, 3],
                     nonlinear_minimal_patch=75,
-                    convergence=0.005, caching=False, verbose=False):
+                    convergence=0.005, caching=False, verbose=False,
+                    unifize_kwargs=None, brain_extraction_unifize_kwargs=None):
     """ Create common template from native anatomical images and achieve
     their registration to it.
 
@@ -31,21 +29,6 @@ def anats_to_common(anat_filenames, write_dir, brain_volume,
 
     registration_kind : one of {'rigid', 'affine', 'nonlinear'}, optional
         The allowed transform kind.
-
-    bias_correction_radius : float, optional
-        Radius of the ball used to create a local white matter intensity volume
-        for bias correction, in voxels. Passed to
-        sammba.externals.nipype.interfaces.Unifize
-
-    bottom_percentile : float, optional
-        Lower fraction of the histogram of intensities to be used
-        for local white matter map creation. Passed to
-        sammba.externals.nipype.interfaces.Unifize
-
-    top_percentile : float, optional
-        Upper fraction of the histogram of intensities to be used
-        for local white matter map creation. Passed to
-        sammba.externals.nipype.interfaces.Unifize
 
     nonlinear_levels : list of int, optional
         Maximal levels for each nonlinear warping iteration. Passed iteratively
@@ -65,6 +48,14 @@ def anats_to_common(anat_filenames, write_dir, brain_volume,
     verbose : bool, optional
         If True, all steps are verbose. Note that caching implies some
         verbosity in any case.
+
+    unifize_kwargs : dict, optional
+        Is passed to sammba.externals.nipype.interfaces.afni.Unifize, to
+        control bias correction of the template.
+
+    brain_extraction_unifize_kwargs : dict, optional
+        Is passed to sammba.externals.nipype.interfaces.afni.Unifize, to tune
+        the seperate bias correction step done prior to brain extraction.
 
     Returns
     -------
@@ -152,29 +143,47 @@ def anats_to_common(anat_filenames, write_dir, brain_volume,
     # An initial coarse registration is done using brain centre of mass (CoM).
     #
     # First we loop through anatomical scans and correct intensities for bias.
-    unifized_files = []
+    if brain_extraction_unifize_kwargs is None:
+        brain_extraction_unifize_kwargs = {}
+
+    brain_extraction_in_files = []
     for n, anat_file in enumerate(copied_anat_filenames):
         out_unifize = unifize(in_file=anat_file,
-                              rbt=(bias_correction_radius,
-                                   bottom_percentile,
-                                   top_percentile),
-                              outputtype='NIFTI_GZ')
-        unifized_files.append(out_unifize.outputs.out_file)
+                              out_file='%s_Unifized_for_brain_mask.nii.gz',
+                              outputtype='NIFTI_GZ',
+                              **brain_extraction_unifize_kwargs)
+        brain_extraction_in_files.append(out_unifize.outputs.out_file)
+
+    brain_mask_files = []
+    for n, brain_extraction_in_file in enumerate(brain_extraction_in_files):
+        out_clip_level = clip_level(in_file=brain_extraction_in_file)
+        out_rats = rats(
+            in_file=brain_extraction_in_file,
+            volume_threshold=brain_volume,
+            intensity_threshold=int(out_clip_level.outputs.clip_val),
+            terminal_output=terminal_output)
+        brain_mask_files.append(out_rats.outputs.out_file)
 
     ###########################################################################
     # Second extract brains, aided by an approximate guessed brain volume,
     # and set the NIfTI image centre (as defined in the header) to the CoM
     # of the extracted brain.
+    if unifize_kwargs is None:
+        unifize_kwargs = {}
+
+    unifized_files = []
+    for n, anat_file in enumerate(copied_anat_filenames):
+        out_unifize = unifize(in_file=anat_file,
+                              out_file='%s_Unifized_for_brain_extraction.nii.gz',
+                              outputtype='NIFTI_GZ',
+                              **unifize_kwargs)
+        unifized_files.append(out_unifize.outputs.out_file)
+
     brain_files = []
-    for unifized_file in unifized_files:
-        out_clip_level = clip_level(in_file=unifized_file)
-        out_rats = rats(
-            in_file=unifized_file,
-            volume_threshold=brain_volume,
-            intensity_threshold=int(out_clip_level.outputs.clip_val),
-            terminal_output=terminal_output)
+    for (brain_mask_file, unifized_file) in zip(brain_mask_files,
+                                                unifized_files):
         out_apply_mask = apply_mask(in_file=unifized_file,
-                                    mask_file=out_rats.outputs.out_file)
+                                    mask_file=brain_mask_file)
         out_center_mass = center_mass(
             in_file=out_apply_mask.outputs.out_file,
             cm_file=fname_presuffix(unifized_file, suffix='_cm.txt',
@@ -530,7 +539,8 @@ def anats_to_template(anat_filenames, head_template_filename, write_dir,
                       brain_template_filename=None,
                       dilated_head_mask_filename=None, convergence=.005,
                       maxlev=None,
-                      caching=False, verbose=True):
+                      caching=False, verbose=True, unifize_kwargs=None,
+                      brain_extraction_unifize_kwargs=None):
     """ Registers raw anatomical images to a given template.
 
     Parameters
@@ -573,6 +583,14 @@ def anats_to_template(anat_filenames, head_template_filename, write_dir,
     verbose : bool, optional
         If True, all steps are verbose. Note that caching implies some
         verbosity in any case.
+
+    unifize_kwargs : dict, optional
+        Is passed to sammba.externals.nipype.interfaces.afni.Unifize, to
+        control bias correction of the template.
+
+    brain_extraction_unifize_kwargs : dict, optional
+        Is passed to sammba.externals.nipype.interfaces.afni.Unifize, to tune
+        the seperate bias correction step done prior to brain extraction.
 
     Returns
     -------
@@ -642,20 +660,42 @@ def anats_to_template(anat_filenames, head_template_filename, write_dir,
         dilated_head_mask_filename = out_mask_tool.outputs.out_file
         intermediate_files.append(out_threshold.outputs.out_file)
 
-    affine_transforms = []
-    allineated_filenames = []
-    for anat_filename in anat_filenames:
-        out_unifize = unifize(in_file=anat_filename, environ=environ,
-                              urad=18.3, outputtype='NIFTI_GZ')
-        unbiased_anat_filename = out_unifize.outputs.out_file
+    if brain_extraction_unifize_kwargs is None:
+        brain_extraction_unifize_kwargs = {}
 
-        out_clip_level = clip_level(in_file=unbiased_anat_filename)
+    brain_extraction_in_files = []
+    for anat_filename in anat_filenames:
+        out_unifize = unifize(in_file=anat_filename, outputtype='NIFTI_GZ',
+                              environ=environ,
+                              **brain_extraction_unifize_kwargs)
+        brain_extraction_in_files.append(out_unifize.outputs.out_file)
+
+    brain_mask_files = []
+    for brain_extraction_in_file in brain_extraction_in_files:
+        out_clip_level = clip_level(in_file=brain_extraction_in_file)
         out_rats = rats(
-            in_file=unbiased_anat_filename,
+            in_file=brain_extraction_in_file,
             volume_threshold=brain_volume,
             intensity_threshold=int(out_clip_level.outputs.clip_val))
+        brain_mask_files.append(out_rats.outputs.out_file)
+
+    if unifize_kwargs is None:
+        unifize_kwargs = {}
+
+    unbiased_anat_filenames = []
+    for anat_filename in anat_filenames:
+        out_unifize = unifize(in_file=anat_filename, environ=environ,
+                              urad=18.3, outputtype='NIFTI_GZ',
+                              **unifize_kwargs)
+        unbiased_anat_filenames.append(out_unifize.outputs.out_file)
+
+    affine_transforms = []
+    allineated_filenames = []
+    for (unbiased_anat_filename,
+         brain_mask_file) in zip(unbiased_anat_filenames,
+                                 brain_mask_files):
         out_apply_mask = apply_mask(in_file=unbiased_anat_filename,
-                                    mask_file=out_rats.outputs.out_file)
+                                    mask_file=brain_mask_file)
         masked_anat_filename = out_apply_mask.outputs.out_file
 
         # the actual T1anat to template registration using the brain extracted
