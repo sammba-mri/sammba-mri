@@ -148,7 +148,9 @@ def anats_to_common(anat_filenames, write_dir, brain_volume,
 
     brain_extraction_in_files = []
     for n, anat_file in enumerate(copied_anat_filenames):
-        out_unifize = unifize(in_file=anat_file, outputtype='NIFTI_GZ',
+        out_unifize = unifize(in_file=anat_file,
+							  out_file='%s_Unifized_for_brain_mask.nii.gz',
+							  outputtype='NIFTI_GZ',
                               **brain_extraction_unifize_kwargs)
         brain_extraction_in_files.append(out_unifize.outputs.out_file)
 
@@ -167,11 +169,13 @@ def anats_to_common(anat_filenames, write_dir, brain_volume,
     # and set the NIfTI image centre (as defined in the header) to the CoM
     # of the extracted brain.
     if unifize_kwargs is None:
-        unifize_kwargs = {'cl_frac': .2}
+        unifize_kwargs = {}
 
     unifized_files = []
     for n, anat_file in enumerate(copied_anat_filenames):
-        out_unifize = unifize(in_file=anat_file, outputtype='NIFTI_GZ',
+        out_unifize = unifize(in_file=anat_file,
+							  out_file='%s_Unifized_for_brain_extraction.nii.gz',
+							  outputtype='NIFTI_GZ',
                               **unifize_kwargs)
         unifized_files.append(out_unifize.outputs.out_file)
 
