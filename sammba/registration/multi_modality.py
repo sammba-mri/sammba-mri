@@ -8,10 +8,8 @@ from ..interfaces import RatsMM
 from .utils import fix_obliquity
 
 
-def _mask_outside_brain(head_filename, write_dir,
-                        brain_volume, caching=False,
-                        terminal_output='allatonce',
-                        environ={}):
+def _extract_brain(head_filename, write_dir, brain_volume, caching=False,
+                   terminal_output='allatonce', environ={}):
     if caching:
         memory = Memory(write_dir)
         clip_level = memory.cache(afni.ClipLevel)
@@ -329,5 +327,3 @@ def _per_slice_qwarp(to_qwarp_filename, target_filename, write_dir,
 
     return (out_merge_func.outputs.merged_file, warp_filenames,
             merged_apply_to_filename)
-
-

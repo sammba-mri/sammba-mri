@@ -626,7 +626,9 @@ def anats_to_template(anat_filenames, head_template_filename, write_dir,
             in_file=head_template_filename,
             volume_threshold=brain_volume,
             intensity_threshold=int(out_clip_level.outputs.clip_val))
-        brain_template_filename = out_rats.outputs.out_file
+        out_apply_mask = apply_mask(in_file=head_template_filename,
+                                    mask_file=out_rats.outputs.out_file)
+        brain_template_filename = out_apply_mask.outputs.out_file
 
     if dilated_head_mask_filename is None:
         out_clip_level = clip_level(in_file=head_template_filename)
@@ -713,8 +715,6 @@ def anats_to_template(anat_filenames, head_template_filename, write_dir,
         # find)
         # XXX what is the need to the iwarp ?
         if maxlev is not None:
-            print(allineated_filename)
-            print(head_template_filename)
             out_qwarp = qwarp(
                 in_file=allineated_filename,
                 base_file=head_template_filename,

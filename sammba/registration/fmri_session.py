@@ -4,7 +4,7 @@ from ..externals.nipype.caching import Memory
 from ..externals.nipype.interfaces import afni, fsl
 from ..externals.nipype.utils.filemanip import fname_presuffix
 from .struct import anats_to_template
-from .multi_modality import (_mask_outside_brain, _rigid_body_register, _warp,
+from .multi_modality import (_extract_brain, _rigid_body_register, _warp,
                              _per_slice_qwarp)
 
 
@@ -311,10 +311,10 @@ class FMRISession(object):
         # Rigid-body registration anat -> mean func #
         #############################################
         if prior_rigid_body_registration:
-            anat_brain_filename = _mask_outside_brain(
+            anat_brain_filename = _extract_brain(
                 unbiased_anat_filename, write_dir, brain_volume, caching=False,
                 terminal_output=terminal_output, environ=environ)
-            func_brain_filename = _mask_outside_brain(
+            func_brain_filename = _extract_brain(
                 unbiased_mean_func_filename, write_dir, brain_volume,
                 caching=False, terminal_output=terminal_output,
                 environ=environ)
@@ -344,8 +344,11 @@ class FMRISession(object):
                                              suffix='_anat_to_func.aff12.1D',
                                              use_ext=False)
         if prior_rigid_body_registration:
-            _ = catmatvec(in_file=[(mat_filename, 'ONELINE'),
-                                   (rigid_transform_file, 'ONELINE')],
+#            _ = catmatvec(in_file=[(mat_filename, 'ONELINE'),
+#                                   (rigid_transform_file, 'ONELINE')],
+#                          oneline=True,
+#                          out_file=transform_filename)
+            _ = catmatvec(in_file=[(mat_filename, 'ONELINE')],
                           oneline=True,
                           out_file=transform_filename)
         else:
@@ -380,7 +383,7 @@ class FMRISession(object):
                              dilated_head_mask_filename=None,
                              prior_rigid_body_registration=False,
                              slice_timing=True,
-                             maxlev=2,
+                             maxlev=None,
                              caching=False, verbose=True):
         """ Registration of subject's functional and anatomical images to
         a given template.
@@ -422,7 +425,7 @@ class FMRISession(object):
 
         Returns
         -------
-        The following attributes are added
+        The following attributes are added/updated
             - `template_` : str
                            Path to the given registration template.
             - `output_dir_` : str
@@ -447,8 +450,6 @@ class FMRISession(object):
         animal_output_dir = os.path.join(os.path.abspath(write_dir),
                                          self.animal_id)
         self._set_output_dir_(animal_output_dir)
-        # XXX do a function for creating new attributes ?
-        setattr(self, "template_", head_template_filename)
 
         if not hasattr(self, 'coreg_func_') or not hasattr(self,
                                                            'coreg_transform_'):
@@ -458,6 +459,8 @@ class FMRISession(object):
                 slice_timing=slice_timing,
                 caching=caching, verbose=verbose)
 
+        # XXX do a function for creating new attributes ?
+        setattr(self, "template_", head_template_filename)
         anats_registration = anats_to_template(
             [self.anat],
             head_template_filename,
