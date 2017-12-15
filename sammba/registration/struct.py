@@ -10,8 +10,9 @@ def anats_to_common(anat_filenames, write_dir, brain_volume,
                     registration_kind='affine',
                     nonlinear_levels=[1, 2, 3],
                     nonlinear_minimal_patch=75,
-                    convergence=0.005, caching=False, verbose=False,
-                    unifize_kwargs=None, brain_extraction_unifize_kwargs=None):
+					nonlinear_weight=None,
+                    convergence=0.005, caching=False, verbose=True,
+                    unifize_kwargs=None, brain_masking_unifize_kwargs=None):
     """ Create common template from native anatomical images and achieve
     their registration to it.
 
@@ -24,7 +25,7 @@ def anats_to_common(anat_filenames, write_dir, brain_volume,
         Path to an existant directory to save output files to.
 
     brain_volume : int
-        Volumes of the brain as passed to Rats_MM brain extraction tool.
+        Volumes of the brain as passed to Rats_MM brain masking tool.
         Typically 400 for mouse and 1800 for rat.
 
     registration_kind : one of {'rigid', 'affine', 'nonlinear'}, optional
@@ -37,6 +38,32 @@ def anats_to_common(anat_filenames, write_dir, brain_volume,
     nonlinear_minimal_patch : int, optional
         Minimal patch for the final nonlinear warp, passed to
         sammba.externals.nipype.interfaces.afni.Qwarp
+		
+	nonlinear_weight : str, optional
+		Path to a mask used to weight non-linear registration.
+		
+		Background:
+        Without this weight mask, for automatic non-linear registration, a mask 
+		is generated from the brain-extracted affines and dilated to include 
+		some scalp. The non-linear registration is then weighted to work only 
+		within this mask. This substantially improves performance by 1) reducing 
+		the number of voxels to analyse, and 2) avoiding other parts of the head 
+		where structures are highly variable and signal often poor. However, 
+		this automatically-generated mask is frequently sub-optimal, usually due 
+		to missing paraflocculi and inappropriate dilation.
+		
+		Practical use:
+		Of course, it is impossible to know ahead of time where to weight the 
+		image before the brains/heads have been registered to each other. So in 
+		practice a first running of this script is done up until and including 
+		the affine stage (the default). The user should then manually use 
+		3dmask_tool to create an intersect/frac/union mask of the 
+		_Unifized_for_brain_extraction_masked_resample_shr_affine_catenated 
+		files. These can then be dilated as needed to include some scalp. 
+		Missing regions can be added manually. This does not have to be done 
+		precisely, only roughly, and it is better to include too much tissue 
+		than too little. The procedure should then be rerun as non-linear, but 
+		using this weight mask.
 
     caching : bool, optional
         If True, caching is used for all the registration steps.
@@ -53,9 +80,9 @@ def anats_to_common(anat_filenames, write_dir, brain_volume,
         Is passed to sammba.externals.nipype.interfaces.afni.Unifize, to
         control bias correction of the template.
 
-    brain_extraction_unifize_kwargs : dict, optional
+    brain_masking_unifize_kwargs : dict, optional
         Is passed to sammba.externals.nipype.interfaces.afni.Unifize, to tune
-        the seperate bias correction step done prior to brain extraction.
+        the seperate bias correction step done prior to brain masking.
 
     Returns
     -------
@@ -143,30 +170,34 @@ def anats_to_common(anat_filenames, write_dir, brain_volume,
     # An initial coarse registration is done using brain centre of mass (CoM).
     #
     # First we loop through anatomical scans and correct intensities for bias.
-    if brain_extraction_unifize_kwargs is None:
-        brain_extraction_unifize_kwargs = {}
+	# Second, brain identification/masking is performed aided by a guessed
+	# approximate brain volume.
+    if brain_masking_unifize_kwargs is None:
+        brain_masking_unifize_kwargs = {}
 
-    brain_extraction_in_files = []
+    brain_masking_in_files = []
     for n, anat_file in enumerate(copied_anat_filenames):
         out_unifize = unifize(in_file=anat_file,
-                              out_file='%s_Unifized_for_brain_mask.nii.gz',
+                              out_file='%s_Unifized_for_brain_mask',
                               outputtype='NIFTI_GZ',
-                              **brain_extraction_unifize_kwargs)
-        brain_extraction_in_files.append(out_unifize.outputs.out_file)
+                              **brain_masking_unifize_kwargs)
+        brain_masking_in_files.append(out_unifize.outputs.out_file)
 
     brain_mask_files = []
-    for n, brain_extraction_in_file in enumerate(brain_extraction_in_files):
-        out_clip_level = clip_level(in_file=brain_extraction_in_file)
+    for n, brain_masking_in_file in enumerate(brain_masking_in_files):
+        out_clip_level = clip_level(in_file=brain_masking_in_file)
         out_rats = rats(
-            in_file=brain_extraction_in_file,
+            in_file=brain_masking_in_file,
             volume_threshold=brain_volume,
             intensity_threshold=int(out_clip_level.outputs.clip_val),
             terminal_output=terminal_output)
         brain_mask_files.append(out_rats.outputs.out_file)
 
     ###########################################################################
-    # Second extract brains, aided by an approximate guessed brain volume,
-    # and set the NIfTI image centre (as defined in the header) to the CoM
+    # First, bias-correct images (to a different set of parameters that the 
+	# previous step if needed), then extract them using the mask from the same 
+	# previous step
+    # Second, set the NIfTI image centre (as defined in the header) to the CoM
     # of the extracted brain.
     if unifize_kwargs is None:
         unifize_kwargs = {}
@@ -174,7 +205,7 @@ def anats_to_common(anat_filenames, write_dir, brain_volume,
     unifized_files = []
     for n, anat_file in enumerate(copied_anat_filenames):
         out_unifize = unifize(in_file=anat_file,
-                              out_file='%s_Unifized_for_brain_extraction.nii.gz',
+                              out_file='%s_Unifized_for_brain_extraction',
                               outputtype='NIFTI_GZ',
                               **unifize_kwargs)
         unifized_files.append(out_unifize.outputs.out_file)
@@ -339,7 +370,7 @@ def anats_to_common(anat_filenames, write_dir, brain_volume,
 
     ###########################################################################
     # Each resulting registration matrix is concatenated to the corresponding
-    # rigid bory registration matrix then directly applied to the CoM brain
+    # rigid body registration matrix then directly applied to the CoM brain
     # and head, reducing reslice errors in the final result.
     allineated_brain_files = []
     for centered_brain_file, affine_transform_file in zip(
@@ -387,13 +418,13 @@ def anats_to_common(anat_filenames, write_dir, brain_volume,
     # A weight mask that extends beyond the brain, incorporating some
     # surrounding tissue, is needed to help better define the brain head
     # boundary.
-    out_mask_tool = mask_tool(in_file=out_tcat.outputs.out_file, count=True,
-                              outputtype='NIFTI_GZ')
-    out_mask_tool = mask_tool(in_file=out_tcat.outputs.out_file, union=True,
-                              outputtype='NIFTI_GZ')
-    out_mask_tool = mask_tool(in_file=out_mask_tool.outputs.out_file,
-                              dilate_inputs='4',
-                              outputtype='NIFTI_GZ')
+	if nonlinear_weight is None:
+		out_mask_tool = mask_tool(in_file=out_tcat.outputs.out_file, union=True,
+								  outputtype='NIFTI_GZ')
+		out_mask_tool = mask_tool(in_file=out_mask_tool.outputs.out_file,
+								  dilate_inputs='4',
+								  outputtype='NIFTI_GZ')
+		nonlinear_weight = out_mask_tool.outputs.out_file
 
     ###########################################################################
     # The input source images are initially transformed prior to registration,
@@ -412,7 +443,7 @@ def anats_to_common(anat_filenames, write_dir, brain_volume,
             nmi=True,
             noneg=True,
             iwarp=True,
-            weight=out_mask_tool.outputs.out_file,
+            weight=nonlinear_weight,
             iniwarp=[affine_transform_file],
             inilev=0,
             maxlev=nonlinear_levels[0],
@@ -447,7 +478,7 @@ def anats_to_common(anat_filenames, write_dir, brain_volume,
                 nmi=True,
                 noneg=True,
                 iwarp=True,
-                weight=out_mask_tool.outputs.out_file,
+                weight=nonlinear_weight,
                 iniwarp=[out_nwarp_cat.outputs.out_file],
                 inilev=nonlinear_levels[0],
                 maxlev=nonlinear_levels[1],
@@ -470,7 +501,11 @@ def anats_to_common(anat_filenames, write_dir, brain_volume,
         if nonlinear_minimal_patch is None:
             nonlinear_minimal_patch = 75
 
-        for n_iter, inilev in enumerate(nonlinear_levels[2:]):
+        for n_iter, maxlev in enumerate(nonlinear_levels[2:]):
+			if n_iter == 0:
+				inilev = nonlinear_levels[1]
+			else:
+				inilev = nonlinear_levels[2:][n_iter - 1]
             previous_warp_files = warp_files
             warped_files = []
             warp_files = []
@@ -491,9 +526,10 @@ def anats_to_common(anat_filenames, write_dir, brain_volume,
                     nmi=True,
                     noneg=True,
                     iwarp=True,
-                    weight=out_mask_tool.outputs.out_file,
+                    weight=nonlinear_weight,
                     iniwarp=[warp_file],
                     inilev=inilev,
+					maxlev=maxlev,
                     minpatch=nonlinear_minimal_patch,
                     out_file=out_file)
                 warped_files.append(out_qwarp.outputs.warped_source)
