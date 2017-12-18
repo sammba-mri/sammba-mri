@@ -35,7 +35,7 @@ def anats_to_common(anat_filenames, write_dir, brain_volume,
         Maximal levels for each nonlinear warping iteration. Passed iteratively
         to sammba.externals.nipype.interfaces.afni.Qwarp
 
-    nonlinear_minimal_patch : list of int, optional
+    nonlinear_minimal_patches : list of int, optional
         Minimal patches for the final nonlinear warps, passed to
         sammba.externals.nipype.interfaces.afni.Qwarp
         
@@ -471,7 +471,7 @@ def anats_to_common(anat_filenames, write_dir, brain_volume,
                                                      centered_head_files):
                 out_file = fname_presuffix(
                     centered_head_file,
-                    suffix='_warped{}'.format(n_iter + 1 + len(nonlinear_levels)))
+                    suffix='_warped{}'.format(n_iter + 2))
 
                 out_qwarp = qwarp(
                     in_file=centered_head_file,
@@ -491,7 +491,7 @@ def anats_to_common(anat_filenames, write_dir, brain_volume,
                 out_file=os.path.join(
                     write_dir,
                     'warped_{0}iters_hetemplate_filenameads.nii.gz'.format(
-                        n_iter + 1 + len(nonlinear_levels))))
+                        n_iter + 2)))
             out_tstat_warp_head = tstat(in_file=out_tcat.outputs.out_file,
                                         outputtype='NIFTI_GZ')
 
@@ -508,8 +508,8 @@ def anats_to_common(anat_filenames, write_dir, brain_volume,
                                                      centered_head_files):
                 out_file = fname_presuffix(
                     centered_head_file,
-                    suffix='_warped{}'.format(n_iter + 2))
-
+                    suffix='_warped{}'.format(
+                               n_iter + 1 + len(nonlinear_levels)))
                 out_qwarp = qwarp(
                     in_file=centered_head_file,
                     base_file=out_tstat_warp_head.outputs.out_file,
@@ -528,7 +528,7 @@ def anats_to_common(anat_filenames, write_dir, brain_volume,
                 out_file=os.path.join(
                     write_dir,
                     'warped_{0}iters_hetemplate_filenameads.nii.gz'.format(
-                        n_iter + 2)))
+                        n_iter + 1 + len(nonlinear_levels))))
             out_tstat_warp_head = tstat(in_file=out_tcat.outputs.out_file,
                                         outputtype='NIFTI_GZ')										
 
