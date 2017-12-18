@@ -447,46 +447,43 @@ def anats_to_common(anat_filenames, write_dir, brain_volume,
 
         out_file = fname_presuffix(centered_head_file, suffix='_warped{}'.format(n_iter))
     
-        for warp_file, centered_head_file in zip(previous_warp_files_files, 
-                                                     centered_head_files):
+        for warp_file, centered_head_file in zip(previous_warp_files, 
+                                                 centered_head_files):
 
             if n_iter == 0:
-                inilev = 0
                 out_qwarp = qwarp(
                     in_file=centered_head_file,
                     base_file=out_tstat_allineated_head.outputs.out_file,
                     noneg=True,
                     iwarp=True,
                     weight=nonlinear_weight,
-                    iniwarp=[warp_file],
+                    iniwarp=warp_file,
                     inilev=0,
-                    maxlev=levels_minpatches[0],
-                    out_file=out_file
+                    maxlev=levels_minpatches[n_iter],
+                    out_file=out_file)
                 
             if n_iter < len(nonlinear_levels):
-                inilev = nonlinear_levels[n_iter] + 1
                 out_qwarp = qwarp(
                     in_file=centered_head_file,
                     base_file=out_tstat_warp_head.outputs.out_file,
                     noneg=True,
                     iwarp=True,
                     weight=nonlinear_weight,
-                    iniwarp=[warp_file],
-                    inilev=inilev,
-                    maxlev=maxlev,
+                    iniwarp=warp_file,
+                    inilev=levels_minpatches[n_iter - 1] + 1,
+                    maxlev=levels_minpatches[n_iter],
                     out_file=out_file)
                     
             if n_iter >= len(nonlinear_levels):
-                inilev = nonlinear_levels[-1] + 1 # not ideal, should go up /loop
                 out_qwarp = qwarp(
                     in_file=centered_head_file,
                     base_file=out_tstat_warp_head.outputs.out_file,
                     noneg=True,
                     iwarp=True,
                     weight=nonlinear_weight,
-                    iniwarp=[warp_file],
-                    inilev=inilev,
-                    minpatch=minpatch,
+                    iniwarp=warp_file,
+                    inilev=nonlinear_levels[-1] + 1, # not ideal
+                    minpatch=levels_minpatches[n_iter],
                     out_file=out_file)
                     
             warped_files.append(out_qwarp.outputs.warped_source)
