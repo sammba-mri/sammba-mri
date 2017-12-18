@@ -432,7 +432,7 @@ def anats_to_common(anat_filenames, write_dir, brain_volume,
     # 
     if nonlinear_levels is None:
         nonlinear_levels = [1, 2, 3]
-    if nonlinear_minimal_patches is None
+    if nonlinear_minimal_patches is None:
        nonlinear_minimal_patches = []
     levels_minpatches = nonlinear_levels + nonlinear_minimal_patches
 
