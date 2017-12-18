@@ -832,7 +832,7 @@ def anats_to_template(anat_filenames, head_template_filename, write_dir,
         out_threshold = threshold(in_file=head_template_filename,
                                   thresh=out_clip_level.outputs.clip_val)
         out_mask_tool = mask_tool(in_file=out_threshold.outputs.out_file,
-                                  dilate_inputs='3', verbose=verbose,
+                                  dilate_inputs='3',
                                   outputtype='NIFTI_GZ', environ=environ)
         dilated_head_mask_filename = out_mask_tool.outputs.out_file
         intermediate_files.append(out_threshold.outputs.out_file)
