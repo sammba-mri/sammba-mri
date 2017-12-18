@@ -427,52 +427,44 @@ def anats_to_common(anat_filenames, write_dir, brain_volume,
         nonlinear_weight = out_mask_tool.outputs.out_file
 
     ###########################################################################
-    # The input source images are initially transformed prior to registration,
-    # to ensure that they are already quite well-aligned to the template.
-    # To save time, we only achieve one refinement level per step
+    # Description to fill
+    # 
+    # 
     if nonlinear_levels is None:
         nonlinear_levels = [1, 2, 3]
+    if nonlinear_minimal_patches is None
+       nonlinear_minimal_patches = []
+    levels_minpatches = nonlinear_levels + nonlinear_minimal_patches
 
-    warped_files = []
-    warp_files = []
-    for affine_transform_file, centered_head_file in zip(
-            affine_transform_files, centered_head_files):
-        out_qwarp = qwarp(
-            in_file=centered_head_file,
-            base_file=out_tstat_allineated_head.outputs.out_file,
-            noneg=True,
-            iwarp=True,
-            weight=nonlinear_weight,
-            iniwarp=[affine_transform_file],
-            inilev=0,
-            maxlev=nonlinear_levels[0],
-            out_file=fname_presuffix(centered_head_file, suffix='_warped1'))
-        warp_files.append(out_qwarp.outputs.source_warp)
-        warped_files.append(out_qwarp.outputs.warped_source)
-
-    out_tcat = tcat(
-        in_files=warped_files,
-        out_file=os.path.join(write_dir, 'warped_1iter_heads.nii.gz'))
-    out_tstat_warp_head = tstat(in_file=out_tcat.outputs.out_file,
-                                outputtype='NIFTI_GZ')
-
-    ###########################################################################
-    # Using previous files and concatenated transforms can be exploited to
-    # avoid building up reslice errors.
-    # Warp to maxlev
-    if len(nonlinear_levels) > 1:
-
-        for n_iter, maxlev in enumerate(nonlinear_levels[1:]):
-            inilev = nonlinear_levels[n_iter] + 1
+    for n_iter, level_or_minpatch in enumerate(levels_minpatches):
+        
+        if n_iter == 0:
+            previous_warp_files = affine_transform_files
+        else:
             previous_warp_files = warp_files
-            warped_files = []
-            warp_files = []
-            for warp_file, centered_head_file in zip(previous_warp_files,
-                                                     centered_head_files):
-                out_file = fname_presuffix(
-                    centered_head_file,
-                    suffix='_warped{}'.format(n_iter + 2))
+        warped_files = []
+        warp_files = []
 
+        out_file = fname_presuffix(centered_head_file, suffix='_warped{}'.format(n_iter))
+    
+        for warp_file, centered_head_file in zip(previous_warp_files_files, 
+                                                     centered_head_files):
+
+            if n_iter == 0:
+                inilev = 0
+                out_qwarp = qwarp(
+                    in_file=centered_head_file,
+                    base_file=out_tstat_allineated_head.outputs.out_file,
+                    noneg=True,
+                    iwarp=True,
+                    weight=nonlinear_weight,
+                    iniwarp=[warp_file],
+                    inilev=0,
+                    maxlev=levels_minpatches[0],
+                    out_file=out_file
+                
+            if n_iter < len(nonlinear_levels):
+                inilev = nonlinear_levels[n_iter] + 1
                 out_qwarp = qwarp(
                     in_file=centered_head_file,
                     base_file=out_tstat_warp_head.outputs.out_file,
@@ -483,33 +475,9 @@ def anats_to_common(anat_filenames, write_dir, brain_volume,
                     inilev=inilev,
                     maxlev=maxlev,
                     out_file=out_file)
-                warped_files.append(out_qwarp.outputs.warped_source)
-                warp_files.append(out_qwarp.outputs.source_warp)
-
-            out_tcat = tcat(
-                in_files=warped_files,
-                out_file=os.path.join(
-                    write_dir,
-                    'warped_{0}iters_hetemplate_filenameads.nii.gz'.format(
-                        n_iter + 2)))
-            out_tstat_warp_head = tstat(in_file=out_tcat.outputs.out_file,
-                                        outputtype='NIFTI_GZ')
-
-    ###########################################################################
-    # Similar to previous loop but warp to minpatch rather than maxlev
-    if len(nonlinear_minimal_patches) is not None:
-
-        for n_iter, minpatch in enumerate(nonlinear_minimal_patches):
-            inilev = nonlinear_levels[-1] # not ideal, ought to rise per loop
-            previous_warp_files = warp_files
-            warped_files = []
-            warp_files = []
-            for warp_file, centered_head_file in zip(previous_warp_files,
-                                                     centered_head_files):
-                out_file = fname_presuffix(
-                    centered_head_file,
-                    suffix='_warped{}'.format(
-                               n_iter + 1 + len(nonlinear_levels)))
+                    
+            if n_iter >= len(nonlinear_levels):
+                inilev = nonlinear_levels[-1] + 1 # not ideal, should go up /loop
                 out_qwarp = qwarp(
                     in_file=centered_head_file,
                     base_file=out_tstat_warp_head.outputs.out_file,
@@ -520,21 +488,18 @@ def anats_to_common(anat_filenames, write_dir, brain_volume,
                     inilev=inilev,
                     minpatch=minpatch,
                     out_file=out_file)
-                warped_files.append(out_qwarp.outputs.warped_source)
-                warp_files.append(out_qwarp.outputs.source_warp)
+                    
+            warped_files.append(out_qwarp.outputs.warped_source)
+            warp_files.append(out_qwarp.outputs.source_warp)
+        
+        out_tcat = tcat(
+            in_files=warped_files,
+            out_file=os.path.join(
+			    write_dir,
+				'warped_{0}iters_hetemplate_filenameads.nii.gz'))
+        out_tstat_warp_head = tstat(in_file=out_tcat.outputs.out_file,
+                                    outputtype='NIFTI_GZ')
 
-            out_tcat = tcat(
-                in_files=warped_files,
-                out_file=os.path.join(
-                    write_dir,
-                    'warped_{0}iters_hetemplate_filenameads.nii.gz'.format(
-                        n_iter + 1 + len(nonlinear_levels))))
-            out_tstat_warp_head = tstat(in_file=out_tcat.outputs.out_file,
-                                        outputtype='NIFTI_GZ')										
-
-    ###########################################################################
-    # We can repeat this very last warp while using the last average until we
-    # are satisfied with the template quality
 
     ###########################################################################
     # Register to template
