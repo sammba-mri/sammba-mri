@@ -9,8 +9,8 @@ from sklearn.datasets.base import Bunch
 def anats_to_common(anat_filenames, write_dir, brain_volume,
                     registration_kind='affine',
                     nonlinear_levels=[1, 2, 3],
-                    nonlinear_minimal_patch=75,
-					nonlinear_weight=None,
+                    nonlinear_minimal_patches=[75],
+                    nonlinear_weight=None,
                     convergence=0.005, caching=False, verbose=True,
                     unifize_kwargs=None, brain_masking_unifize_kwargs=None):
     """ Create common template from native anatomical images and achieve
@@ -35,35 +35,35 @@ def anats_to_common(anat_filenames, write_dir, brain_volume,
         Maximal levels for each nonlinear warping iteration. Passed iteratively
         to sammba.externals.nipype.interfaces.afni.Qwarp
 
-    nonlinear_minimal_patch : int, optional
-        Minimal patch for the final nonlinear warp, passed to
+    nonlinear_minimal_patch : list of int, optional
+        Minimal patches for the final nonlinear warps, passed to
         sammba.externals.nipype.interfaces.afni.Qwarp
-		
-	nonlinear_weight : str, optional
-		Path to a mask used to weight non-linear registration.
-		
-		Background:
+        
+    nonlinear_weight : str, optional
+        Path to a mask used to weight non-linear registration.
+        
+        Background:
         Without this weight mask, for automatic non-linear registration, a mask 
-		is generated from the brain-extracted affines and dilated to include 
-		some scalp. The non-linear registration is then weighted to work only 
-		within this mask. This substantially improves performance by 1) reducing 
-		the number of voxels to analyse, and 2) avoiding other parts of the head 
-		where structures are highly variable and signal often poor. However, 
-		this automatically-generated mask is frequently sub-optimal, usually due 
-		to missing paraflocculi and inappropriate dilation.
-		
-		Practical use:
-		Of course, it is impossible to know ahead of time where to weight the 
-		image before the brains/heads have been registered to each other. So in 
-		practice a first running of this script is done up until and including 
-		the affine stage (the default). The user should then manually use 
-		3dmask_tool to create an intersect/frac/union mask of the 
-		_Unifized_for_brain_extraction_masked_resample_shr_affine_catenated 
-		files. These can then be dilated as needed to include some scalp. 
-		Missing regions can be added manually. This does not have to be done 
-		precisely, only roughly, and it is better to include too much tissue 
-		than too little. The procedure should then be rerun as non-linear, but 
-		using this weight mask.
+        is generated from the brain-extracted affines and dilated to include 
+        some scalp. The non-linear registration is then weighted to work only 
+        within this mask. This substantially improves performance by 1) reducing 
+        the number of voxels to analyse, and 2) avoiding other parts of the head 
+        where structures are highly variable and signal often poor. However, 
+        this automatically-generated mask is frequently sub-optimal, usually due 
+        to missing paraflocculi and inappropriate dilation.
+        
+        Practical use:
+        Of course, it is impossible to know ahead of time where to weight the 
+        image before the brains/heads have been registered to each other. So in 
+        practice a first running of this script is done up until and including 
+        the affine stage (the default). The user should then manually use 
+        3dmask_tool to create an intersect/frac/union mask of the 
+        _Unifized_for_brain_extraction_masked_resample_shr_affine_catenated 
+        files. These can then be dilated as needed to include some scalp. 
+        Missing regions can be added manually. This does not have to be done 
+        precisely, only roughly, and it is better to include too much tissue 
+        than too little. The procedure should then be rerun as non-linear, but 
+        using this weight mask.
 
     caching : bool, optional
         If True, caching is used for all the registration steps.
@@ -170,8 +170,8 @@ def anats_to_common(anat_filenames, write_dir, brain_volume,
     # An initial coarse registration is done using brain centre of mass (CoM).
     #
     # First we loop through anatomical scans and correct intensities for bias.
-	# Second, brain identification/masking is performed aided by a guessed
-	# approximate brain volume.
+    # Second, brain identification/masking is performed aided by a guessed
+    # approximate brain volume.
     if brain_masking_unifize_kwargs is None:
         brain_masking_unifize_kwargs = {}
 
@@ -195,8 +195,8 @@ def anats_to_common(anat_filenames, write_dir, brain_volume,
 
     ###########################################################################
     # First, bias-correct images (to a different set of parameters that the 
-	# previous step if needed), then extract them using the mask from the same 
-	# previous step
+    # previous step if needed), then extract them using the mask from the same 
+    # previous step
     # Second, set the NIfTI image centre (as defined in the header) to the CoM
     # of the extracted brain.
     if unifize_kwargs is None:
@@ -418,13 +418,13 @@ def anats_to_common(anat_filenames, write_dir, brain_volume,
     # A weight mask that extends beyond the brain, incorporating some
     # surrounding tissue, is needed to help better define the brain head
     # boundary.
-	if nonlinear_weight is None:
-		out_mask_tool = mask_tool(in_file=out_tcat.outputs.out_file, union=True,
-								  outputtype='NIFTI_GZ')
-		out_mask_tool = mask_tool(in_file=out_mask_tool.outputs.out_file,
-								  dilate_inputs='4',
-								  outputtype='NIFTI_GZ')
-		nonlinear_weight = out_mask_tool.outputs.out_file
+    if nonlinear_weight is None:
+        out_mask_tool = mask_tool(in_file=out_tcat.outputs.out_file, union=True,
+                                  outputtype='NIFTI_GZ')
+        out_mask_tool = mask_tool(in_file=out_mask_tool.outputs.out_file,
+                                  dilate_inputs='4',
+                                  outputtype='NIFTI_GZ')
+        nonlinear_weight = out_mask_tool.outputs.out_file
 
     ###########################################################################
     # The input source images are initially transformed prior to registration,
@@ -440,7 +440,6 @@ def anats_to_common(anat_filenames, write_dir, brain_volume,
         out_qwarp = qwarp(
             in_file=centered_head_file,
             base_file=out_tstat_allineated_head.outputs.out_file,
-            nmi=True,
             noneg=True,
             iwarp=True,
             weight=nonlinear_weight,
@@ -458,79 +457,31 @@ def anats_to_common(anat_filenames, write_dir, brain_volume,
                                 outputtype='NIFTI_GZ')
 
     ###########################################################################
-    # Then iterative registration from a given level to another is achieved.
-    # Note that any level below a patch size of 25 will not be done (see
-    # 3dQwarp help for further detail).
-    # The input transform is the former warp and needs to be concatenated to
-    # IDENT initially; I forget why, I think it is to avoid some weird bug.
-    if len(nonlinear_levels) > 1:
-        previous_warp_files = warp_files
-        warped_files = []
-        warp_files = []
-        for warp_file, centered_head_file in zip(previous_warp_files,
-                                                 centered_head_files):
-            out_nwarp_cat = nwarp_cat(
-                in_files=[('IDENT', out_tstat_warp_head.outputs.out_file),
-                          warp_file], out_file='iniwarp.nii.gz')
-            out_qwarp = qwarp(
-                in_file=centered_head_file,
-                base_file=out_tstat_warp_head.outputs.out_file,
-                nmi=True,
-                noneg=True,
-                iwarp=True,
-                weight=nonlinear_weight,
-                iniwarp=[out_nwarp_cat.outputs.out_file],
-                inilev=nonlinear_levels[0],
-                maxlev=nonlinear_levels[1],
-                out_file=fname_presuffix(centered_head_file,
-                                         suffix='_warped2'))
-            warp_files.append(out_qwarp.outputs.source_warp)
-            warped_files.append(out_qwarp.outputs.warped_source)
-
-        out_tcat = tcat(in_files=warped_files,
-                        out_file='warped_2iters_heads.nii.gz')
-        out_tstat_warp_head = tstat(in_file=out_tcat.outputs.out_file,
-                                    outputtype='NIFTI_GZ')
-
-    ###########################################################################
     # Using previous files and concatenated transforms can be exploited to
     # avoid building up reslice errors.
-    # Warp with mini-patch
-    # In this particular case, minpatch=75 corresponds to a level of 4
-    if len(nonlinear_levels) > 2:
-        if nonlinear_minimal_patch is None:
-            nonlinear_minimal_patch = 75
+    # Warp to maxlev
+    if len(nonlinear_levels) > 1:
 
-        for n_iter, maxlev in enumerate(nonlinear_levels[2:]):
-			if n_iter == 0:
-				inilev = nonlinear_levels[1]
-			else:
-				inilev = nonlinear_levels[2:][n_iter - 1]
+        for n_iter, maxlev in enumerate(nonlinear_levels[1:]):
+            inilev = nonlinear_levels[n_iter] + 1
             previous_warp_files = warp_files
             warped_files = []
             warp_files = []
             for warp_file, centered_head_file in zip(previous_warp_files,
                                                      centered_head_files):
-                suffixed_file = fname_presuffix(
+                out_file = fname_presuffix(
                     centered_head_file,
-                    suffix='_warped{}'.format(n_iter + 3))
-                if n_iter == len(nonlinear_levels):
-                    out_file = os.path.join(write_dir,
-                                            os.path.basename(suffixed_file))
-                else:
-                    out_file = suffixed_file
+                    suffix='_warped{}'.format(n_iter + 2))
 
                 out_qwarp = qwarp(
                     in_file=centered_head_file,
                     base_file=out_tstat_warp_head.outputs.out_file,
-                    nmi=True,
                     noneg=True,
                     iwarp=True,
                     weight=nonlinear_weight,
                     iniwarp=[warp_file],
                     inilev=inilev,
-					maxlev=maxlev,
-                    minpatch=nonlinear_minimal_patch,
+                    maxlev=maxlev,
                     out_file=out_file)
                 warped_files.append(out_qwarp.outputs.warped_source)
                 warp_files.append(out_qwarp.outputs.source_warp)
@@ -540,9 +491,46 @@ def anats_to_common(anat_filenames, write_dir, brain_volume,
                 out_file=os.path.join(
                     write_dir,
                     'warped_{0}iters_hetemplate_filenameads.nii.gz'.format(
-                        n_iter + 3)))
+                        n_iter + 2)))
             out_tstat_warp_head = tstat(in_file=out_tcat.outputs.out_file,
                                         outputtype='NIFTI_GZ')
+
+    ###########################################################################
+    # Similar to previous loop but warp to minpatch rather than maxlev
+    if len(nonlinear_minimal_patches) is not None:
+
+        for n_iter, minpatch in enumerate(nonlinear_minimal_patches):
+            inilev = nonlinear_levels[-1] # not ideal, ought to rise per loop
+            previous_warp_files = warp_files
+            warped_files = []
+            warp_files = []
+            for warp_file, centered_head_file in zip(previous_warp_files,
+                                                     centered_head_files):
+                out_file = fname_presuffix(
+                    centered_head_file,
+                    suffix='_warped{}'.format(n_iter + 2))
+
+                out_qwarp = qwarp(
+                    in_file=centered_head_file,
+                    base_file=out_tstat_warp_head.outputs.out_file,
+                    noneg=True,
+                    iwarp=True,
+                    weight=nonlinear_weight,
+                    iniwarp=[warp_file],
+                    inilev=inilev,
+                    minpatch=minpatch,
+                    out_file=out_file)
+                warped_files.append(out_qwarp.outputs.warped_source)
+                warp_files.append(out_qwarp.outputs.source_warp)
+
+            out_tcat = tcat(
+                in_files=warped_files,
+                out_file=os.path.join(
+                    write_dir,
+                    'warped_{0}iters_hetemplate_filenameads.nii.gz'.format(
+                        n_iter + 2)))
+            out_tstat_warp_head = tstat(in_file=out_tcat.outputs.out_file,
+                                        outputtype='NIFTI_GZ')										
 
     ###########################################################################
     # We can repeat this very last warp while using the last average until we
