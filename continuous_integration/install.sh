@@ -27,7 +27,6 @@ create_new_venv() {
     pip install prov
     pip install nose
     pip install doctest-ignore-unicode
-    sudo apt-get install graphviz
 }
 
 print_conda_requirements() {
@@ -92,6 +91,8 @@ create_new_conda_env() {
         # Make sure that MKL is not used
         conda remove --yes --features mkl || echo "MKL not installed"
     fi
+
+    sudo apt-get install graphviz
 }
 
 if [[ "$DISTRIB" == "neurodebian" ]]; then
