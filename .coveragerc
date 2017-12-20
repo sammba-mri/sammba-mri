@@ -2,7 +2,5 @@
 branch = True
 source = sammba
 include = */sammba/*
-omit =
-    */sammba/externals/*
-    */setup.py
+
 
