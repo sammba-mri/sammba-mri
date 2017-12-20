@@ -100,7 +100,8 @@ if [[ "$DISTRIB" == "neurodebian" ]]; then
     sudo apt-get install -qq python-scipy python-nose python-nibabel\
          python-sklearn python-pandas python-nilearn python-patsy\
          python-networkx python-configparser python-future python-traits\
-         python-simplejson python-funcsigs python-click graphviz
+         python-simplejson python-funcsigs python-click graphviz afni
+    export PATH=/usr/lib/afni/bin:$PATH
 
 elif [[ "$DISTRIB" == "conda" ]]; then
     create_new_conda_env
