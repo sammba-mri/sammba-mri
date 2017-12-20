@@ -103,6 +103,7 @@ if [[ "$DISTRIB" == "neurodebian" ]]; then
          python-simplejson python-funcsigs python-click graphviz afni
     source /etc/afni/afni.sh
     echo "AFNI plugin path $AFNI_PLUGINPATH."
+    echo "AFNI binaries installed in $(which afni)"
 
 elif [[ "$DISTRIB" == "conda" ]]; then
     create_new_conda_env
