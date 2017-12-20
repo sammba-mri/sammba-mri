@@ -492,6 +492,7 @@ def _func_to_template(func_coreg_filename, template_filename, write_dir,
                       func_to_anat_oned_filename,
                       anat_to_template_oned_filename,
                       anat_to_template_warp_filename,
+                      voxel_size=None,
                       caching=False, verbose=True):
     """ Applies successive transforms to coregistered functional to put it in
     template space.
@@ -514,6 +515,9 @@ def _func_to_template(func_coreg_filename, template_filename, write_dir,
 
     anat_to_template_warp_filename : str
         Path to the warp transform from anatomical to template space.
+
+    voxel_size : 3-tuple of floats, optional
+        Voxel size of the registered functional.
 
     caching : bool, optional
         Wether or not to use caching.
@@ -541,10 +545,16 @@ def _func_to_template(func_coreg_filename, template_filename, write_dir,
     warp = "'{0} {1} {2}'".format(anat_to_template_warp_filename,
                                   anat_to_template_oned_filename,
                                   func_to_anat_oned_filename)
+    if voxel_size is not None:
+        warp_kwargs = {}
+    else:
+        warp_kwargs = {'voxel_size': voxel_size}
+
     _ = warp_apply(in_file=func_coreg_filename,
                    master=template_filename,
                    warp=warp,
-                   out_file=normalized_filename)
+                   out_file=normalized_filename,
+                   **warp_kwargs)
     os.chdir(current_dir)
     return normalized_filename
 

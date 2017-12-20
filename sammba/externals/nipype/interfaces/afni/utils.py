@@ -1561,6 +1561,11 @@ class NwarpApplyInputSpec(CommandLineInputSpec):
         desc='be extra verbose :)',
         argstr='-verb',
         xor=['quiet'])
+    voxel_size = traits.Tuple(
+        *[traits.Float()] * 3,
+        argstr='-dxyz %f %f %f',
+        desc='resize the master dataset grid spacing to new dx, dy and dz. '
+             '(cubical voxels, in mm)')
 
 
 class NwarpApply(AFNICommandBase):
