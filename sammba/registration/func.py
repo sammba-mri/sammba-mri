@@ -492,7 +492,7 @@ def _func_to_template(func_coreg_filename, template_filename, write_dir,
                       func_to_anat_oned_filename,
                       anat_to_template_oned_filename,
                       anat_to_template_warp_filename,
-                      voxel_size=None,
+                      resolution=None,
                       caching=False, verbose=True):
     """ Applies successive transforms to coregistered functional to put it in
     template space.
@@ -516,8 +516,8 @@ def _func_to_template(func_coreg_filename, template_filename, write_dir,
     anat_to_template_warp_filename : str
         Path to the warp transform from anatomical to template space.
 
-    voxel_size : 3-tuple of floats, optional
-        Voxel size of the registered functional, in mm.
+    resolution : float, optional
+        Voxel size of the registered functional, in mm (cubical voxels).
 
     caching : bool, optional
         Wether or not to use caching.
@@ -545,10 +545,10 @@ def _func_to_template(func_coreg_filename, template_filename, write_dir,
     warp = "'{0} {1} {2}'".format(anat_to_template_warp_filename,
                                   anat_to_template_oned_filename,
                                   func_to_anat_oned_filename)
-    if voxel_size is None:
+    if resolution is None:
         warp_kwargs = {}
     else:
-        warp_kwargs = {'voxel_size': voxel_size}
+        warp_kwargs = {'resolution': resolution}
 
     _ = warp_apply(in_file=func_coreg_filename,
                    master=template_filename,
@@ -566,7 +566,7 @@ def fmri_sessions_to_template(sessions, t_r, head_template_filename,
                               prior_rigid_body_registration=False,
                               slice_timing=True,
                               maxlev=2,
-                              voxel_size=None,
+                              resolution=None,
                               caching=False, verbose=True):
     """ Registration of subject's functional and anatomical images to
     a given template.
@@ -601,8 +601,8 @@ def fmri_sessions_to_template(sessions, t_r, head_template_filename,
         Maximal level for the warp when registering anat to template. Passed to
         sammba.registration.anats_to_template
 
-    voxel_size : 3-tuple of floats, optional
-        Voxel size of the registered functional, in mm.
+    resolution : float, optional
+        Voxel size of the registered functional, in mm (cubical voxels).
 
     caching : bool, optional
         Wether or not to use caching.
@@ -693,7 +693,7 @@ def fmri_sessions_to_template(sessions, t_r, head_template_filename,
             animal_data.output_dir_,
             animal_data.coreg_transform_,
             anat_to_template_oned_filename,
-            anat_to_template_warp_filename, voxel_size=voxel_size,
+            anat_to_template_warp_filename, resolution=resolution,
             caching=caching, verbose=verbose)
 
         setattr(animal_data, "registered_func_", normalized_func_filename)
