@@ -566,6 +566,7 @@ def fmri_sessions_to_template(sessions, t_r, head_template_filename,
                               prior_rigid_body_registration=False,
                               slice_timing=True,
                               maxlev=2,
+                              voxel_size=None,
                               caching=False, verbose=True):
     """ Registration of subject's functional and anatomical images to
     a given template.
@@ -599,6 +600,9 @@ def fmri_sessions_to_template(sessions, t_r, head_template_filename,
     maxlev : int or None, optional
         Maximal level for the warp when registering anat to template. Passed to
         sammba.registration.anats_to_template
+
+    voxel_size : 3-tuple of floats, optional
+        Voxel size of the registered functional.
 
     caching : bool, optional
         Wether or not to use caching.
@@ -689,7 +693,7 @@ def fmri_sessions_to_template(sessions, t_r, head_template_filename,
             animal_data.output_dir_,
             animal_data.coreg_transform_,
             anat_to_template_oned_filename,
-            anat_to_template_warp_filename,
+            anat_to_template_warp_filename, voxel_size=voxel_size,
             caching=caching, verbose=verbose)
 
         setattr(animal_data, "registered_func_", normalized_func_filename)
