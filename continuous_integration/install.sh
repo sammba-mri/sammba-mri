@@ -102,6 +102,7 @@ if [[ "$DISTRIB" == "neurodebian" ]]; then
          python-networkx python-configparser python-future python-traits\
          python-simplejson python-funcsigs python-click graphviz afni
     source /etc/afni/afni.sh
+    echo "AFNI plugin path $AFNI_PLUGINPATH."
 
 elif [[ "$DISTRIB" == "conda" ]]; then
     create_new_conda_env
