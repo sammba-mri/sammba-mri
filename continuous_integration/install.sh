@@ -101,7 +101,7 @@ if [[ "$DISTRIB" == "neurodebian" ]]; then
          python-sklearn python-pandas python-nilearn python-patsy\
          python-networkx python-configparser python-future python-traits\
          python-simplejson python-funcsigs python-click graphviz afni
-    export PATH=/usr/lib/afni/bin:$PATH
+    source /etc/afni/afni.sh
 
 elif [[ "$DISTRIB" == "conda" ]]; then
     create_new_conda_env
