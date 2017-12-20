@@ -517,7 +517,7 @@ def _func_to_template(func_coreg_filename, template_filename, write_dir,
         Path to the warp transform from anatomical to template space.
 
     voxel_size : 3-tuple of floats, optional
-        Voxel size of the registered functional.
+        Voxel size of the registered functional, in mm.
 
     caching : bool, optional
         Wether or not to use caching.
@@ -545,7 +545,7 @@ def _func_to_template(func_coreg_filename, template_filename, write_dir,
     warp = "'{0} {1} {2}'".format(anat_to_template_warp_filename,
                                   anat_to_template_oned_filename,
                                   func_to_anat_oned_filename)
-    if voxel_size is not None:
+    if voxel_size is None:
         warp_kwargs = {}
     else:
         warp_kwargs = {'voxel_size': voxel_size}
@@ -602,7 +602,7 @@ def fmri_sessions_to_template(sessions, t_r, head_template_filename,
         sammba.registration.anats_to_template
 
     voxel_size : 3-tuple of floats, optional
-        Voxel size of the registered functional.
+        Voxel size of the registered functional, in mm.
 
     caching : bool, optional
         Wether or not to use caching.
