@@ -1,11 +1,8 @@
 [run]
 branch = True
 source = sammba
-include = 
-    */sammba/data_fetchers/*
-    */sammba/registration/*
-    */sammba/interfaces/*
-
+include = */sammba/*
 omit =
     */sammba/externals/*
     */setup.py
+
