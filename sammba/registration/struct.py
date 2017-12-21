@@ -445,7 +445,8 @@ def anats_to_common(anat_filenames, write_dir, brain_volume,
     
     for n_iter, level_or_minpatch in enumerate(levels_minpatches):
         
-        if n_iter == 0: previous_warp_files = affine_transform_files
+        if n_iter == 0:
+            previous_warp_files = affine_transform_files
         warped_files = []
         warp_files = []
     
@@ -482,7 +483,7 @@ def anats_to_common(anat_filenames, write_dir, brain_volume,
                     maxlev=level_or_minpatch,
                     out_file=out_file)
                     
-            elif n_iter >= len(nonlinear_levels):
+            else:
                 out_qwarp = qwarp(
                     in_file=centered_head_file,
                     base_file=out_tstat_warp_head.outputs.out_file,
