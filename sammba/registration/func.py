@@ -492,7 +492,7 @@ def _func_to_template(func_coreg_filename, template_filename, write_dir,
                       func_to_anat_oned_filename,
                       anat_to_template_oned_filename,
                       anat_to_template_warp_filename,
-                      resolution=None,
+                      voxel_size=None,
                       caching=False, verbose=True):
     """ Applies successive transforms to coregistered functional to put it in
     template space.
@@ -516,8 +516,8 @@ def _func_to_template(func_coreg_filename, template_filename, write_dir,
     anat_to_template_warp_filename : str
         Path to the warp transform from anatomical to template space.
 
-    resolution : float, optional
-        Voxel size of the registered functional, in mm (cubical voxels).
+    voxel_size : 3-tuple of floats, optional
+        Voxel size of the registered functional, in mm.
 
     caching : bool, optional
         Wether or not to use caching.
@@ -534,27 +534,33 @@ def _func_to_template(func_coreg_filename, template_filename, write_dir,
     if caching:
         memory = Memory(write_dir)
         warp_apply = memory.cache(afni.NwarpApply)
+        resample = memory.cache(afni.Resample)
         warp_apply.interface().set_default_terminal_output(terminal_output)
+        resample.interface().set_default_terminal_output(terminal_output)
     else:
         warp_apply = afni.NwarpApply(terminal_output=terminal_output).run
+        resample = afni.Resample(terminal_output=terminal_output).run
 
     current_dir = os.getcwd()
     os.chdir(write_dir)
     normalized_filename = fname_presuffix(func_coreg_filename,
                                           suffix='_normalized')
+    if voxel_size is None:
+        func_template_filename = template_filename
+    else:
+        out_resample = resample(in_file=template_filename,
+                                voxel_size=voxel_size,
+                                outputtype='NIFTI_GZ')
+        func_template_filename = out_resample.outputs.out_file
+
     warp = "'{0} {1} {2}'".format(anat_to_template_warp_filename,
                                   anat_to_template_oned_filename,
                                   func_to_anat_oned_filename)
-    if resolution is None:
-        warp_kwargs = {}
-    else:
-        warp_kwargs = {'resolution': resolution}
 
     _ = warp_apply(in_file=func_coreg_filename,
-                   master=template_filename,
+                   master=func_template_filename,
                    warp=warp,
-                   out_file=normalized_filename,
-                   **warp_kwargs)
+                   out_file=normalized_filename)
     os.chdir(current_dir)
     return normalized_filename
 
@@ -566,7 +572,7 @@ def fmri_sessions_to_template(sessions, t_r, head_template_filename,
                               prior_rigid_body_registration=False,
                               slice_timing=True,
                               maxlev=2,
-                              func_resolution=None,
+                              func_voxel_size=None,
                               caching=False, verbose=True):
     """ Registration of subject's functional and anatomical images to
     a given template.
@@ -601,8 +607,8 @@ def fmri_sessions_to_template(sessions, t_r, head_template_filename,
         Maximal level for the warp when registering anat to template. Passed to
         sammba.registration.anats_to_template
 
-    func_resolution : float, optional
-        Voxel size of the registered functional, in mm (cubical voxels).
+    func_voxel_size : 3-tuple of floats, optional
+        Voxel size of the registered functional, in mm.
 
     caching : bool, optional
         Wether or not to use caching.
@@ -693,7 +699,8 @@ def fmri_sessions_to_template(sessions, t_r, head_template_filename,
             animal_data.output_dir_,
             animal_data.coreg_transform_,
             anat_to_template_oned_filename,
-            anat_to_template_warp_filename, resolution=func_resolution,
+            anat_to_template_warp_filename,
+            voxel_size=func_voxel_size,
             caching=caching, verbose=verbose)
 
         setattr(animal_data, "registered_func_", normalized_func_filename)

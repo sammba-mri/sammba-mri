@@ -1561,10 +1561,9 @@ class NwarpApplyInputSpec(CommandLineInputSpec):
         desc='be extra verbose :)',
         argstr='-verb',
         xor=['quiet'])
-    resolution = traits.Float(
-        argstr='-dxyz %f',
-        desc='resize the master dataset grid spacing to new dx, dy and dz. '
-             '(cubical voxels, in mm)')
+    newgrid = traits.Float(
+        argstr='-newgrid %f',
+        desc='Write the output dataset using isotropic grid spacing in mm.')
 
 
 class NwarpApply(AFNICommandBase):
