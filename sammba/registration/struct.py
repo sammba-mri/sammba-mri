@@ -11,7 +11,8 @@ def anats_to_common(anat_filenames, write_dir, brain_volume,
                     nonlinear_levels=[1, 2, 3],
                     nonlinear_minimal_patches=[75],
                     nonlinear_weight_file=None,
-                    convergence=0.005, caching=False, verbose=True,
+                    convergence=0.005, two_blur=1.1,
+                    caching=False, verbose=True,
                     unifize_kwargs=None, brain_masking_unifize_kwargs=None):
     """ Create common template from native anatomical images and achieve
     their registration to it.
@@ -161,8 +162,9 @@ def anats_to_common(anat_filenames, write_dir, brain_volume,
     os.chdir(write_dir)
 
     ###########################################################################
-    # First copy anatomical files, to make sure they are never changed
-    # and they have different names across individuals
+    # First copy anatomical files to make sure the originals are never changed
+    # and they have different names across individuals. Then produce a video of
+    # this raw data and a mean
     copied_anat_filenames = []
     for n, anat_file in enumerate(anat_filenames):
         suffixed_file = fname_presuffix(anat_file, suffix='_{}'.format(n))
@@ -170,44 +172,71 @@ def anats_to_common(anat_filenames, write_dir, brain_volume,
         out_copy = copy(in_file=anat_file, out_file=out_file)
         copied_anat_filenames.append(out_copy.outputs.out_file)
 
+    out_tcat = tcat(in_files=copied_anat_filenames,
+                    out_file=os.path.join(write_dir, 'raw_heads.nii.gz'),
+                    outputtype='NIFTI_GZ', terminal_output=terminal_output)
+    out_tstat = tstat(in_file=out_tcat.outputs.out_file, outputtype='NIFTI_GZ')
+
     ###########################################################################
-    # Register using center of mass
+    # Bias correct and register using center of mass
     # -----------------------------
     # An initial coarse registration is done using brain centre of mass (CoM).
     #
-    # First we loop through anatomical scans and correct intensities for bias.
-    # Second, brain identification/masking is performed aided by a guessed
-    # approximate brain volume.
+    # First we loop through anatomical scans and correct intensities for bias. 
+    # This is done twice with parameters that can be set differently: once to 
+    # create an image for automatic brain mask generation, and a another time 
+    # for the image that will actually have its brain extracted by this mask and 
+    # also be passed on to the rest of the function. This separation is useful
+    # because in some circumstances the ideal bias correction can create zones 
+    # of signal and noise that confuse the brain masker, so it is best if that 
+    # calculation is performed on a differently-corrected image. In a lot(most?) 
+    # cases, the same parameters can be used for both bias correctors (the 
+    # default) as though the correction was only ever done once.
+    #
+    # Second, image centers are redefined based on the CoM of brains extracted 
+    # by the brain masks. The images are then translated to force the new 
+    # centers to all be at the same position: the center of the image matrix. 
+    # This is a crude form of translation-only registration amongst images that 
+    # simultaneously shifts the position of all brains to being in the centre of 
+    # the image if this was not already the case (which it often is not in small 
+    # mammal head imaging where the brain is usually in the upper half).
+    #
+    # Note that the heads created at the end will be the start point for all 
+    # subsequent transformations (meaning any transformation generated from now
+    # on will be a concatenation of previous ones for direct application to CoM-
+    # registered heads). This avoids reslice errors from one registration to the 
+    # next. Ideally it should be done on images prior to center correction 
+    # (which itself involes reslicing), but I have not yet figured out how to 
+    # convert the CoM change into an affine transform (it should be very easy 
+    # but I have other fish to fry).
+    
+    # bias correction for images to be used for brain mask creation
     if brain_masking_unifize_kwargs is None:
         brain_masking_unifize_kwargs = {}
-
     brain_masking_in_files = []
     for n, anat_file in enumerate(copied_anat_filenames):
         out_unifize = unifize(in_file=anat_file,
-                              out_file='%s_Unifized_for_brain_mask',
+                              out_file='%s_Unifized_for_brain_masking',
                               outputtype='NIFTI_GZ',
                               **brain_masking_unifize_kwargs)
         brain_masking_in_files.append(out_unifize.outputs.out_file)
-
+    
+    # brain mask creation
     brain_mask_files = []
     for n, brain_masking_in_file in enumerate(brain_masking_in_files):
         out_clip_level = clip_level(in_file=brain_masking_in_file)
         out_rats = rats(
             in_file=brain_masking_in_file,
+            out_file=fname_presuffix(brain_masking_in_file, suffix='_mask'),
             volume_threshold=brain_volume,
             intensity_threshold=int(out_clip_level.outputs.clip_val),
             terminal_output=terminal_output)
         brain_mask_files.append(out_rats.outputs.out_file)
 
-    ###########################################################################
-    # First, bias-correct images (to a different set of parameters that the 
-    # previous step if needed), then extract them using the mask from the same 
-    # previous step
-    # Second, set the NIfTI image centre (as defined in the header) to the CoM
-    # of the extracted brain.
+    # bias correction for images to be both brain-extracted with the mask 
+    # generated above and then passed on to the rest of the function
     if unifize_kwargs is None:
         unifize_kwargs = {}
-
     unifized_files = []
     for n, anat_file in enumerate(copied_anat_filenames):
         out_unifize = unifize(in_file=anat_file,
@@ -216,6 +245,8 @@ def anats_to_common(anat_filenames, write_dir, brain_volume,
                               **unifize_kwargs)
         unifized_files.append(out_unifize.outputs.out_file)
 
+    # extrcat brains and set NIfTI image center (as defined in the header) to 
+    # the brain CoM
     brain_files = []
     for (brain_mask_file, unifized_file) in zip(brain_mask_files,
                                                 unifized_files):
@@ -228,66 +259,64 @@ def anats_to_common(anat_filenames, write_dir, brain_volume,
             set_cm=(0, 0, 0))
         brain_files.append(out_center_mass.outputs.out_file)
 
-    ###########################################################################
-    # Same header change, for head files.
-    head_files = []
+    # apply center change to head files too
+    head_files = []    
     for unifized_file, brain_file in zip(unifized_files, brain_files):
         out_refit = refit(in_file=unifized_file, duporigin_file=brain_file)
         head_files.append(out_refit.outputs.out_file)
 
-    ###########################################################################
-    # The brain files with new image center are concatenated to produce
-    # a quality check video
-    out_tcat = tcat(in_files=brain_files, outputtype='NIFTI_GZ',
-                    terminal_output=terminal_output)
-
-    ###########################################################################
-    # and averaged
-    out_tstat = tstat(in_file=out_tcat.outputs.out_file, outputtype='NIFTI_GZ')
-
-    ###########################################################################
-    # to create an empty template, with origicopied_t1_filenamesn placed at CoM
+    # create an empty template with a center at the image matrix center
     out_undump = undump(in_file=out_tstat.outputs.out_file,
+                        out_file=os.path.join(write_dir, 'undump.nii.gz'),
                         outputtype='NIFTI_GZ')
     out_refit = refit(in_file=out_undump.outputs.out_file,
                       xorigin='cen', yorigin='cen', zorigin='cen')
 
-    ###########################################################################
-    # Finally, we shift heads and brains within the images to place the CoM at
-    # the image center.
-    centered_head_files = []
-    for head_file in head_files:
-        out_resample = resample(in_file=head_file,
-                                master=out_refit.outputs.out_file,
-                                outputtype='NIFTI_GZ')
-        centered_head_files.append(out_resample.outputs.out_file)
-
+    # shift brains to place their new centers at the same central position. 
+    # make a quality check video and mean
     centered_brain_files = []
     for brain_file in brain_files:
         out_resample = resample(in_file=brain_file,
                                 master=out_refit.outputs.out_file,
                                 outputtype='NIFTI_GZ')
         centered_brain_files.append(out_resample.outputs.out_file)
-
-    ###########################################################################
-    # Quality check videos and average brain
     out_tcat = tcat(in_files=centered_brain_files,
                     out_file=os.path.join(write_dir, 'centered_brains.nii.gz'))
     out_tstat_centered_brain = tstat(in_file=out_tcat.outputs.out_file,
                                      outputtype='NIFTI_GZ')
+    
+    # do the same for heads. is also a better quality check than the brain
+    centered_head_files = []
+    for head_file in head_files:
+        out_resample = resample(in_file=head_file,
+                                master=out_refit.outputs.out_file,
+                                outputtype='NIFTI_GZ')
+        centered_head_files.append(out_resample.outputs.out_file)
+    out_tcat = tcat(in_files=centered_head_files,
+                    out_file=os.path.join(write_dir, 'centered_heads.nii.gz'))
+    out_tstat_centered_brain = tstat(in_file=out_tcat.outputs.out_file,
+                                     outputtype='NIFTI_GZ')
+    
 
     ###########################################################################
-    # At this point, we achieved a translation-only registration of the raw
+    # At this point, we have achieved a translation-only registration of the 
     # anatomical images to each other's brain's (as defined by the brain
-    # extractor) CoMs.
+    # masker) CoMs.
     ###########################################################################
-    # Shift rotate
-    # ------------
-    # Now we move to rigid-body registration of CoM brains, and application of
-    # this registration to CoM heads. This registration requires a target
-    #  template. Here we use mean of all bias-corrected, brain-extracted,
+    # Rigid-body registration (shift rotate in AFNI parlance)
+    # -------------------------------------------------------
+    # Now we move on to the rigid-body registration of CoM brains, and 
+    # application of this registration to CoM heads. This requires a target
+    # template. Here we use the mean of all bias-corrected, brain-extracted,
     # mass-centered images. Other possibilities include an externally-sourced
     # image or, more biased, a nicely-aligned individual.
+    # 
+    # In extreme cases where acquisitions were done at highly variable head 
+    # angles, it may be worth running this twice or even more (for which there 
+    # is no current functionality), but we have never found a case that extreme 
+    # so it is not implemented.
+    
+    # rigid-body registration
     shift_rotated_brain_files = []
     rigid_transform_files = []
     for centered_brain_file in centered_brain_files:
@@ -300,15 +329,13 @@ def anats_to_common(anat_filenames, write_dir, brain_volume,
             reference=out_tstat_centered_brain.outputs.out_file,
             out_matrix=out_matrix,
             convergence=convergence,
-            two_blur=1,
+            two_blur=two_blur,
             warp_type='shift_rotate',
             out_file=fname_presuffix(centered_brain_file, suffix='_shr'))
         rigid_transform_files.append(out_allineate.outputs.out_matrix)
         shift_rotated_brain_files.append(out_allineate.outputs.out_file)
 
-    ###########################################################################
-    # Application to the whole head image. can also be used for a good
-    # demonstration of linear vs. non-linear registration quality
+    # application to the head images
     shift_rotated_head_files = []
     for centered_head_file, rigid_transform_file in zip(centered_head_files,
                                                         rigid_transform_files):
@@ -321,12 +348,15 @@ def anats_to_common(anat_filenames, write_dir, brain_volume,
             out_file=out_file)
         shift_rotated_head_files.append(out_allineate.outputs.out_file)
 
-    ###########################################################################
-    # Note that this rigid body registration may need to be run more than once.
-    # Now we produce an average of rigid body registered heads
+    # quality check video and mean for head and brain
     out_tcat = tcat(
         in_files=shift_rotated_head_files,
         out_file=os.path.join(write_dir, 'rigid_body_registered_heads.nii.gz'))
+    out_tstat_shr = tstat(in_file=out_tcat.outputs.out_file,
+                          outputtype='NIFTI_GZ')
+    out_tcat = tcat(
+        in_files=shift_rotated_brain_files,
+        out_file=os.path.join(write_dir, 'rigid_body_registered_brains.nii.gz'))
     out_tstat_shr = tstat(in_file=out_tcat.outputs.out_file,
                           outputtype='NIFTI_GZ')
 
@@ -338,15 +368,24 @@ def anats_to_common(anat_filenames, write_dir, brain_volume,
     ###########################################################################
     # Affine transform
     # ----------------
-    # We begin by achieving an affine registration on aligned heads.
-    # A weighting mask is used to ...
+    # Similar to the previous rigid-body registration but with the following
+    # differences:
+    # 1) The registration target is now the product of rigid-body rather than
+    #    CoM registration.
+    # 2) Rather than using the mean brain as a target, the mean head is used, 
+    #    weighted by a mask made by binarizing the brains and making a count 
+    #    mask out of them. This should mathematically be exactly the same thing 
+    #    and was done this way partially for fun, partially to make more use of 
+    #    the count mask, whose main purpose is to demonstrate variability in 
+    #    brain size and extraction quality.
+    # 3) There is an extra step for concatenation of transform results.
+    
+    # make the count mask
     out_mask_tool = mask_tool(in_file=out_tcat.outputs.out_file,
                               count=True,
                               outputtype='NIFTI_GZ')
 
-    ###########################################################################
-    # The count mask is also useful for looking at brain extraction efficiency
-    # and differences in brain size.
+    #affine transform
     affine_transform_files = []
     for shift_rotated_head_file, rigid_transform_file in zip(
             shift_rotated_head_files, rigid_transform_files):
@@ -357,12 +396,12 @@ def anats_to_common(anat_filenames, write_dir, brain_volume,
                                        suffix='_affine.aff12.1D',
                                        use_ext=False),
             convergence=convergence,
-            two_blur=1,
+            two_blur=two_blur,
             one_pass=True,
             weight=out_mask_tool.outputs.out_file,
             out_file=fname_presuffix(shift_rotated_head_file,
                                      suffix='_affine'))
-
+        # matrix concatenation
         suffixed_matrix = fname_presuffix(shift_rotated_head_file,
                                           suffix='_affine_catenated.aff12.1D',
                                           use_ext=False)
@@ -374,10 +413,7 @@ def anats_to_common(anat_filenames, write_dir, brain_volume,
                                   out_file=catmatvec_out_file)
         affine_transform_files.append(catmatvec_out_file)
 
-    ###########################################################################
-    # Each resulting registration matrix is concatenated to the corresponding
-    # rigid body registration matrix then directly applied to the CoM brain
-    # and head, reducing reslice errors in the final result.
+    # application to brains
     allineated_brain_files = []
     for centered_brain_file, affine_transform_file in zip(
             centered_brain_files, affine_transform_files):
@@ -389,9 +425,7 @@ def anats_to_common(anat_filenames, write_dir, brain_volume,
                                      suffix='_shr_affine_catenated'))
         allineated_brain_files.append(out_allineate.outputs.out_file)
 
-    ###########################################################################
-    # The application to the whole head image can also be used for a good
-    # demonstration of linear vs. non-linear registration quality.
+    # application to heads
     allineated_head_files = []
     for centered_head_file, affine_transform_file in zip(
             centered_head_files, affine_transform_files):
@@ -405,12 +439,16 @@ def anats_to_common(anat_filenames, write_dir, brain_volume,
             out_file=out_file)
         allineated_head_files.append(out_allineate.outputs.out_file)
 
-    ###########################################################################
-    # Quality check videos and template
+    #quality check videos and template for head and brain
     out_tcat_head = tcat(
         in_files=allineated_head_files,
         out_file=os.path.join(write_dir, 'affine_registered_heads.nii.gz'))
     out_tstat_allineated_head = tstat(in_file=out_tcat_head.outputs.out_file,
+                                      outputtype='NIFTI_GZ')
+    out_tcat_brain = tcat(
+        in_files=allineated_brain_files,
+        out_file=os.path.join(write_dir, 'affine_registered_brains.nii.gz'))
+    out_tstat_allineated_brain = tstat(in_file=out_tcat_brain.outputs.out_file,
                                       outputtype='NIFTI_GZ')
 
     if registration_kind == 'affine':
@@ -425,11 +463,20 @@ def anats_to_common(anat_filenames, write_dir, brain_volume,
     # surrounding tissue, is needed to help better define the brain head
     # boundary.
     if nonlinear_weight_file is None:
-        out_mask_tool = mask_tool(in_file=out_tcat.outputs.out_file, union=True,
-                                  outputtype='NIFTI_GZ')
-        out_mask_tool = mask_tool(in_file=out_mask_tool.outputs.out_file,
-                                  dilate_inputs='4',
-                                  outputtype='NIFTI_GZ')
+        out_mask_tool = mask_tool(
+            in_file=out_tcat.outputs.out_file,
+            union=True,
+            out_file=os.path.join(
+                write_dir,
+                'affine_registered_brains_unionmask.nii.gz'),
+            outputtype='NIFTI_GZ')
+        out_mask_tool = mask_tool(
+            in_file=out_mask_tool.outputs.out_file,
+            out_file=os.path.join(
+                write_dir,
+                'affine_registered_brains_unionmask_dil4.nii.gz'),
+            dilate_inputs='4',
+            outputtype='NIFTI_GZ')
         nonlinear_weight_file = out_mask_tool.outputs.out_file
 
     ###########################################################################
@@ -441,8 +488,7 @@ def anats_to_common(anat_filenames, write_dir, brain_volume,
     if nonlinear_minimal_patches is None:
        nonlinear_minimal_patches = []
     levels_minpatches = nonlinear_levels + nonlinear_minimal_patches
-    out_tstat_warp_head = out_tstat_allineated_head # prevent later elif failure
-    
+
     for n_iter, level_or_minpatch in enumerate(levels_minpatches):
         
         if n_iter == 0:
