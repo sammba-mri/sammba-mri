@@ -208,18 +208,18 @@ def anats_to_common(anat_filenames, write_dir, brain_volume,
     # Note that the heads created at the end will be the start point for all 
     # subsequent transformations (meaning any transformation generated from now
     # on will be a concatenation of itself and previous ones for direct 
-	# application to CoM-registered heads). This avoids the accumulation of 
-	# reslice error from one registration to the next. Ideally, the start point 
-	# should be the bias-corrected images prior to center correction (which 
-	# itself involes reslicing). However, I have not yet figured out the best 
-	# way to convert CoM change into an affine transform and then use it. The 
-	# conversion should be relatively easy, using nibabel to extract the two 
-	# affines then numpy to calculate the difference. Using it is not so simple. 
-	# Unlike 3dQwarp, 3dAllineate does not have a simple initialization flag. 
-	# Instead, it is necessary to use -parini to initialize any given affine 
-	# parameter individually. However, -parini can be overidden by other flags, 
-	# so careful checks need to be made to ensure that this will never happen 
-	# with the particular command or set of commands used here.
+    # application to CoM-registered heads). This avoids the accumulation of 
+    # reslice error from one registration to the next. Ideally, the start point 
+    # should be the bias-corrected images prior to center correction (which 
+    # itself involes reslicing). However, I have not yet figured out the best 
+    # way to convert CoM change into an affine transform and then use it. The 
+    # conversion should be relatively easy, using nibabel to extract the two 
+    # affines then numpy to calculate the difference. Using it is not so simple. 
+    # Unlike 3dQwarp, 3dAllineate does not have a simple initialization flag. 
+    # Instead, it is necessary to use -parini to initialize any given affine 
+    # parameter individually. However, -parini can be overidden by other flags, 
+    # so careful checks need to be made to ensure that this will never happen 
+    # with the particular command or set of commands used here.
     
     # bias correction for images to be used for brain mask creation
     if brain_masking_unifize_kwargs is None:
@@ -288,6 +288,7 @@ def anats_to_common(anat_filenames, write_dir, brain_volume,
     centered_brain_files = []
     for brain_file in brain_files:
         out_resample = resample(in_file=brain_file,
+                                resample_mode='Cu',
                                 master=out_refit.outputs.out_file,
                                 outputtype='NIFTI_GZ')
         centered_brain_files.append(out_resample.outputs.out_file)
@@ -300,6 +301,7 @@ def anats_to_common(anat_filenames, write_dir, brain_volume,
     centered_head_files = []
     for head_file in head_files:
         out_resample = resample(in_file=head_file,
+                                resample_mode='Cu',
                                 master=out_refit.outputs.out_file,
                                 outputtype='NIFTI_GZ')
         centered_head_files.append(out_resample.outputs.out_file)
