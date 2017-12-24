@@ -505,7 +505,8 @@ def anats_to_common(anat_filenames, write_dir, brain_volume,
             if n_iter == 0:
                 out_nwarp_cat = nwarp_cat(
                     in_files=[('IDENT', centered_head_file), warp_file],
-                    out_file='iniwarp.nii.gz')
+                    out_file=fname_presuffix(centered_head_file,
+                                             suffix='_iniwarp'))
                 out_qwarp = qwarp(
                     in_file=centered_head_file,
                     base_file=out_tstat_allineated_head.outputs.out_file,
