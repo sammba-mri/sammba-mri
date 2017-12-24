@@ -11,7 +11,7 @@ def anats_to_common(anat_filenames, write_dir, brain_volume,
                     nonlinear_levels=[1, 2, 3],
                     nonlinear_minimal_patches=[75],
                     nonlinear_weight_file=None,
-                    convergence=0.005, two_blur=1.1,
+                    convergence=0.005, blur_radius_coarse=1.1,
                     caching=False, verbose=True,
                     unifize_kwargs=None, brain_masking_unifize_kwargs=None):
     """ Create common template from native anatomical images and achieve
@@ -44,13 +44,17 @@ def anats_to_common(anat_filenames, write_dir, brain_volume,
         Path to a mask used to weight non-linear registration. Ideally should 
         include not just the whole brain but also extend in all directions to 
         include some amount of surrounding head tissue.
-
-    caching : bool, optional
-        If True, caching is used for all the registration steps.
-
+        
     convergence : float, optional
         Convergence limit, passed to
         sammba.externals.nipype.interfaces.afni.Allineate
+        
+    blur_radius_coarse : float, optional
+        Radius passed to sammba.externals.nipype.interfaces.afni.Allineate for
+        the "-twoblur" option
+
+    caching : bool, optional
+        If True, caching is used for all the registration steps.
 
     verbose : bool, optional
         If True, all steps are verbose. Note that caching implies some
@@ -203,12 +207,19 @@ def anats_to_common(anat_filenames, write_dir, brain_volume,
     #
     # Note that the heads created at the end will be the start point for all 
     # subsequent transformations (meaning any transformation generated from now
-    # on will be a concatenation of previous ones for direct application to CoM-
-    # registered heads). This avoids reslice errors from one registration to the 
-    # next. Ideally it should be done on images prior to center correction 
-    # (which itself involes reslicing), but I have not yet figured out how to 
-    # convert the CoM change into an affine transform (it should be very easy 
-    # but I have other fish to fry).
+    # on will be a concatenation of itself and previous ones for direct 
+	# application to CoM-registered heads). This avoids the accumulation of 
+	# reslice error from one registration to the next. Ideally, the start point 
+	# should be the bias-corrected images prior to center correction (which 
+	# itself involes reslicing). However, I have not yet figured out the best 
+	# way to convert CoM change into an affine transform and then use it. The 
+	# conversion should be relatively easy, using nibabel to extract the two 
+	# affines then numpy to calculate the difference. Using it is not so simple. 
+	# Unlike 3dQwarp, 3dAllineate does not have a simple initialization flag. 
+	# Instead, it is necessary to use -parini to initialize any given affine 
+	# parameter individually. However, -parini can be overidden by other flags, 
+	# so careful checks need to be made to ensure that this will never happen 
+	# with the particular command or set of commands used here.
     
     # bias correction for images to be used for brain mask creation
     if brain_masking_unifize_kwargs is None:
@@ -329,7 +340,7 @@ def anats_to_common(anat_filenames, write_dir, brain_volume,
             reference=out_tstat_centered_brain.outputs.out_file,
             out_matrix=out_matrix,
             convergence=convergence,
-            two_blur=two_blur,
+            blur_radius_coarse=blur_radius_coarse,
             warp_type='shift_rotate',
             out_file=fname_presuffix(centered_brain_file, suffix='_shr'))
         rigid_transform_files.append(out_allineate.outputs.out_matrix)
@@ -396,7 +407,7 @@ def anats_to_common(anat_filenames, write_dir, brain_volume,
                                        suffix='_affine.aff12.1D',
                                        use_ext=False),
             convergence=convergence,
-            two_blur=two_blur,
+            blur_radius_coarse=blur_radius_coarse,
             one_pass=True,
             weight=out_mask_tool.outputs.out_file,
             out_file=fname_presuffix(shift_rotated_head_file,
