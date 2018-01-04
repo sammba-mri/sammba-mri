@@ -114,7 +114,7 @@ def anats_to_common(anat_filenames, write_dir, brain_volume,
                 registration_kinds, registration_kind))
 
     if verbose:
-        terminal_output = 'allatonce'
+        terminal_output = 'stream'
     else:
         terminal_output = 'none'
 
@@ -514,7 +514,6 @@ def anats_to_common(anat_filenames, write_dir, brain_volume,
     # 
     if nonlinear_levels is None:
         nonlinear_levels = [1, 2, 3]
-<<<<<<< HEAD
     if nonlinear_minimal_patches is None:
        nonlinear_minimal_patches = []
     levels_minpatches = nonlinear_levels + nonlinear_minimal_patches
@@ -523,10 +522,15 @@ def anats_to_common(anat_filenames, write_dir, brain_volume,
         
         if n_iter == 0:
             previous_warp_files = affine_transform_files
-=======
 
     warped_files = []
     warp_files = []
+    # XXX tmp fix to xor bug
+    if verbose:
+        verbosity_kwargs = {'verb': verbose > 2}
+    else:
+        verbosity_kwargs = {'quiet': True}
+
     for affine_transform_file, centered_head_file in zip(
             affine_transform_files, centered_head_files):
         out_qwarp = qwarp(
@@ -540,8 +544,7 @@ def anats_to_common(anat_filenames, write_dir, brain_volume,
             inilev=0,
             maxlev=nonlinear_levels[0],
             out_file=fname_presuffix(centered_head_file, suffix='_warped1'),
-            verb=verbose > 2,
-            quiet=not verbose)
+            **verbosity_kwargs)
         warp_files.append(out_qwarp.outputs.source_warp)
         warped_files.append(out_qwarp.outputs.warped_source)
 
@@ -566,6 +569,7 @@ def anats_to_common(anat_filenames, write_dir, brain_volume,
         if n_iter == 0:
             previous_warp_files = affine_transform_files
         warped_files = []
+<<<<<<< HEAD
 	warp_files = []
     
         for warp_file, centered_head_file in zip(previous_warp_files, 
@@ -592,6 +596,59 @@ def anats_to_common(anat_filenames, write_dir, brain_volume,
                     out_file=out_file)
                 
             elif n_iter < len(nonlinear_levels):
+=======
+        warp_files = []
+        for warp_file, centered_head_file in zip(previous_warp_files,
+                                                 centered_head_files):
+            out_nwarp_cat = nwarp_cat(
+                in_files=[('IDENT', out_tstat_warp_head.outputs.out_file),
+                          warp_file], out_file='iniwarp.nii.gz')
+            out_qwarp = qwarp(
+                in_file=centered_head_file,
+                base_file=out_tstat_warp_head.outputs.out_file,
+                nmi=True,
+                noneg=True,
+                iwarp=True,
+                weight=out_mask_tool.outputs.out_file,
+                iniwarp=[out_nwarp_cat.outputs.out_file],
+                inilev=nonlinear_levels[0],
+                maxlev=nonlinear_levels[1],
+                out_file=fname_presuffix(centered_head_file,
+                                         suffix='_warped2'),
+
+                **verbosity_kwargs)
+            warp_files.append(out_qwarp.outputs.source_warp)
+            warped_files.append(out_qwarp.outputs.warped_source)
+
+        out_tcat = tcat(in_files=warped_files, verb=verbose > 1,
+                        out_file='warped_2iters_heads.nii.gz')
+        out_tstat_warp_head = tstat(in_file=out_tcat.outputs.out_file,
+                                    outputtype='NIFTI_GZ')
+
+    ###########################################################################
+    # Using previous files and concatenated transforms can be exploited to
+    # avoid building up reslice errors.
+    # Warp with mini-patch
+    # In this particular case, minpatch=75 corresponds to a level of 4
+    if len(nonlinear_levels) > 2:
+        if nonlinear_minimal_patch is None:
+            nonlinear_minimal_patch = 75
+
+        for n_iter, inilev in enumerate(nonlinear_levels[2:]):
+            previous_warp_files = warp_files
+            warped_files = []
+            warp_files = []
+            for warp_file, centered_head_file in zip(previous_warp_files,
+                                                     centered_head_files):
+                suffixed_file = fname_presuffix(
+                    centered_head_file,
+                    suffix='_warped{}'.format(n_iter + 3))
+                if n_iter == len(nonlinear_levels):
+                    out_file = os.path.join(write_dir,
+                                            os.path.basename(suffixed_file))
+                else:
+                    out_file = suffixed_file
+
                 out_qwarp = qwarp(
                     in_file=centered_head_file,
                     base_file=out_tstat_warp_head.outputs.out_file,
@@ -646,8 +703,7 @@ def anats_to_common(anat_filenames, write_dir, brain_volume,
             warp=warp_file,
             master=out_tstat_warp_head.outputs.out_file,
             out_file=out_file,
-            verb=verbose > 2,
-            quiet=not verbose)
+            **verbosity_kwargs)
         warped_files.append(out_warp_apply.outputs.out_file)
 
     os.chdir(current_dir)
