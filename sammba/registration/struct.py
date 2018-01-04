@@ -240,7 +240,8 @@ def anats_to_common(anat_filenames, write_dir, brain_volume,
                               outputtype='NIFTI_GZ',
                               **brain_masking_unifize_kwargs)
         brain_masking_in_files.append(out_unifize.outputs.out_file)
-    
+
+    # brain mask creation
     brain_mask_files = []
     for n, brain_masking_in_file in enumerate(brain_masking_in_files):
         out_clip_level = clip_level(in_file=brain_masking_in_file)
@@ -412,7 +413,7 @@ def anats_to_common(anat_filenames, write_dir, brain_volume,
     
     # make the count mask
     out_mask_tool = mask_tool(in_file=out_tcat.outputs.out_file,
-                              count=True,            
+                              count=True,
                               verbose=verbose,
                               outputtype='NIFTI_GZ')
 
@@ -433,7 +434,7 @@ def anats_to_common(anat_filenames, write_dir, brain_volume,
             out_file=fname_presuffix(shift_rotated_head_file,
                                      suffix='_affine'),
             **verbosity_quietness_kwargs)
-
+        # matrix concatenation
         suffixed_matrix = fname_presuffix(shift_rotated_head_file,
                                           suffix='_affine_catenated.aff12.1D',
                                           use_ext=False)
@@ -505,14 +506,16 @@ def anats_to_common(anat_filenames, write_dir, brain_volume,
             out_file=os.path.join(
                 write_dir,
                 'affine_registered_brains_unionmask.nii.gz'),
-            outputtype='NIFTI_GZ')
+            outputtype='NIFTI_GZ',
+            verbose=verbose)
         out_mask_tool = mask_tool(
             in_file=out_mask_tool.outputs.out_file,
             out_file=os.path.join(
                 write_dir,
                 'affine_registered_brains_unionmask_dil4.nii.gz'),
             dilate_inputs='4',
-            outputtype='NIFTI_GZ')
+            outputtype='NIFTI_GZ',
+            verbose=verbose)
         nonlinear_weight_file = out_mask_tool.outputs.out_file
 
     ###########################################################################
@@ -742,7 +745,9 @@ def anats_to_template(anat_filenames, head_template_filename, write_dir,
                                   thresh=out_clip_level.outputs.clip_val)
         out_mask_tool = mask_tool(in_file=out_threshold.outputs.out_file,
                                   dilate_inputs='3',
-                                  outputtype='NIFTI_GZ', environ=environ)
+                                  outputtype='NIFTI_GZ',
+                                  environ=environ,
+                                  verbose=verbose)
         dilated_head_mask_filename = out_mask_tool.outputs.out_file
         intermediate_files.append(out_threshold.outputs.out_file)
 
