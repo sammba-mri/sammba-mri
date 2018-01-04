@@ -438,6 +438,13 @@ class AllineateInputSpec(AFNICommandInputSpec):
         traits.Enum(*_dirs),
         argstr='-nwarp_fixdep%s',
         desc='To fix non-linear warp dependency along directions.')
+    verb = traits.Bool(
+        argstr='-verb',
+        desc='Print out verbose progress reports.')
+    quiet = traits.Bool(
+        argstr='-quiet',
+        desc='Don\'t print out verbose progress reports.',
+        xor=['verb'])
 
 
 class AllineateOutputSpec(TraitedSpec):
@@ -3349,8 +3356,7 @@ class QwarpInputSpec(AFNICommandInputSpec):
         xor=['quiet'])
     quiet = traits.Bool(
         desc='Cut out most of the fun fun fun progress messages :-(',
-        argstr='-quiet',
-        xor=['verb'])
+        argstr='-quiet')
     # Hidden and semi-hidden options
     overwrite = traits.Bool(
         desc='Overwrite outputs',
