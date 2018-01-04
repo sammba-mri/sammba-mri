@@ -12,7 +12,7 @@ def anats_to_common(anat_filenames, write_dir, brain_volume,
                     nonlinear_minimal_patches=[75],
                     nonlinear_weight_file=None,
                     convergence=0.005, blur_radius_coarse=1.1,
-                    caching=False, verbose=True,
+                    caching=False, verbose=1,
                     unifize_kwargs=None, brain_masking_unifize_kwargs=None):
     """ Create common template from native anatomical images and achieve
     their registration to it.
@@ -56,8 +56,8 @@ def anats_to_common(anat_filenames, write_dir, brain_volume,
     caching : bool, optional
         If True, caching is used for all the registration steps.
 
-    verbose : bool, optional
-        If True, all steps are verbose. Note that caching implies some
+    verbose : int, optional
+        Verbosity level. Note that caching implies some
         verbosity in any case.
 
     unifize_kwargs : dict, optional
@@ -173,7 +173,8 @@ def anats_to_common(anat_filenames, write_dir, brain_volume,
     for n, anat_file in enumerate(anat_filenames):
         suffixed_file = fname_presuffix(anat_file, suffix='_{}'.format(n))
         out_file = os.path.join(write_dir, os.path.basename(suffixed_file))
-        out_copy = copy(in_file=anat_file, out_file=out_file)
+        out_copy = copy(in_file=anat_file, out_file=out_file,
+                        verb=verbose > 1)
         copied_anat_filenames.append(out_copy.outputs.out_file)
 
     out_tcat = tcat(in_files=copied_anat_filenames,
@@ -229,10 +230,10 @@ def anats_to_common(anat_filenames, write_dir, brain_volume,
         out_unifize = unifize(in_file=anat_file,
                               out_file='%s_Unifized_for_brain_masking',
                               outputtype='NIFTI_GZ',
+                              quiet=not verbose,
                               **brain_masking_unifize_kwargs)
         brain_masking_in_files.append(out_unifize.outputs.out_file)
     
-    # brain mask creation
     brain_mask_files = []
     for n, brain_masking_in_file in enumerate(brain_masking_in_files):
         out_clip_level = clip_level(in_file=brain_masking_in_file)
@@ -253,6 +254,7 @@ def anats_to_common(anat_filenames, write_dir, brain_volume,
         out_unifize = unifize(in_file=anat_file,
                               out_file='%s_Unifized_for_brain_extraction',
                               outputtype='NIFTI_GZ',
+                              quiet=not verbose,
                               **unifize_kwargs)
         unifized_files.append(out_unifize.outputs.out_file)
 
@@ -293,6 +295,7 @@ def anats_to_common(anat_filenames, write_dir, brain_volume,
                                 outputtype='NIFTI_GZ')
         centered_brain_files.append(out_resample.outputs.out_file)
     out_tcat = tcat(in_files=centered_brain_files,
+                    verb=verbose > 1,
                     out_file=os.path.join(write_dir, 'centered_brains.nii.gz'))
     out_tstat_centered_brain = tstat(in_file=out_tcat.outputs.out_file,
                                      outputtype='NIFTI_GZ')
@@ -344,7 +347,9 @@ def anats_to_common(anat_filenames, write_dir, brain_volume,
             convergence=convergence,
             two_blur=blur_radius_coarse,
             warp_type='shift_rotate',
-            out_file=fname_presuffix(centered_brain_file, suffix='_shr'))
+            out_file=fname_presuffix(centered_brain_file, suffix='_shr'),
+            verb=verbose > 2,
+            quiet=not verbose)
         rigid_transform_files.append(out_allineate.outputs.out_matrix)
         shift_rotated_brain_files.append(out_allineate.outputs.out_file)
 
@@ -358,13 +363,16 @@ def anats_to_common(anat_filenames, write_dir, brain_volume,
             in_file=centered_head_file,
             master=out_tstat_centered_brain.outputs.out_file,
             in_matrix=rigid_transform_file,
-            out_file=out_file)
+            out_file=out_file,
+            verb=verbose > 2,
+            quiet=not verbose)
         shift_rotated_head_files.append(out_allineate.outputs.out_file)
 
     # quality check video and mean for head and brain
     out_tcat = tcat(
         in_files=shift_rotated_head_files,
-        out_file=os.path.join(write_dir, 'rigid_body_registered_heads.nii.gz'))
+        out_file=os.path.join(write_dir, 'rigid_body_registered_heads.nii.gz'),
+                              verb=verbose > 1)
     out_tstat_shr = tstat(in_file=out_tcat.outputs.out_file,
                           outputtype='NIFTI_GZ')
     out_tcat = tcat(
@@ -395,7 +403,8 @@ def anats_to_common(anat_filenames, write_dir, brain_volume,
     
     # make the count mask
     out_mask_tool = mask_tool(in_file=out_tcat.outputs.out_file,
-                              count=True,
+                              count=True,            
+                              verbose=verbose,
                               outputtype='NIFTI_GZ')
 
     #affine transform
@@ -413,8 +422,10 @@ def anats_to_common(anat_filenames, write_dir, brain_volume,
             one_pass=True,
             weight=out_mask_tool.outputs.out_file,
             out_file=fname_presuffix(shift_rotated_head_file,
-                                     suffix='_affine'))
-        # matrix concatenation
+                                     suffix='_affine'),
+            verb=verbose > 2,
+            quiet=not verbose)
+
         suffixed_matrix = fname_presuffix(shift_rotated_head_file,
                                           suffix='_affine_catenated.aff12.1D',
                                           use_ext=False)
@@ -435,7 +446,9 @@ def anats_to_common(anat_filenames, write_dir, brain_volume,
             master=out_tstat_shr.outputs.out_file,
             in_matrix=affine_transform_file,
             out_file=fname_presuffix(centered_brain_file,
-                                     suffix='_shr_affine_catenated'))
+                                     suffix='_shr_affine_catenated'),
+            verb=verbose > 2,
+            quiet=not verbose)
         allineated_brain_files.append(out_allineate.outputs.out_file)
 
     # application to heads
@@ -449,13 +462,16 @@ def anats_to_common(anat_filenames, write_dir, brain_volume,
             in_file=centered_head_file,
             master=out_tstat_shr.outputs.out_file,
             in_matrix=affine_transform_file,
-            out_file=out_file)
+            out_file=out_file,
+            verb=verbose > 2,
+            quiet=not verbose)
         allineated_head_files.append(out_allineate.outputs.out_file)
 
     #quality check videos and template for head and brain
     out_tcat_head = tcat(
         in_files=allineated_head_files,
-        out_file=os.path.join(write_dir, 'affine_registered_heads.nii.gz'))
+        out_file=os.path.join(write_dir, 'affine_registered_heads.nii.gz'),
+            verb=verbose > 1)
     out_tstat_allineated_head = tstat(in_file=out_tcat_head.outputs.out_file,
                                       outputtype='NIFTI_GZ')
     out_tcat_brain = tcat(
@@ -498,6 +514,49 @@ def anats_to_common(anat_filenames, write_dir, brain_volume,
     # 
     if nonlinear_levels is None:
         nonlinear_levels = [1, 2, 3]
+<<<<<<< HEAD
+    if nonlinear_minimal_patches is None:
+       nonlinear_minimal_patches = []
+    levels_minpatches = nonlinear_levels + nonlinear_minimal_patches
+
+    for n_iter, level_or_minpatch in enumerate(levels_minpatches):
+        
+        if n_iter == 0:
+            previous_warp_files = affine_transform_files
+=======
+
+    warped_files = []
+    warp_files = []
+    for affine_transform_file, centered_head_file in zip(
+            affine_transform_files, centered_head_files):
+        out_qwarp = qwarp(
+            in_file=centered_head_file,
+            base_file=out_tstat_allineated_head.outputs.out_file,
+            nmi=True,
+            noneg=True,
+            iwarp=True,
+            weight=out_mask_tool.outputs.out_file,
+            iniwarp=[affine_transform_file],
+            inilev=0,
+            maxlev=nonlinear_levels[0],
+            out_file=fname_presuffix(centered_head_file, suffix='_warped1'),
+            verb=verbose > 2,
+            quiet=not verbose)
+        warp_files.append(out_qwarp.outputs.source_warp)
+        warped_files.append(out_qwarp.outputs.warped_source)
+
+    out_tcat = tcat(
+        in_files=warped_files, verb=verbose > 1,
+        out_file=os.path.join(write_dir, 'warped_1iter_heads.nii.gz'))
+    out_tstat_warp_head = tstat(in_file=out_tcat.outputs.out_file,
+                                outputtype='NIFTI_GZ')
+
+    ###########################################################################
+    # Description to fill
+    # 
+    # 
+    if nonlinear_levels is None:
+        nonlinear_levels = [1, 2, 3]
     if nonlinear_minimal_patches is None:
        nonlinear_minimal_patches = []
     levels_minpatches = nonlinear_levels + nonlinear_minimal_patches
@@ -507,11 +566,10 @@ def anats_to_common(anat_filenames, write_dir, brain_volume,
         if n_iter == 0:
             previous_warp_files = affine_transform_files
         warped_files = []
-        warp_files = []
+	warp_files = []
     
         for warp_file, centered_head_file in zip(previous_warp_files, 
-                                                 centered_head_files):
-            
+                                                 centered_head_files):            
             out_file = fname_presuffix(centered_head_file,
                                        suffix='_warped{}'.format(n_iter))
     
@@ -529,6 +587,8 @@ def anats_to_common(anat_filenames, write_dir, brain_volume,
                     iniwarp=[out_nwarp_cat.outputs.out_file],
                     inilev=0,
                     maxlev=level_or_minpatch,
+	            verb=verbose > 2,
+	            quiet=not verbose,
                     out_file=out_file)
                 
             elif n_iter < len(nonlinear_levels):
@@ -541,6 +601,8 @@ def anats_to_common(anat_filenames, write_dir, brain_volume,
                     iniwarp=[warp_file],
                     inilev=levels_minpatches[n_iter - 1] + 1,
                     maxlev=level_or_minpatch,
+	            verb=verbose > 2,
+        	    quiet=not verbose,
                     out_file=out_file)
                     
             else:
@@ -553,6 +615,8 @@ def anats_to_common(anat_filenames, write_dir, brain_volume,
                     iniwarp=[warp_file],
                     inilev=nonlinear_levels[-1] + 1, # not ideal
                     minpatch=level_or_minpatch,
+	            verb=verbose > 2,
+	            quiet=not verbose,
                     out_file=out_file)
                     
             warped_files.append(out_qwarp.outputs.warped_source)
@@ -581,7 +645,9 @@ def anats_to_common(anat_filenames, write_dir, brain_volume,
             in_file=centered_head_file,
             warp=warp_file,
             master=out_tstat_warp_head.outputs.out_file,
-            out_file=out_file)
+            out_file=out_file,
+            verb=verbose > 2,
+            quiet=not verbose)
         warped_files.append(out_warp_apply.outputs.out_file)
 
     os.chdir(current_dir)
@@ -710,7 +776,7 @@ def anats_to_template(anat_filenames, head_template_filename, write_dir,
         out_threshold = threshold(in_file=head_template_filename,
                                   thresh=out_clip_level.outputs.clip_val)
         out_mask_tool = mask_tool(in_file=out_threshold.outputs.out_file,
-                                  dilate_inputs='3',
+                                  dilate_inputs='3', verbose=verbose,
                                   outputtype='NIFTI_GZ', environ=environ)
         dilated_head_mask_filename = out_mask_tool.outputs.out_file
         intermediate_files.append(out_threshold.outputs.out_file)
