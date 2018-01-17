@@ -142,7 +142,7 @@ def anats_to_common(anat_filenames, write_dir, brain_volume,
         mask_tool = memory.cache(afni.MaskTool)
         catmatvec = memory.cache(afni.CatMatvec)
         qwarp = memory.cache(afni.Qwarp)
-        qwarp2 = memory.cache(afni.Qwarp)
+        qwarp2 = memory.cache(afni.Qwarp)  # workaround to initialize inputs
         nwarp_cat = memory.cache(afni.NwarpCat)
         warp_apply = memory.cache(afni.NwarpApply)
         for step in [copy, unifize, rats, apply_mask, refit,
