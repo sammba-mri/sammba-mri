@@ -142,6 +142,7 @@ def anats_to_common(anat_filenames, write_dir, brain_volume,
         mask_tool = memory.cache(afni.MaskTool)
         catmatvec = memory.cache(afni.CatMatvec)
         qwarp = memory.cache(afni.Qwarp)
+        qwarp2 = memory.cache(afni.Qwarp)
         nwarp_cat = memory.cache(afni.NwarpCat)
         warp_apply = memory.cache(afni.NwarpApply)
         for step in [copy, unifize, rats, apply_mask, refit,
@@ -165,6 +166,7 @@ def anats_to_common(anat_filenames, write_dir, brain_volume,
         mask_tool = afni.MaskTool(terminal_output=terminal_output).run
         catmatvec = afni.CatMatvec(terminal_output=terminal_output).run
         qwarp = afni.Qwarp(terminal_output=terminal_output).run
+        qwarp2 = afni.Qwarp(terminal_output=terminal_output).run
         nwarp_cat = afni.NwarpCat(terminal_output=terminal_output).run
         warp_apply = afni.NwarpApply(terminal_output=terminal_output).run
 
@@ -572,7 +574,7 @@ def anats_to_common(anat_filenames, write_dir, brain_volume,
                     **verbosity_quietness_kwargs)
                     
             else:
-                out_qwarp = qwarp(
+                out_qwarp = qwarp2(
                     in_file=centered_head_file,
                     base_file=out_tstat_warp_head.outputs.out_file,
                     noneg=True,
