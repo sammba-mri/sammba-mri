@@ -94,6 +94,8 @@ def test_check_same_geometry():
     
 def test_copy_geometry():
     func_filename = os.path.join(os.path.dirname(testing_data.__file__),
+                                 'func.nii.gz')
+    anat_filename = os.path.join(os.path.dirname(testing_data.__file__),
                                  'anat.nii.gz')
     if afni.Info().version():
         tempdir = tempfile.mkdtemp()
@@ -103,27 +105,32 @@ def test_copy_geometry():
         # Allineate changes the geometry
         allineate = afni.Allineate().run
         out_allineate = allineate(
-            in_file=func_filename,
-            master=func_filename,
+            in_file=anat_filename,
+            master=anat_filename,
             in_matrix=matrix_filename,
             out_file=os.path.join(tempdir, 'test_geometry.nii.gz'))
 
-        header = nibabel.load(func_filename).header
+        header = nibabel.load(anat_filename).header
         allineate_header = nibabel.load(out_allineate.outputs.out_file).header
 
         assert_false(np.alltrue(utils.check_same_geometry(header,
                                                           allineate_header)))
         changed_filename = utils.copy_geometry(
-            func_filename, out_allineate.outputs.out_file,
+            anat_filename, out_allineate.outputs.out_file,
             in_place=False)
         changed_header = nibabel.load(changed_filename).header
         copy_geom = fsl.CopyGeom().run
         out_copy_geom = copy_geom(dest_file=out_allineate.outputs.out_file,
-                                  in_file=func_filename)
+                                  in_file=anat_filename)
         fsl_cpgeom_header = nibabel.load(out_copy_geom.outputs.out_file).header
         assert(np.alltrue(utils.check_same_geometry(header,
                                                     changed_header)))
 
+        changed_filename = utils.copy_geometry(
+            func_filename, anat_filename,
+            in_place=False)
+        assert(np.alltrue(utils.check_same_geometry(nibabel.load(func_filename).header,
+                                                    nibabel.load(changed_filename).header)))
         for filename in [out_allineate.outputs.out_file, changed_filename,
                          matrix_filename]:
             if os.path.exists(filename):
