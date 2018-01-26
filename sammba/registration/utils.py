@@ -146,6 +146,53 @@ def _check_same_obliquity(img_filename1, img_filename2):
     return np.alltrue(equal_fields)
 
 
+def copy_geometry(filename_to_copy, filename_to_change, out_filename=None,
+                  copy_shape=True, in_place=True):
+    """ Mimics FSL command fslcpgeom to copy geometry information from header.
+
+    filename_to_copy : str
+        Path to the image with the header information to copy.
+
+    to_change_filename : str
+        Path to the image with the new geometry.
+
+    out_filename : str or None, optional
+        Path to save the image with the changed header to.
+
+    copy_shape : bool, optional
+        If False, image data shape is not copied.
+
+    in_place : bool, optional
+        If False, a new image is created with the copied geometry information.
+    """
+    img_to_copy = nibabel.load(filename_to_copy)
+    img_to_change = nibabel.load(filename_to_change)
+    header_to_copy = img_to_copy.header
+    header_to_change = img_to_change.header
+    new_header = header_to_change.copy()
+    quaternion_keys = ['quaternion_{0}'.format(letter) for letter in 'abc']
+    qoffset_keys = ['qoffset_{0}'.format(letter) for letter in 'xyz']
+    srow_keys = ['srow_{0}'.format(letter) for letter in 'xyz']
+    geometry_keys = ['pixdim', 'sform_code', 'qform_code'] +\
+        quaternion_keys + qoffset_keys + srow_keys
+    if copy_shape:
+        geometry_keys += ['dim']
+    for key in geometry_keys:
+        new_header[key] = header_to_copy[key]
+
+    new_img = nibabel.Nifti1Image(img_to_change, img_to_copy.affine,
+                                  new_header)
+
+    if not in_place:
+        if out_filename is None:
+            out_filename = fname_presuffix(filename_to_change,
+                                           suffix='copied_geom')
+    else:
+        out_filename = filename_to_change
+    new_img.to_filename(out_filename)
+    return out_filename
+
+
 def create_pipeline_graph(pipeline_name, graph_file,
                           graph_kind='hierarchical'):
     """Creates pipeline graph for a given piepline.

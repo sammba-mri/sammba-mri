@@ -1,11 +1,15 @@
+import sys
+sys.path.remove('/usr/lib/python2.7/dist-packages')
+sys.path.append('/usr/lib/python2.7/dist-packages')
 import os
 import shutil
 import tempfile
+import numpy as np
 from numpy.testing import assert_array_equal, assert_array_almost_equal
 from nose.tools import assert_true, assert_false
 import nibabel
 from nilearn._utils.testing import assert_raises_regex
-from sammba.externals.nipype.interfaces import afni
+from sammba.externals.nipype.interfaces import afni, fsl
 from sammba.registration import utils
 from sammba import testing_data
 
@@ -79,6 +83,51 @@ def test_fix_obliquity():
         utils.fix_obliquity(tmp_filename, target_filename)
         assert_true(
             utils._check_same_obliquity(tmp_filename, target_filename))
+
+        if os.path.exists(tmp_filename):
+            os.remove(tmp_filename)
+        if os.path.exists(tempdir):
+            os.removedirs(tempdir)
+
+
+def test_copy_geometry():
+    func_filename = os.path.join(os.path.dirname(testing_data.__file__),
+                                 'func.nii.gz')
+    if afni.Info().version():
+        # Allineate changes the geometry
+        tempdir = tempfile.mkdtemp()
+        tmp_filename = os.path.join(tempdir, 'test_geometry.1D')
+        volreg = afni.Volreg().run
+        out_volreg = volreg(
+            in_file=func_filename,
+            outputtype='NIFTI_GZ',
+            oned_file=os.path.join(tempdir, 'test_geometry.1Dfile.1D'),
+            oned_matrix_save=os.path.join(tempdir, 'test_geometry.aff12.1D'))
+        allineate = afni.Allineate().run
+        out_allineate = allineate(
+            in_file=func_filename,
+            master=func_filename,
+            in_matrix=out_volreg.outputs.oned_matrix_save,
+            out_file=os.path.join(tempdir, 'test_geometry.nii.gz'))
+
+        header = nibabel.load(out_volreg.outputs.out_file).header
+        allineate_header = nibabel.load(out_allineate.outputs.out_file).header
+        allineate_equal_fields = [np.allclose(v1, v2)
+                                  for v1, v2 in zip(header.values(),
+                                                    allineate_header.values())]
+        assert_false(np.alltrue(allineate_equal_fields))
+        changed_filename = utils.copy_geometry(
+            out_volreg.outputs.out_file, out_allineate.outputs.out_file,
+            in_place=False)
+        copy_geom = fsl.CopyGeom().run
+        out_copy_geom = copy_geom(dest_file=out_allineate.outputs.out_file,
+                                  in_file=out_volreg.outputs.out_file)
+        changed_header = nibabel.load(changed_filename).header
+        fsl_cpgeom_header = nibabel.load(out_copy_geom.outputs.out_file).header
+        copied_equal_fields = [np.allclose(v1, v2)
+                               for v1, v2 in zip(changed_header.values(),
+                                                 fsl_cpgeom_header.values())]
+        assert(np.alltrue(copied_equal_fields))
 
         if os.path.exists(tmp_filename):
             os.remove(tmp_filename)

@@ -107,7 +107,6 @@ def coregister_fmri_session(session_data, t_r, write_dir, brain_volume,
         memory = Memory(write_dir)
         tshift = memory.cache(afni.TShift)
         clip_level = memory.cache(afni.ClipLevel)
-        threshold = memory.cache(fsl.Threshold)
         volreg = memory.cache(afni.Volreg)
         allineate = memory.cache(afni.Allineate)
         copy_geom = memory.cache(fsl.CopyGeom)
@@ -123,7 +122,7 @@ def coregister_fmri_session(session_data, t_r, write_dir, brain_volume,
         slicer = memory.cache(afni.ZCutUp)
         warp_apply = memory.cache(afni.NwarpApply)
         qwarp = memory.cache(afni.Qwarp)
-        merge = memory.cache(fsl.Merge)
+        merge = memory.cache(afni.Zcat)
         overwrite = False
         for step in [tshift, volreg, allineate, allineate2, copy_geom,
                      tstat, compute_mask, calc, unifize, resample,
@@ -132,7 +131,6 @@ def coregister_fmri_session(session_data, t_r, write_dir, brain_volume,
     else:
         tshift = afni.TShift(terminal_output=terminal_output).run
         clip_level = afni.ClipLevel().run
-        threshold = fsl.Threshold(terminal_output=terminal_output).run
         volreg = afni.Volreg(terminal_output=terminal_output).run
         allineate = afni.Allineate(terminal_output=terminal_output).run
         allineate2 = afni.Allineate(terminal_output=terminal_output).run  # TODO: remove after fixed bug
@@ -147,7 +145,7 @@ def coregister_fmri_session(session_data, t_r, write_dir, brain_volume,
         slicer = afni.ZCutUp(terminal_output=terminal_output).run
         warp_apply = afni.NwarpApply(terminal_output=terminal_output).run
         qwarp = afni.Qwarp(terminal_output=terminal_output).run
-        merge = fsl.Merge(terminal_output=terminal_output).run
+        merge = afni.Zcat(terminal_output=terminal_output).run
         overwrite = True
 
     session_data._check_inputs()
@@ -175,9 +173,11 @@ def coregister_fmri_session(session_data, t_r, write_dir, brain_volume,
     ################################################
     # XXX why do you need a thresholded image ?
     out_clip_level = clip_level(in_file=func_filename)
-    out_threshold = threshold(in_file=func_filename,
-                              thresh=out_clip_level.outputs.clip_val)
-    thresholded_filename = out_threshold.outputs.out_file
+    out_calc_threshold = calc(
+        in_file_a=func_filename,
+        expr='ispositive(a-{0})'.format(out_clip_level.outputs.clip_val),
+        outputtype='NIFTI_GZ')
+    thresholded_filename = out_calc_threshold.outputs.out_file
 
     out_volreg = volreg(  # XXX dfile not saved
         in_file=thresholded_filename,
@@ -477,14 +477,14 @@ def coregister_fmri_session(session_data, t_r, write_dir, brain_volume,
                                     environ=environ)
         warped_func_slices.append(out_warp_apply.outputs.out_file)
 
-    # Fix the obliquity
-    for (sliced_func_filename, warped_func_slice) in zip(
-            sliced_func_filenames, warped_func_slices):
-        _ = fix_obliquity(warped_func_slice, sliced_func_filename,
-                          overwrite=overwrite, verbose=verbose)
-
     # Finally, merge all slices !
-    out_merge_func = merge(in_files=warped_func_slices, dimension='z')
+    out_merge_func = merge(in_files=warped_func_slices,
+                           outputtype='NIFTI_GZ',
+                           environ=environ)
+
+    # Fix the obliquity
+    _ = fix_obliquity(out_merge_func.outputs.out_file, allineated_filename,
+                      overwrite=overwrite, verbose=verbose)
 
     # Update the fmri data
     setattr(session_data, "coreg_func_", out_merge_func.outputs.merged_file)
