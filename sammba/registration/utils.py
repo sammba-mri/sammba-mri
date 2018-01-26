@@ -170,18 +170,17 @@ def copy_geometry(filename_to_copy, filename_to_change, out_filename=None,
     header_to_copy = img_to_copy.header
     header_to_change = img_to_change.header
     new_header = header_to_change.copy()
-    quaternion_keys = ['quaternion_{0}'.format(letter) for letter in 'abc']
-    qoffset_keys = ['qoffset_{0}'.format(letter) for letter in 'xyz']
-    srow_keys = ['srow_{0}'.format(letter) for letter in 'xyz']
-    geometry_keys = ['pixdim', 'sform_code', 'qform_code'] +\
-        quaternion_keys + qoffset_keys + srow_keys
+    geometry_keys = ['sform_code', 'qform_code', 'quatern_b',
+                     'quatern_c', 'quatern_d', 'qoffset_x',
+                     'qoffset_y', 'qoffset_z', 'srow_x', 'srow_y', 'srow_z']
     if copy_shape:
         geometry_keys += ['dim']
     for key in geometry_keys:
         new_header[key] = header_to_copy[key]
 
-    new_img = nibabel.Nifti1Image(img_to_change, img_to_copy.affine,
-                                  new_header)
+    new_header['pixdim'][:4] = header_to_copy['pixdim'][:4]
+    new_img = nibabel.Nifti1Image(img_to_change.get_data(), img_to_copy.affine,
+                                  header=new_header)
 
     if not in_place:
         if out_filename is None:
@@ -191,6 +190,24 @@ def copy_geometry(filename_to_copy, filename_to_change, out_filename=None,
         out_filename = filename_to_change
     new_img.to_filename(out_filename)
     return out_filename
+
+
+def check_same_geometry(header1, header2):
+    unchecked_fields = ['descrip', 'pixdim', 'scl_slope', 'scl_inter',
+                        'xyzt_units', 'qform_code', 'regular']
+    equal_values = []
+    for item1, item2 in zip(header1.items(), header2.items()):
+        if item1[0] in unchecked_fields:
+            continue
+        if item1[1].dtype in [np.dtype('float'), np.dtype('float32'),
+                              np.dtype('float64'), np.dtype('float128')]:
+            equal_values.append(np.allclose(item1[1], item2[1]))
+        else:
+            equal_values.append(item1[1] == item2[1])
+
+    equal_values.append(np.allclose(header1['pixdim'][:4],
+                                    header2['pixdim'][:4]))
+    return [np.alltrue(a) for a in equal_values]
 
 
 def create_pipeline_graph(pipeline_name, graph_file,
