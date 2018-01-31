@@ -1522,6 +1522,57 @@ class Notes(CommandLine):
         return outputs
 
 
+class NwarpAdjustInputSpec(CommandLineInputSpec):
+    warps = InputMultiPath(
+        File(exists=True),
+        minlen=5,
+        mandatory=True,
+        argstr='-nwarp %s',
+        desc='List of input 3D warp datasets')
+    in_files = InputMultiPath(
+        File(exists=True),
+        minlen=5,
+        mandatory=False,
+        argstr='-source %s',
+        desc='List of input 3D datasets to be warped by the adjusted warp '
+             'datasets.  There must be exactly as many of these datasets as '
+             'there are input warps.')
+    mean_file = File(
+        desc='Output mean dataset, only needed if in_files are also given. '
+             'The output dataset will be on the common grid shared by the '
+             'source datasets.',
+        argstr='-prefix %s',
+        mandatory=False,
+        xand=['in_files'])
+
+
+class NwarpAdjust(AFNICommandBase):
+    """This program takes as input a bunch of 3D warps, averages them,
+    and computes the inverse of this average warp.  It then composes
+    each input warp with this inverse average to 'adjust' the set of
+    warps.  Optionally, it can also read in a set of 1-brick datasets
+    corresponding to the input warps, and warp each of them, and average
+    those.
+
+    For complete details, see the `3dNwarpAdjust Documentation.
+    <https://afni.nimh.nih.gov/pub/dist/doc/program_help/3dNwarpAdjust.html>`_
+
+    Examples
+    ========
+
+    >>> from nipype.interfaces import afni
+    >>> adjust = afni.NwarpAdjust()
+    >>> adjust.inputs.warps = [Fred_WARP+tlrc, Fred.Xaff12.1D, Fred.Xaff12.1D, Fred.Xaff12.1D, Fred.Xaff12.1D]
+    >>> adjust.cmdline
+    "NwarpAdjust -nwarp Fred_WARP+tlrc Fred.Xaff12.1D Fred.Xaff12.1D Fred.Xaff12.1D Fred.Xaff12.1D"
+    >>> res = adjust.run()  # doctest: +SKIP
+
+    """
+    _cmd = '3dNwarpAdjust'
+    input_spec = NwarpAdjustInputSpec
+    output_spec = AFNICommandOutputSpec
+
+
 class NwarpApplyInputSpec(CommandLineInputSpec):
     in_file = traits.Either(File(exists=True), traits.List(File(exists=True)),
         mandatory=True,
