@@ -2,7 +2,7 @@ import os
 import numpy as np
 import nibabel
 from sammba.externals.nipype.caching import Memory
-from sammba.externals.nipype.interfaces import afni, fsl
+from sammba.externals.nipype.interfaces import afni
 from sammba.externals.nipype.utils.filemanip import fname_presuffix
 from sammba.interfaces import segmentation
 from .utils import fix_obliquity, copy_geometry
