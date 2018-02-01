@@ -484,7 +484,7 @@ def coregister_fmri_session(session_data, t_r, write_dir, brain_volume,
                       overwrite=overwrite, verbose=verbose)
 
     # Update the fmri data
-    setattr(session_data, "coreg_func_", out_merge_func.outputs.merged_file)
+    setattr(session_data, "coreg_func_", out_merge_func.outputs.out_file)
     setattr(session_data, "coreg_anat_", registered_anat_oblique_filename)
     setattr(session_data, "coreg_transform_", transform_filename)
     os.chdir(current_dir)
