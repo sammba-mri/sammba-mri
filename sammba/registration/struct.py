@@ -3,6 +3,7 @@ from sammba.externals.nipype.interfaces import afni
 from sammba.externals.nipype.utils.filemanip import fname_presuffix
 from sammba.externals.nipype.caching import Memory
 from sklearn.datasets.base import Bunch
+from sammba.interfaces import segmentation
 
 
 def anats_to_common(anat_filenames, write_dir, brain_volume,

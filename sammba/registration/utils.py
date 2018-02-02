@@ -291,7 +291,8 @@ def create_pipeline_graph(pipeline_name, graph_file,
     workflow.connect(clip_level, 'clip_val',
                      compute_mask, 'intensity_threshold')
     workflow.connect(unifize, 'out_file', compute_mask, 'in_file')
-    workflow.connect(compute_mask, 'out_file', apply_mask, 'mask_file')
+    workflow.connect(compute_mask, 'out_file', apply_mask, 'in_file_a')
+    workflow.connect(unifize, 'out_file', apply_mask, 'in_file_b')
     workflow.connect(apply_mask, 'out_file',
                      center_mass, 'in_file')
     workflow.connect(unifize, 'out_file', refit_copy, 'in_file')
