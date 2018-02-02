@@ -129,6 +129,10 @@ class HistogramMaskInputSpec(BaseInterfaceInputSpec):
         desc="Number of binary closing iterations to post-process the mask. "
              "[default: 10]",
         usedefault=True)
+    dilation_size = traits.Tuple(
+        (1, 1, 2),
+        desc="Element size for binary dilation if needed",
+        usedefault=True)
     verbose = traits.Bool(
         False,
         desc="be very verbose",
@@ -321,9 +325,9 @@ class HistogramMask(BaseInterface):
                     break
 
         # Dilation if needed
-        size = (1, 1, 2)
-        for n in range(10):
-            if n_voxels_mask < n_voxels_min * 1.1:
+        size = self.inputs.dilation_size
+        for n in range(3):
+            if n_voxels_mask < n_voxels_min * .9:
                 previous_n_voxels_mask = copy.copy(n_voxels_mask)
                 mask_data = grey_dilation(mask_data, size=size)
                 n_voxels_mask = np.sum(mask_data > 0)
@@ -411,7 +415,7 @@ class MathMorphoMask(CommandLine):
     >>> rats_masker.inputs.in_file = 'structural.nii'
     >>> rats_masker.inputs.intensity_threshold = 1000
     >>> rats_masker.cmdline  # doctest: +IGNORE_UNICODE
-    'RATS_MM structural.nii structural_masked.nii -t 1000'
+    'RATS_MM structural.nii structural_morpho_mask.nii -t 1000'
     >>> res = rats_masker.run()  # doctest: +SKIP
     """
     input_spec = MathMorphoMaskInputSpec
