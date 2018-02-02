@@ -1,6 +1,3 @@
-import sys
-sys.path.remove('/usr/lib/python2.7/dist-packages')
-sys.path.append('/usr/lib/python2.7/dist-packages')
 import os
 import shutil
 import numpy as np 

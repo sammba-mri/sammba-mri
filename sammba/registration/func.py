@@ -124,7 +124,7 @@ def coregister_fmri_session(session_data, t_r, write_dir, brain_volume,
         merge = memory.cache(afni.Zcat)
         overwrite = False
         for step in [tshift, volreg, allineate, allineate2,
-                     tstat, rats, calc, unifize, resample,
+                     tstat, compute_mask, calc, unifize, resample,
                      slicer, warp_apply, qwarp, merge]:
             step.interface().set_default_terminal_output(terminal_output)
     else:
