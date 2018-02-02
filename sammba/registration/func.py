@@ -5,7 +5,7 @@ from sammba.externals.nipype.caching import Memory
 from sammba.externals.nipype.interfaces import afni, fsl
 from sammba.externals.nipype.utils.filemanip import fname_presuffix
 from sammba.interfaces import segmentation
-from .utils import fix_obliquity
+from .utils import fix_obliquity, copy_geometry
 from .fmri_session import FMRISession
 from .struct import anats_to_template
 
@@ -109,7 +109,6 @@ def coregister_fmri_session(session_data, t_r, write_dir, brain_volume,
         clip_level = memory.cache(afni.ClipLevel)
         volreg = memory.cache(afni.Volreg)
         allineate = memory.cache(afni.Allineate)
-        copy_geom = memory.cache(fsl.CopyGeom)
         tstat = memory.cache(afni.TStat)
         compute_mask = memory.cache(ComputeMask)
         calc = memory.cache(afni.Calc)
@@ -124,8 +123,8 @@ def coregister_fmri_session(session_data, t_r, write_dir, brain_volume,
         qwarp = memory.cache(afni.Qwarp)
         merge = memory.cache(afni.Zcat)
         overwrite = False
-        for step in [tshift, volreg, allineate, allineate2, copy_geom,
-                     tstat, compute_mask, calc, unifize, resample,
+        for step in [tshift, volreg, allineate, allineate2,
+                     tstat, rats, calc, unifize, resample,
                      slicer, warp_apply, qwarp, merge]:
             step.interface().set_default_terminal_output(terminal_output)
     else:
@@ -134,7 +133,6 @@ def coregister_fmri_session(session_data, t_r, write_dir, brain_volume,
         volreg = afni.Volreg(terminal_output=terminal_output).run
         allineate = afni.Allineate(terminal_output=terminal_output).run
         allineate2 = afni.Allineate(terminal_output=terminal_output).run  # TODO: remove after fixed bug
-        copy_geom = fsl.CopyGeom(terminal_output=terminal_output).run
         tstat = afni.TStat(terminal_output=terminal_output).run
         compute_mask = ComputeMask(terminal_output=terminal_output).run
         calc = afni.Calc(terminal_output=terminal_output).run
@@ -199,10 +197,9 @@ def coregister_fmri_session(session_data, t_r, write_dir, brain_volume,
     # 3dAllineate removes the obliquity. This is not a good way to readd it as
     # removes motion correction info in the header if it were an AFNI file...as
     # it happens it's NIfTI which does not store that so irrelevant!
-    out_copy_geom = copy_geom(dest_file=out_allineate.outputs.out_file,
-                              in_file=out_volreg.outputs.out_file)
-
-    allineated_filename = out_copy_geom.outputs.out_file
+    allineated_filename = copy_geometry(
+        filename_to_copy=out_volreg.outputs.out_file,
+        filename_to_change=out_allineate.outputs.out_file)
 
     # Create a (hopefully) nice mean image for use in the registration
     out_tstat = tstat(in_file=allineated_filename, args='-mean',
