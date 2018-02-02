@@ -1537,12 +1537,15 @@ class NwarpAdjustInputSpec(CommandLineInputSpec):
         desc='List of input 3D datasets to be warped by the adjusted warp '
              'datasets.  There must be exactly as many of these datasets as '
              'there are input warps.')
-    mean_file = File(
+    out_file = File(
         desc='Output mean dataset, only needed if in_files are also given. '
              'The output dataset will be on the common grid shared by the '
              'source datasets.',
         argstr='-prefix %s',
         mandatory=False,
+        name_source='in_files',
+        name_template='%s_NwarpAdjust',
+        keep_extension=True,
         xand=['in_files'])
 
 
@@ -1571,6 +1574,33 @@ class NwarpAdjust(AFNICommandBase):
     _cmd = '3dNwarpAdjust'
     input_spec = NwarpAdjustInputSpec
     output_spec = AFNICommandOutputSpec
+
+    def _parse_inputs(self, skip=None):
+        if not self.inputs.in_files:
+            if skip is None:
+                skip = []
+            skip += ['out_file']
+        return super(NwarpAdjust, self)._parse_inputs(skip=skip)
+
+    def _list_outputs(self):
+        outputs = self.output_spec().get()
+
+        if self.inputs.out_file:
+            outputs['out_file'] = os.path.abspath(self.inputs.out_file)
+
+        if self.inputs.in_files:
+            if self.inputs.out_file:
+                outputs['out_file'] = os.path.abspath(self.inputs.out_file)
+            else:
+                basename = os.path.basename(self.inputs.in_files[0])
+                basename_noext, ext = op.splitext(basename)
+                if '.gz' in ext:
+                    basename_noext, ext2 = op.splitext(basename_noext)
+                    ext = ext2 + ext
+                outputs['out_file'] = os.path.abspath(
+                    basename_noext + '_NwarpAdjust' + ext)
+
+        return outputs
 
 
 class NwarpApplyInputSpec(CommandLineInputSpec):
