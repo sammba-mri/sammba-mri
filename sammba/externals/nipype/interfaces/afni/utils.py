@@ -1567,7 +1567,7 @@ class NwarpAdjust(AFNICommandBase):
     >>> adjust = afni.NwarpAdjust()
     >>> adjust.inputs.warps = [Fred_WARP+tlrc, Fred.Xaff12.1D, Fred.Xaff12.1D, Fred.Xaff12.1D, Fred.Xaff12.1D]
     >>> adjust.cmdline
-    "NwarpAdjust -nwarp Fred_WARP+tlrc Fred.Xaff12.1D Fred.Xaff12.1D Fred.Xaff12.1D Fred.Xaff12.1D"
+    NwarpAdjust -nwarp Fred_WARP+tlrc Fred.Xaff12.1D Fred.Xaff12.1D Fred.Xaff12.1D Fred.Xaff12.1D'
     >>> res = adjust.run()  # doctest: +SKIP
 
     """
