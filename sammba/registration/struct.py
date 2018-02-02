@@ -1,6 +1,5 @@
 import os
 from sammba.externals.nipype.interfaces import afni
-from sammba.interfaces import RatsMM
 from sammba.externals.nipype.utils.filemanip import fname_presuffix
 from sammba.externals.nipype.caching import Memory
 from sklearn.datasets.base import Bunch
