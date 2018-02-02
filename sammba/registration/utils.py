@@ -2,10 +2,11 @@ import os
 import shutil
 import numpy as np
 import nibabel
+from nilearn import image
 from sammba.externals.nipype.caching import Memory
 from sammba.externals.nipype.utils.filemanip import fname_presuffix
 import sammba.externals.nipype.pipeline.engine as pe
-from sammba.externals.nipype.interfaces import afni, fsl
+from sammba.externals.nipype.interfaces import afni
 from sammba.interfaces import segmentation
 
 
@@ -173,13 +174,24 @@ def copy_geometry(filename_to_copy, filename_to_change, out_filename=None,
     geometry_keys = ['sform_code', 'qform_code', 'quatern_b',
                      'quatern_c', 'quatern_d', 'qoffset_x',
                      'qoffset_y', 'qoffset_z', 'srow_x', 'srow_y', 'srow_z']
+    data_to_change = img_to_change.get_data()
     if copy_shape:
         geometry_keys += ['dim']
+        geometry_keys += ['dim_info']
+        geometry_keys += ['slice_end']
+        target_shape = img_to_copy.get_data().shape
+        if data_to_change.shape != target_shape:
+            img_to_change = image.resample_to_img(img_to_change,
+                                                  img_to_copy)
+            data_to_copy = img_to_change.get_data()
+            data_to_change = np.squeeze(
+                data_to_copy[..., :header_to_copy['slice_end'] + 1])
+
     for key in geometry_keys:
         new_header[key] = header_to_copy[key]
 
     new_header['pixdim'][:4] = header_to_copy['pixdim'][:4]
-    new_img = nibabel.Nifti1Image(img_to_change.get_data(), img_to_copy.affine,
+    new_img = nibabel.Nifti1Image(data_to_change, img_to_copy.affine,
                                   header=new_header)
 
     if not in_place:
@@ -192,9 +204,11 @@ def copy_geometry(filename_to_copy, filename_to_change, out_filename=None,
     return out_filename
 
 
-def check_same_geometry(header1, header2):
+def _check_same_geometry(img_filename1, img_filename2):
     unchecked_fields = ['descrip', 'pixdim', 'scl_slope', 'scl_inter',
                         'xyzt_units', 'qform_code', 'regular']
+    header1 = nibabel.load(img_filename1).header
+    header2 = nibabel.load(img_filename2).header
     equal_values = []
     for item1, item2 in zip(header1.items(), header2.items()):
         if item1[0] in unchecked_fields:
@@ -248,7 +262,7 @@ def create_pipeline_graph(pipeline_name, graph_file,
                          name='compute_mask_threshold')
     compute_mask = pe.Node(interface=segmentation.MathMorphoMask(),
                            name='compute_brain_mask')
-    apply_mask = pe.Node(interface=fsl.ApplyMask(), name='apply_brain_mask')
+    apply_mask = pe.Node(interface=afni.Calc(), name='apply_brain_mask')
     center_mass = pe.Node(interface=afni.CenterMass(),
                           name='compute_and_set_cm_in_header')
     refit_copy = pe.Node(afni.Refit(), name='copy_cm_in_header')

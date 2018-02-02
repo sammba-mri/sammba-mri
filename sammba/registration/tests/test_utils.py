@@ -3,13 +3,13 @@ sys.path.remove('/usr/lib/python2.7/dist-packages')
 sys.path.append('/usr/lib/python2.7/dist-packages')
 import os
 import shutil
+import numpy as np 
 import tempfile
-import numpy as np
 from numpy.testing import assert_array_equal, assert_array_almost_equal
 from nose.tools import assert_true, assert_false
 import nibabel
 from nilearn._utils.testing import assert_raises_regex
-from sammba.externals.nipype.interfaces import afni, fsl
+from sammba.externals.nipype.interfaces import afni
 from sammba.registration import utils
 from sammba import testing_data
 
@@ -89,9 +89,18 @@ def test_fix_obliquity():
         if os.path.exists(tempdir):
             os.removedirs(tempdir)
 
+
 def test_check_same_geometry():
-    pass
-    
+    img_filename1 = os.path.join(os.path.dirname(testing_data.__file__),
+                                 'anat.nii.gz')
+    img_filename2 = os.path.join(os.path.dirname(testing_data.__file__),
+                                 'func.nii.gz')
+    assert_true(np.alltrue(utils._check_same_geometry(img_filename1,
+                                                      img_filename1)))
+    assert_false(np.alltrue(utils._check_same_geometry(img_filename1,
+                                                       img_filename2)))
+
+
 def test_copy_geometry():
     func_filename = os.path.join(os.path.dirname(testing_data.__file__),
                                  'func.nii.gz')
@@ -99,42 +108,16 @@ def test_copy_geometry():
                                  'anat.nii.gz')
     if afni.Info().version():
         tempdir = tempfile.mkdtemp()
-        matrix_filename = os.path.join(tempdir, 'test_geometry.aff12.1D')
-        matrix = np.random.randn(3, 12)
-        np.savetxt(matrix_filename, matrix, fmt='%.2f', delimiter='\t')
-        # Allineate changes the geometry
-        allineate = afni.Allineate().run
-        out_allineate = allineate(
-            in_file=anat_filename,
-            master=anat_filename,
-            in_matrix=matrix_filename,
-            out_file=os.path.join(tempdir, 'test_geometry.nii.gz'))
-
-        header = nibabel.load(anat_filename).header
-        allineate_header = nibabel.load(out_allineate.outputs.out_file).header
-
-        assert_false(np.alltrue(utils.check_same_geometry(header,
-                                                          allineate_header)))
         changed_filename = utils.copy_geometry(
-            anat_filename, out_allineate.outputs.out_file,
+            anat_filename, func_filename,
+            out_filename=os.path.join(tempdir, 'geometry_test.nii.gz'),
             in_place=False)
-        changed_header = nibabel.load(changed_filename).header
-        copy_geom = fsl.CopyGeom().run
-        out_copy_geom = copy_geom(dest_file=out_allineate.outputs.out_file,
-                                  in_file=anat_filename)
-        fsl_cpgeom_header = nibabel.load(out_copy_geom.outputs.out_file).header
-        assert(np.alltrue(utils.check_same_geometry(header,
-                                                    changed_header)))
-
-        changed_filename = utils.copy_geometry(
-            func_filename, anat_filename,
-            in_place=False)
-        assert(np.alltrue(utils.check_same_geometry(nibabel.load(func_filename).header,
-                                                    nibabel.load(changed_filename).header)))
-        for filename in [out_allineate.outputs.out_file, changed_filename,
-                         matrix_filename]:
-            if os.path.exists(filename):
-                os.remove(filename)
+        assert_false(np.alltrue(utils._check_same_geometry(func_filename,
+                                                           anat_filename)))
+        assert_true(np.alltrue(utils._check_same_geometry(changed_filename,
+                                                          anat_filename)))
+        if os.path.exists(changed_filename):
+            os.remove(changed_filename)
         if os.path.exists(tempdir):
             os.removedirs(tempdir)
 

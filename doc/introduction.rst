@@ -20,7 +20,6 @@ The required dependencies to use the package are
 the softwares:
 
 * AFNI
-* FSL >= 5.0
 * `RATS <http://www.iibi.uiowa.edu/content/rats-overview/>`_ for brain
   extraction
 
@@ -78,24 +77,6 @@ In the ``sammba-mri`` directory created by the previous step, run
 
 Interfaces configuration
 ========================
-**Configuring FSL**: On an Ubuntu system, FSL is usually installed at :: /usr/share/fsl. You need to add this location to your .bashrc file. Edit this file by running the shell command::
-
-    gedit ~/.bashrc
-
-and add the following lines::
-
-    # FSL
-    FSLDIR=/usr/share/fsl
-    . ${FSLDIR}/5.0/etc/fslconf/fsl.sh
-    PATH=${FSLDIR}/5.0/bin:${PATH}
-    export FSLDIR PATH
-
-To test if FSL is correctly installed, open a new terminal and type in the shell command::
-
-    fsl
-
-You should see the FSL GUI with the version number in the header.
-
 **Configuring AFNI**: To be able to run AFNI make sure to add the following lines of code to your .bashrc file::
 
     # AFNI
