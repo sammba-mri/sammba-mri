@@ -833,7 +833,7 @@ def anats_to_template(anat_filenames, head_template_filename, write_dir,
         # separate as 3dAllineate performs well on brain image, and 3dQwarp
         # well on whole head
         affine_transform_filename = fname_presuffix(masked_anat_filename,
-                                                    suffix='_shr.aff12.1D',
+                                                    suffix='_aff.aff12.1D',
                                                     use_ext=False)
         out_allineate = allineate(
             in_file=masked_anat_filename,
@@ -846,8 +846,7 @@ def anats_to_template(anat_filenames, head_template_filename, write_dir,
             two_pass=True,
             center_of_mass='',
             maxrot=90,
-            warp_type='shift_rotate',
-            out_file=fname_presuffix(masked_anat_filename, suffix='_shr'),
+            out_file=fname_presuffix(masked_anat_filename, suffix='_aff'),
             environ=environ,
             **verbosity_quietness_kwargs)
         affine_transforms.append(affine_transform_filename)
@@ -858,7 +857,7 @@ def anats_to_template(anat_filenames, head_template_filename, write_dir,
             master=head_template_filename,
             in_matrix=affine_transform_filename,
             out_file=fname_presuffix(unbiased_anat_filename,
-                                     suffix='_shift_rotated'),
+                                     suffix='_affine_general'),
             environ=environ,
             **verbosity_quietness_kwargs)
         allineated_filenames.append(out_allineate2.outputs.out_file)
