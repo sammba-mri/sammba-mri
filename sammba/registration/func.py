@@ -4,13 +4,14 @@ import nibabel
 from sammba.externals.nipype.caching import Memory
 from sammba.externals.nipype.interfaces import afni, fsl
 from sammba.externals.nipype.utils.filemanip import fname_presuffix
-from sammba.interfaces import RatsMM
+from sammba.interfaces import segmentation
 from .utils import fix_obliquity
 from .fmri_session import FMRISession
 from .struct import anats_to_template
 
 
 def coregister_fmri_session(session_data, t_r, write_dir, brain_volume,
+                            use_rats_tool=True,
                             slice_timing=True,
                             prior_rigid_body_registration=False,
                             caching=False, voxel_size_x=.1, voxel_size_y=.1,
@@ -35,8 +36,12 @@ def coregister_fmri_session(session_data, t_r, write_dir, brain_volume,
         Directory to save the output and temporary images.
 
     brain_volume : int
-        Volumes of the brain as passed to Rats_MM brain extraction tool.
+        Volume of the brain used for brain extraction.
         Typically 400 for mouse and 1800 for rat.
+
+    use_rats_tool : bool, optional
+        If True, brain mask is computed using RATS Mathematical Morphology.
+        Otherwise, a histogram-based brain segmentation is used.
 
     prior_rigid_body_registration : bool, optional
         If True, a rigid-body registration of the anat to the func is performed
@@ -71,6 +76,12 @@ def coregister_fmri_session(session_data, t_r, write_dir, brain_volume,
                           Path to paths to the coregistered functional image.
         - `coreg_transform_` : str
                                Path to the transform from anat to func.
+
+    Notes
+    -----
+    If `use_rats_tool` is turned on, RATS tool is used for brain extraction
+    and has to be cited. For more information, see
+    `RATS <http://www.iibi.uiowa.edu/content/rats-overview/>`_
     """
     func_filename = session_data.func
     anat_filename = session_data.anat
@@ -84,6 +95,14 @@ def coregister_fmri_session(session_data, t_r, write_dir, brain_volume,
     else:
         terminal_output = 'none'
 
+    if use_rats_tool:
+        if segmentation.Info().version() is None:
+            raise ValueError('Can not locate compute_mask')
+        else:
+            ComputeMask = segmentation.MathMorphoMask
+    else:
+        ComputeMask = segmentation.HistogramMask
+
     if caching:
         memory = Memory(write_dir)
         tshift = memory.cache(afni.TShift)
@@ -93,7 +112,7 @@ def coregister_fmri_session(session_data, t_r, write_dir, brain_volume,
         allineate = memory.cache(afni.Allineate)
         copy_geom = memory.cache(fsl.CopyGeom)
         tstat = memory.cache(afni.TStat)
-        rats = memory.cache(RatsMM)
+        compute_mask = memory.cache(ComputeMask)
         calc = memory.cache(afni.Calc)
         allineate = memory.cache(afni.Allineate)
         allineate2 = memory.cache(afni.Allineate)
@@ -107,7 +126,7 @@ def coregister_fmri_session(session_data, t_r, write_dir, brain_volume,
         merge = memory.cache(fsl.Merge)
         overwrite = False
         for step in [tshift, volreg, allineate, allineate2, copy_geom,
-                     tstat, rats, calc, unifize, resample,
+                     tstat, compute_mask, calc, unifize, resample,
                      slicer, warp_apply, qwarp, merge]:
             step.interface().set_default_terminal_output(terminal_output)
     else:
@@ -119,7 +138,7 @@ def coregister_fmri_session(session_data, t_r, write_dir, brain_volume,
         allineate2 = afni.Allineate(terminal_output=terminal_output).run  # TODO: remove after fixed bug
         copy_geom = fsl.CopyGeom(terminal_output=terminal_output).run
         tstat = afni.TStat(terminal_output=terminal_output).run
-        rats = RatsMM(terminal_output=terminal_output).run
+        compute_mask = ComputeMask(terminal_output=terminal_output).run
         calc = afni.Calc(terminal_output=terminal_output).run
         unifize = afni.Unifize(terminal_output=terminal_output).run
         catmatvec = afni.CatMatvec().run
@@ -219,24 +238,24 @@ def coregister_fmri_session(session_data, t_r, write_dir, brain_volume,
     if prior_rigid_body_registration:
         # Mask the mean functional volume outside the brain.
         out_clip_level = clip_level(in_file=unbiased_func_filename)
-        out_rats_func = rats(
+        out_compute_mask_func = compute_mask(
             in_file=unbiased_func_filename,
             volume_threshold=brain_volume,
             intensity_threshold=int(out_clip_level.outputs.clip_val))
         out_cacl_func = calc(in_file_a=unbiased_func_filename,
-                             in_file_b=out_rats_func.outputs.out_file,
+                             in_file_b=out_compute_mask_func.outputs.out_file,
                              expr='a*b',
                              outputtype='NIFTI_GZ',
                              environ=environ)
 
         # Mask the anatomical volume outside the brain.
         out_clip_level = clip_level(in_file=unbiased_anat_filename)
-        out_rats_anat = rats(
+        out_compute_mask_anat = compute_mask(
             in_file=unbiased_anat_filename,
             volume_threshold=brain_volume,
             intensity_threshold=int(out_clip_level.outputs.clip_val))
         out_cacl_anat = calc(in_file_a=unbiased_anat_filename,
-                             in_file_b=out_rats_anat.outputs.out_file,
+                             in_file_b=out_compute_mask_anat.outputs.out_file,
                              expr='a*b',
                              outputtype='NIFTI_GZ',
                              environ=environ)
@@ -255,9 +274,9 @@ def coregister_fmri_session(session_data, t_r, write_dir, brain_volume,
                                      suffix='_shr'),
             environ=environ)
         rigid_transform_file = out_allineate.outputs.out_matrix
-        output_files.extend([out_rats_func.outputs.out_file,
+        output_files.extend([out_compute_mask_func.outputs.out_file,
                              out_cacl_func.outputs.out_file,
-                             out_rats_anat.outputs.out_file,
+                             out_compute_mask_anat.outputs.out_file,
                              out_cacl_anat.outputs.out_file,
                              rigid_transform_file,
                              out_allineate.outputs.out_file])
@@ -311,7 +330,7 @@ def coregister_fmri_session(session_data, t_r, write_dir, brain_volume,
     transform_filename = fname_presuffix(registered_anat_filename,
                                          suffix='_anat_to_func.aff12.1D',
                                          use_ext=False)
-    if prior_rigid_body_registration:
+    if False:#prior_rigid_body_registration:
         _ = catmatvec(in_file=[(mat_filename, 'ONELINE'),
                                (rigid_transform_file, 'ONELINE')],
                       oneline=True,
@@ -567,7 +586,8 @@ def _func_to_template(func_coreg_filename, template_filename, write_dir,
 
 def fmri_sessions_to_template(sessions, t_r, head_template_filename,
                               write_dir,
-                              brain_volume, brain_template_filename=None,
+                              brain_volume, use_rats_tool=True,
+                              brain_template_filename=None,
                               dilated_head_mask_filename=None,
                               prior_rigid_body_registration=False,
                               slice_timing=True,
@@ -589,8 +609,12 @@ def fmri_sessions_to_template(sessions, t_r, head_template_filename,
         Template to register the functional to.
 
     brain_volume : int
-        Volumes of the brain as passed to Rats_MM brain extraction tool.
+        Volume of the brain used for brain extraction.
         Typically 400 for mouse and 1800 for rat.
+
+    use_rats_tool : bool, optional
+        If True, brain mask is computed using RATS Mathematical Morphology.
+        Otherwise, a histogram-based brain segmentation is used.
 
     write_dir : str
         Path to the affine 1D transform from anatomical to template space.
@@ -640,6 +664,12 @@ def fmri_sessions_to_template(sessions, t_r, head_template_filename,
     --------
     sammba.registration.coregister_fmri_session,
     sammba.registration.anats_to_template
+
+    Notes
+    -----
+    If `use_rats_tool` is turned on, RATS tool is used for brain extraction
+    and has to be cited. For more information, see
+    `RATS <http://www.iibi.uiowa.edu/content/rats-overview/>`_
     """
     if not hasattr(sessions, "__iter__"):
             raise ValueError(
@@ -669,6 +699,7 @@ def fmri_sessions_to_template(sessions, t_r, head_template_filename,
 
         coregister_fmri_session(
             animal_data, t_r, write_dir, brain_volume,
+            use_rats_tool=use_rats_tool,
             prior_rigid_body_registration=prior_rigid_body_registration,
             slice_timing=slice_timing,
             caching=caching, verbose=verbose)
@@ -680,6 +711,7 @@ def fmri_sessions_to_template(sessions, t_r, head_template_filename,
         head_template_filename,
         animal_data.output_dir_,
         brain_volume,
+        use_rats_tool=use_rats_tool,
         brain_template_filename=brain_template_filename,
         dilated_head_mask_filename=dilated_head_mask_filename,
         maxlev=maxlev,

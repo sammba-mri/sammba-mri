@@ -1,3 +1,4 @@
-from .preproc_tools import RatsMM
+from .segmentation import MathMorphoMask, HistogramMask
 
-__all__ = ['RatsMM']
+__all__ = ['MathMorphoMask', 'HistogramMask']
+

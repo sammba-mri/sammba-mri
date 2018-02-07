@@ -1,6 +1,6 @@
 import os
 from sammba.externals.nipype.interfaces import afni, fsl
-from sammba.interfaces import RatsMM
+from sammba.interfaces import segmentation
 from sammba.externals.nipype.utils.filemanip import fname_presuffix
 from sammba.externals.nipype.caching import Memory
 from sklearn.datasets.base import Bunch
@@ -8,6 +8,7 @@ from sklearn.datasets.base import Bunch
 
 def anats_to_common(anat_filenames, write_dir, brain_volume,
                     registration_kind='affine',
+                    use_rats_tool=True,
                     nonlinear_levels=[1, 2, 3],
                     nonlinear_minimal_patches=[75],
                     nonlinear_weight_file=None,
@@ -26,11 +27,15 @@ def anats_to_common(anat_filenames, write_dir, brain_volume,
         Path to an existant directory to save output files to.
 
     brain_volume : int
-        Volumes of the brain as passed to Rats_MM brain masking tool.
+        Volume of the brain used for brain extraction.
         Typically 400 for mouse and 1800 for rat.
 
     registration_kind : one of {'rigid', 'affine', 'nonlinear'}, optional
         The allowed transform kind.
+
+    use_rats_tool : bool, optional
+        If True, brain mask is computed using RATS Mathematical Morphology.
+        Otherwise, a histogram-based brain segmentation is used.
 
     nonlinear_levels : list of int, optional
         Maximal levels for each nonlinear warping iteration. Passed iteratively
@@ -105,13 +110,25 @@ def anats_to_common(anat_filenames, write_dir, brain_volume,
     regions can be added manually. This does not have to be done precisely, only 
     roughly, and it is better to include too much tissue than too little. The 
     procedure should then be rerun as non-linear, but using this weight mask.                     
-    
+
+    use_rats_tool:
+    If `use_rats_tool` is turned on, RATS tool is used for brain extraction
+    and has to be cited. For more information, see
+    `RATS <http://www.iibi.uiowa.edu/content/rats-overview/>`_
     """
     registration_kinds = ['rigid', 'affine', 'nonlinear']
     if registration_kind not in registration_kinds:
         raise ValueError(
             'Registration kind must be one of {0}, you entered {1}'.format(
                 registration_kinds, registration_kind))
+
+    if use_rats_tool:
+        if segmentation.Info().version() is None:
+            raise ValueError('Can not locate RATS')
+        else:
+            ComputeMask = segmentation.MathMorphoMask
+    else:
+        ComputeMask = segmentation.HistogramMask
 
     if verbose:
         terminal_output = 'stream'
@@ -129,7 +146,7 @@ def anats_to_common(anat_filenames, write_dir, brain_volume,
         copy = memory.cache(afni.Copy)
         unifize = memory.cache(afni.Unifize)
         clip_level = memory.cache(afni.ClipLevel)
-        rats = memory.cache(RatsMM)
+        compute_mask = memory.cache(ComputeMask)
         apply_mask = memory.cache(fsl.ApplyMask)
         center_mass = memory.cache(afni.CenterMass)
         refit = memory.cache(afni.Refit)
@@ -142,9 +159,10 @@ def anats_to_common(anat_filenames, write_dir, brain_volume,
         mask_tool = memory.cache(afni.MaskTool)
         catmatvec = memory.cache(afni.CatMatvec)
         qwarp = memory.cache(afni.Qwarp)
+        qwarp2 = memory.cache(afni.Qwarp)  # workaround to initialize inputs
         nwarp_cat = memory.cache(afni.NwarpCat)
         warp_apply = memory.cache(afni.NwarpApply)
-        for step in [copy, unifize, rats, apply_mask, refit,
+        for step in [copy, unifize, compute_mask, apply_mask, refit,
                      tcat, tstat, undump, resample, allineate, allineate2,
                      mask_tool, catmatvec, qwarp, nwarp_cat, warp_apply]:
             step.interface().set_default_terminal_output(terminal_output)
@@ -152,7 +170,7 @@ def anats_to_common(anat_filenames, write_dir, brain_volume,
         copy = afni.Copy(terminal_output=terminal_output).run
         unifize = afni.Unifize(terminal_output=terminal_output).run
         clip_level = afni.ClipLevel().run  # XXX fix nipype bug with 'none'
-        rats = RatsMM(terminal_output=terminal_output).run
+        compute_mask = ComputeMask(terminal_output=terminal_output).run
         apply_mask = fsl.ApplyMask(terminal_output=terminal_output).run
         center_mass = afni.CenterMass().run  # XXX fix nipype bug with 'none'
         refit = afni.Refit(terminal_output=terminal_output).run
@@ -165,6 +183,7 @@ def anats_to_common(anat_filenames, write_dir, brain_volume,
         mask_tool = afni.MaskTool(terminal_output=terminal_output).run
         catmatvec = afni.CatMatvec(terminal_output=terminal_output).run
         qwarp = afni.Qwarp(terminal_output=terminal_output).run
+        qwarp2 = afni.Qwarp(terminal_output=terminal_output).run
         nwarp_cat = afni.NwarpCat(terminal_output=terminal_output).run
         warp_apply = afni.NwarpApply(terminal_output=terminal_output).run
 
@@ -245,13 +264,13 @@ def anats_to_common(anat_filenames, write_dir, brain_volume,
     brain_mask_files = []
     for n, brain_masking_in_file in enumerate(brain_masking_in_files):
         out_clip_level = clip_level(in_file=brain_masking_in_file)
-        out_rats = rats(
+        out_compute_mask = compute_mask(
             in_file=brain_masking_in_file,
             out_file=fname_presuffix(brain_masking_in_file, suffix='_mask'),
             volume_threshold=brain_volume,
             intensity_threshold=int(out_clip_level.outputs.clip_val),
             terminal_output=terminal_output)
-        brain_mask_files.append(out_rats.outputs.out_file)
+        brain_mask_files.append(out_compute_mask.outputs.out_file)
 
     # bias correction for images to be both brain-extracted with the mask 
     # generated above and then passed on to the rest of the function
@@ -572,7 +591,7 @@ def anats_to_common(anat_filenames, write_dir, brain_volume,
                     **verbosity_quietness_kwargs)
                     
             else:
-                out_qwarp = qwarp(
+                out_qwarp = qwarp2(
                     in_file=centered_head_file,
                     base_file=out_tstat_warp_head.outputs.out_file,
                     noneg=True,
@@ -620,7 +639,7 @@ def anats_to_common(anat_filenames, write_dir, brain_volume,
 
 
 def anats_to_template(anat_filenames, head_template_filename, write_dir,
-                      brain_volume,
+                      brain_volume, use_rats_tool=True,
                       brain_template_filename=None,
                       dilated_head_mask_filename=None, convergence=.005,
                       maxlev=None,
@@ -640,8 +659,12 @@ def anats_to_template(anat_filenames, head_template_filename, write_dir,
         Path to an existant directory to save output files to.
 
     brain_volume : int
-        Volumes of the brain as passed to Rats_MM brain extraction tool.
-        Typically 400 for mouse and 1600 for rat.
+        Volume of the brain used for brain extraction.
+        Typically 400 for mouse and 1800 for rat.
+
+    use_rats_tool : bool, optional
+        If True, brain mask is computed using RATS Mathematical Morphology.
+        Otherwise, a histogram-based brain segmentation is used.
 
     brain_template_filename : str, optional
         Path to a brain template. Note that this must coincide with the brain
@@ -691,6 +714,11 @@ def anats_to_template(anat_filenames, head_template_filename, write_dir,
         - `transforms` : list of str.
                          Paths to the transforms from the allineated
                          images to the final registered images.
+    Notes
+    -----
+    If `use_rats_tool` is turned on, RATS tool is used for brain extraction
+    and has to be cited. For more information, see
+    `RATS <http://www.iibi.uiowa.edu/content/rats-overview/>`_
     """
     environ = {}
     if verbose:
@@ -702,10 +730,18 @@ def anats_to_template(anat_filenames, head_template_filename, write_dir,
         quietness_kwargs = {'quiet': True}
         verbosity_quietness_kwargs = {'quiet': True}
 
+    if use_rats_tool:
+        if segmentation.Info().version() is None:
+            raise ValueError('Can not locate RATS')
+        else:
+            ComputeMask = segmentation.MathMorphoMask
+    else:
+        ComputeMask = segmentation.HistogramMask
+
     if caching:
         memory = Memory(write_dir)
         clip_level = memory.cache(afni.ClipLevel)
-        rats = memory.cache(RatsMM)
+        compute_mask = memory.cache(ComputeMask)
         apply_mask = memory.cache(fsl.ApplyMask)
         mask_tool = memory.cache(afni.MaskTool)
         allineate = memory.cache(afni.Allineate)
@@ -713,13 +749,13 @@ def anats_to_template(anat_filenames, head_template_filename, write_dir,
         unifize = memory.cache(afni.Unifize)
         threshold = memory.cache(fsl.Threshold)
         qwarp = memory.cache(afni.Qwarp)
-        for step in [rats,  allineate, allineate2, apply_mask, mask_tool,
-                     unifize, threshold, qwarp]:
+        for step in [compute_mask,  allineate, allineate2, apply_mask,
+                     mask_tool, unifize, threshold, qwarp]:
             step.interface().set_default_terminal_output(terminal_output)
     else:
         unifize = afni.Unifize(terminal_output=terminal_output).run
         clip_level = afni.ClipLevel().run
-        rats = RatsMM(terminal_output=terminal_output).run
+        compute_mask = ComputeMask(terminal_output=terminal_output).run
         apply_mask = fsl.ApplyMask(terminal_output=terminal_output).run
         mask_tool = afni.MaskTool(terminal_output=terminal_output).run
         allineate = afni.Allineate(terminal_output=terminal_output).run
@@ -733,7 +769,7 @@ def anats_to_template(anat_filenames, head_template_filename, write_dir,
     intermediate_files = []
     if brain_template_filename is None:
         out_clip_level = clip_level(in_file=head_template_filename)
-        out_rats = rats(
+        out_rats = compute_mask(
             in_file=head_template_filename,
             volume_threshold=brain_volume,
             intensity_threshold=int(out_clip_level.outputs.clip_val))
@@ -766,7 +802,7 @@ def anats_to_template(anat_filenames, head_template_filename, write_dir,
     brain_mask_files = []
     for brain_extraction_in_file in brain_extraction_in_files:
         out_clip_level = clip_level(in_file=brain_extraction_in_file)
-        out_rats = rats(
+        out_rats = compute_mask(
             in_file=brain_extraction_in_file,
             volume_threshold=brain_volume,
             intensity_threshold=int(out_clip_level.outputs.clip_val))

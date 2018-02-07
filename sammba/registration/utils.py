@@ -6,7 +6,7 @@ from sammba.externals.nipype.caching import Memory
 from sammba.externals.nipype.utils.filemanip import fname_presuffix
 import sammba.externals.nipype.pipeline.engine as pe
 from sammba.externals.nipype.interfaces import afni, fsl
-from sammba.interfaces import RatsMM
+from sammba.interfaces import segmentation
 
 
 def _reset_affines(in_file, out_file, overwrite=False, axes_to_permute=None,
@@ -182,7 +182,8 @@ def create_pipeline_graph(pipeline_name, graph_file,
     unifize = pe.Node(interface=afni.Unifize(), name='bias_correct')
     clip_level = pe.Node(interface=afni.ClipLevel(),
                          name='compute_mask_threshold')
-    rats = pe.Node(interface=RatsMM(), name='compute_brain_mask')
+    compute_mask = pe.Node(interface=segmentation.MathMorphoMask(),
+                           name='compute_brain_mask')
     apply_mask = pe.Node(interface=fsl.ApplyMask(), name='apply_brain_mask')
     center_mass = pe.Node(interface=afni.CenterMass(),
                           name='compute_and_set_cm_in_header')
@@ -200,7 +201,8 @@ def create_pipeline_graph(pipeline_name, graph_file,
     tcat3 = pe.Node(afni.TCat(), name='concatenate_across_individuals3')
     tstat3 = pe.Node(afni.TStat(), name='compute_average3')
 
-    workflow.add_nodes([unifize, clip_level, rats, apply_mask, center_mass,
+    workflow.add_nodes([unifize, clip_level, compute_mask, apply_mask,
+                        center_mass,
                         refit_copy, tcat1, tstat1, undump, refit_set,
                         resample1, resample2, shift_rotate, apply_allineate1,
                         tcat2, tstat2, tcat3, tstat3])
@@ -209,9 +211,9 @@ def create_pipeline_graph(pipeline_name, graph_file,
     # and connections
     workflow.connect(unifize, 'out_file', clip_level, 'in_file')
     workflow.connect(clip_level, 'clip_val',
-                     rats, 'intensity_threshold')
-    workflow.connect(unifize, 'out_file', rats, 'in_file')
-    workflow.connect(rats, 'out_file', apply_mask, 'mask_file')
+                     compute_mask, 'intensity_threshold')
+    workflow.connect(unifize, 'out_file', compute_mask, 'in_file')
+    workflow.connect(compute_mask, 'out_file', apply_mask, 'mask_file')
     workflow.connect(apply_mask, 'out_file',
                      center_mass, 'in_file')
     workflow.connect(unifize, 'out_file', refit_copy, 'in_file')
