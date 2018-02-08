@@ -751,7 +751,7 @@ def anats_to_template(anat_filenames, head_template_filename, write_dir,
         unifize = memory.cache(afni.Unifize)
         qwarp = memory.cache(afni.Qwarp)
         for step in [compute_mask,  allineate, allineate2, calc,
-                     mask_tool, unifize, threshold, qwarp]:
+                     mask_tool, unifize, qwarp]:
             step.interface().set_default_terminal_output(terminal_output)
     else:
         unifize = afni.Unifize(terminal_output=terminal_output).run
@@ -779,7 +779,8 @@ def anats_to_template(anat_filenames, head_template_filename, write_dir,
         out_clip_level = clip_level(in_file=head_template_filename)
         out_calc_threshold = calc(
             in_file_a=head_template_filename,
-            expr='ispositive(a-{0})'.format(out_clip_level.outputs.clip_val),
+            in_file_b=head_template_filename,
+            expr='ispositive(a-{0}+1)*b'.format(out_clip_level.outputs.clip_val),
             outputtype='NIFTI_GZ')
         out_mask_tool = mask_tool(in_file=out_calc_threshold.outputs.out_file,
                                   dilate_inputs='3',

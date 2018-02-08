@@ -148,7 +148,7 @@ def _check_same_obliquity(img_filename1, img_filename2):
 
 
 def copy_geometry(filename_to_copy, filename_to_change, out_filename=None,
-                  copy_shape=True, in_place=True):
+                  copy_shape=True, in_place=True, allow_resampling=False):
     """ Mimics FSL command fslcpgeom to copy geometry information from header.
 
     filename_to_copy : str
@@ -165,6 +165,9 @@ def copy_geometry(filename_to_copy, filename_to_change, out_filename=None,
 
     in_place : bool, optional
         If False, a new image is created with the copied geometry information.
+
+    allow_resampling : bool, optional
+        If True, resampling is done when the two images have different shapes.
     """
     img_to_copy = nibabel.load(filename_to_copy)
     img_to_change = nibabel.load(filename_to_change)
@@ -181,12 +184,16 @@ def copy_geometry(filename_to_copy, filename_to_change, out_filename=None,
         geometry_keys += ['slice_end']
         target_shape = img_to_copy.get_data().shape
         if data_to_change.shape != target_shape:
-            img_to_change = image.resample_to_img(img_to_change,
-                                                  img_to_copy)
-            data_to_copy = img_to_change.get_data()
-            data_to_change = np.squeeze(
-                data_to_copy[..., :header_to_copy['slice_end'] + 1])
-
+            if allow_resampling:
+                img_to_change = image.resample_to_img(img_to_change,
+                                                      img_to_copy)
+                data_to_copy = img_to_change.get_data()
+                data_to_change = np.squeeze(
+                    data_to_copy[..., :header_to_copy['slice_end'] + 1])
+            else:
+                raise ValueError('images have different shapes: {0} and {1}. '
+                                 'You need to set `allow_resampling` to True. '
+                                 ''.format(data_to_change.shape, target_shape))
     for key in geometry_keys:
         new_header[key] = header_to_copy[key]
 
