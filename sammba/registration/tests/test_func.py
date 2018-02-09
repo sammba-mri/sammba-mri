@@ -40,11 +40,11 @@ def test_coregister_fmri_session():
     assert_raises_regex(RuntimeError,
                         "badly formed filename",
                         func.coregister_fmri_session, animal_session, 1.,
-                        tempdir, 400, slice_timing=False)
+                        tempdir, 400, slice_timing=False, use_rats_tool=False)
     assert_raises_regex(RuntimeError,
                         "Program Death",
                         func.coregister_fmri_session, animal_session, 1.,
-                        tempdir, 400, slice_timing=False,
+                        tempdir, 400, slice_timing=False, use_rats_tool=False,
                         AFNI_ALLOW_ARBITRARY_FILENAMES='YES')
     if os.path.exists(tempdir):
         os.removedirs(tempdir)
