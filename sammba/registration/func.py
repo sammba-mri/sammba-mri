@@ -173,8 +173,7 @@ def coregister_fmri_session(session_data, t_r, write_dir, brain_volume,
     out_clip_level = clip_level(in_file=func_filename)
     out_calc_threshold = calc(
         in_file_a=func_filename,
-        in_file_b=func_filename,
-        expr='ispositive(a-{0}+1) * b'.format(out_clip_level.outputs.clip_val),
+        expr='ispositive(a-{0}) * a'.format(out_clip_level.outputs.clip_val),
         outputtype='NIFTI_GZ')
     thresholded_filename = out_calc_threshold.outputs.out_file
 
