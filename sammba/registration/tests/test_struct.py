@@ -42,15 +42,11 @@ def test_anats_to_template():
     # test common space of one image is itself
     register_result = struct.anats_to_template([anat_file], anat_file, tempdir,
                                                400, use_rats_tool=False,
-                                               maxlev=0)
+                                               maxlev=0, verbose=0)
     transform = np.loadtxt(register_result.pre_transforms[0])
     assert_array_almost_equal(transform,
                               [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0], decimal=2)
 
-    print(register_result)
-    assert_true(_check_same_fov(
-        nibabel.load(register_result.registered[0]),
-        nibabel.load(anat_file)))
     assert_true(_check_same_obliquity(
         nibabel.load(register_result.registered[0]),
         nibabel.load(anat_file)))

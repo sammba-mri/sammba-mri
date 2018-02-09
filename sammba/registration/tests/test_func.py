@@ -33,7 +33,8 @@ def test_coregister_fmri_session():
     os.remove(animal_session.coreg_transform_)
     os.remove(animal_session.coreg_anat_)
     os.remove(animal_session.coreg_func_)
-    os.removedirs(tempdir)
+    if os.path.exists(tempdir):
+        os.removedirs(tempdir)
 
     # Check environement variables setting
     tempdir = tempfile.mkdtemp(suffix='?')
@@ -46,7 +47,8 @@ def test_coregister_fmri_session():
                         func.coregister_fmri_session, animal_session, 1.,
                         tempdir, 400, slice_timing=False,
                         AFNI_ALLOW_ARBITRARY_FILENAMES='YES')
-    os.removedirs(tempdir)
+    if os.path.exists(tempdir):
+        os.removedirs(tempdir)
 
 
 def test_fmri_sessions_to_template():
