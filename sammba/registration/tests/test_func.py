@@ -38,7 +38,7 @@ def test_coregister_fmri_session():
     # Check environement variables setting
     tempdir = tempfile.mkdtemp(suffix='?')
     assert_raises_regex(RuntimeError,
-                        "badly formed filename",
+                        "Illegal new dataset name",
                         func.coregister_fmri_session, animal_session, 1.,
                         tempdir, 400, slice_timing=False, use_rats_tool=False)
     assert_raises_regex(RuntimeError,
@@ -46,8 +46,12 @@ def test_coregister_fmri_session():
                         func.coregister_fmri_session, animal_session, 1.,
                         tempdir, 400, slice_timing=False, use_rats_tool=False,
                         AFNI_ALLOW_ARBITRARY_FILENAMES='YES')
+
     if os.path.exists(tempdir):
-        os.removedirs(tempdir)
+        output_dir = os.path.join(tempdir, 'animal001')
+        for out_file in os.listdir(output_dir):
+            os.remove(os.path.join(output_dir, out_file))
+        os.removedirs(output_dir)
 
 
 def test_fmri_sessions_to_template():
