@@ -1,9 +1,9 @@
 import os
-from sammba.externals.nipype.interfaces import afni, fsl
-from sammba.interfaces import segmentation
+from sammba.externals.nipype.interfaces import afni
 from sammba.externals.nipype.utils.filemanip import fname_presuffix
 from sammba.externals.nipype.caching import Memory
 from sklearn.datasets.base import Bunch
+from sammba.interfaces import segmentation
 
 
 def anats_to_common(anat_filenames, write_dir, brain_volume,
@@ -152,7 +152,7 @@ def anats_to_common(anat_filenames, write_dir, brain_volume,
         unifize = memory.cache(afni.Unifize)
         clip_level = memory.cache(afni.ClipLevel)
         compute_mask = memory.cache(ComputeMask)
-        apply_mask = memory.cache(fsl.ApplyMask)
+        calc = memory.cache(afni.Calc)
         center_mass = memory.cache(afni.CenterMass)
         refit = memory.cache(afni.Refit)
         tcat = memory.cache(afni.TCat)
@@ -168,7 +168,7 @@ def anats_to_common(anat_filenames, write_dir, brain_volume,
         nwarp_cat = memory.cache(afni.NwarpCat)
         warp_apply = memory.cache(afni.NwarpApply)
         nwarp_adjust = memory.cache(afni.NwarpAdjust)
-        for step in [copy, unifize, compute_mask, apply_mask, refit,
+        for step in [copy, unifize, compute_mask, calc, refit,
                      tcat, tstat, undump, resample, allineate, allineate2,
                      mask_tool, catmatvec, qwarp, nwarp_cat, warp_apply,
                      nwarp_adjust]:
@@ -178,7 +178,7 @@ def anats_to_common(anat_filenames, write_dir, brain_volume,
         unifize = afni.Unifize(terminal_output=terminal_output).run
         clip_level = afni.ClipLevel().run  # XXX fix nipype bug with 'none'
         compute_mask = ComputeMask(terminal_output=terminal_output).run
-        apply_mask = fsl.ApplyMask(terminal_output=terminal_output).run
+        calc = afni.Calc(terminal_output=terminal_output).run
         center_mass = afni.CenterMass().run  # XXX fix nipype bug with 'none'
         refit = afni.Refit(terminal_output=terminal_output).run
         tcat = afni.TCat(terminal_output=terminal_output).run
@@ -300,10 +300,12 @@ def anats_to_common(anat_filenames, write_dir, brain_volume,
     brain_files = []
     for (brain_mask_file, unifized_file) in zip(brain_mask_files,
                                                 unifized_files):
-        out_apply_mask = apply_mask(in_file=unifized_file,
-                                    mask_file=brain_mask_file)
+        out_calc_mask = calc(in_file_a=unifized_file,
+                             in_file_b=brain_mask_file,
+                             expr='a*b',
+                             outputtype='NIFTI_GZ')
         out_center_mass = center_mass(
-            in_file=out_apply_mask.outputs.out_file,
+            in_file=out_calc_mask.outputs.out_file,
             cm_file=fname_presuffix(unifized_file, suffix='_cm.txt',
                                     use_ext=False),
             set_cm=(0, 0, 0))
@@ -755,25 +757,23 @@ def anats_to_template(anat_filenames, head_template_filename, write_dir,
         memory = Memory(write_dir)
         clip_level = memory.cache(afni.ClipLevel)
         compute_mask = memory.cache(ComputeMask)
-        apply_mask = memory.cache(fsl.ApplyMask)
+        calc = memory.cache(afni.Calc)
         mask_tool = memory.cache(afni.MaskTool)
         allineate = memory.cache(afni.Allineate)
         allineate2 = memory.cache(afni.Allineate)
         unifize = memory.cache(afni.Unifize)
-        threshold = memory.cache(fsl.Threshold)
         qwarp = memory.cache(afni.Qwarp)
-        for step in [compute_mask,  allineate, allineate2, apply_mask,
-                     mask_tool, unifize, threshold, qwarp]:
+        for step in [compute_mask,  allineate, allineate2, calc,
+                     mask_tool, unifize, qwarp]:
             step.interface().set_default_terminal_output(terminal_output)
     else:
         unifize = afni.Unifize(terminal_output=terminal_output).run
         clip_level = afni.ClipLevel().run
         compute_mask = ComputeMask(terminal_output=terminal_output).run
-        apply_mask = fsl.ApplyMask(terminal_output=terminal_output).run
+        calc = afni.Calc(terminal_output=terminal_output).run
         mask_tool = afni.MaskTool(terminal_output=terminal_output).run
         allineate = afni.Allineate(terminal_output=terminal_output).run
         allineate2 = afni.Allineate(terminal_output=terminal_output).run  # TODO: remove after fixed bug
-        threshold = fsl.Threshold(terminal_output=terminal_output).run
         qwarp = afni.Qwarp(terminal_output=terminal_output).run
         environ['AFNI_DECONFLICT'] = 'OVERWRITE'
 
@@ -790,15 +790,17 @@ def anats_to_template(anat_filenames, head_template_filename, write_dir,
 
     if dilated_head_mask_filename is None:
         out_clip_level = clip_level(in_file=head_template_filename)
-        out_threshold = threshold(in_file=head_template_filename,
-                                  thresh=out_clip_level.outputs.clip_val)
-        out_mask_tool = mask_tool(in_file=out_threshold.outputs.out_file,
+        out_calc_threshold = calc(
+            in_file_a=head_template_filename,
+            expr='ispositive(a-{0})*a'.format(out_clip_level.outputs.clip_val),
+            outputtype='NIFTI_GZ')
+        out_mask_tool = mask_tool(in_file=out_calc_threshold.outputs.out_file,
                                   dilate_inputs='3',
                                   outputtype='NIFTI_GZ',
                                   environ=environ,
                                   verbose=verbose)
         dilated_head_mask_filename = out_mask_tool.outputs.out_file
-        intermediate_files.append(out_threshold.outputs.out_file)
+        intermediate_files.append(out_calc_threshold.outputs.out_file)
 
     if brain_masking_unifize_kwargs is None:
         brain_masking_unifize_kwargs = {}
@@ -837,9 +839,11 @@ def anats_to_template(anat_filenames, head_template_filename, write_dir,
     for (unbiased_anat_filename,
          brain_mask_file) in zip(unbiased_anat_filenames,
                                  brain_mask_files):
-        out_apply_mask = apply_mask(in_file=unbiased_anat_filename,
-                                    mask_file=brain_mask_file)
-        masked_anat_filename = out_apply_mask.outputs.out_file
+        out_calc_mask = calc(in_file_a=unbiased_anat_filename,
+                             in_file_b=brain_mask_file,
+                             expr='a*b',
+                             outputtype='NIFTI_GZ')
+        masked_anat_filename = out_calc_mask.outputs.out_file
 
         # the actual T1anat to template registration using the brain extracted
         # image could do in one 3dQwarp step using allineate flags but will
