@@ -30,14 +30,10 @@ def test_coregister_fmri_session():
     assert_equal(os.path.join(tempdir, 'test_coreg_dir'),
                  animal_session.output_dir_)
 
-    os.remove(animal_session.coreg_transform_)
-    os.remove(animal_session.coreg_anat_)
-    os.remove(animal_session.coreg_func_)
     if os.path.exists(tempdir):
         for out_file in os.listdir(animal_session.output_dir_):
             os.remove(os.path.join(animal_session.output_dir_, out_file))
         os.removedirs(animal_session.output_dir_)
-        os.removedirs(tempdir)
 
     # Check environement variables setting
     tempdir = tempfile.mkdtemp(suffix='?')
@@ -96,4 +92,3 @@ def test_fmri_sessions_to_template():
         for out_file in os.listdir(registered_data[0].output_dir_):
             os.remove(os.path.join(registered_data[0].output_dir_, out_file))
         os.removedirs(registered_data[0].output_dir_)
-        os.removedirs(tempdir)
