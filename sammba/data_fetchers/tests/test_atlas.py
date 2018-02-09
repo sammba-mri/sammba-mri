@@ -3,7 +3,7 @@ import json
 import numpy as np
 from numpy.testing import assert_array_almost_equal
 from nose import with_setup
-from nose.tools import assert_equal, assert_not_equal
+from nose.tools import assert_equal, assert_not_equal, assert_true
 import nibabel
 from nilearn.datasets import utils
 from nilearn.datasets.tests import test_utils as tst
@@ -68,6 +68,40 @@ def test_fetch_atlas_dorr_2008():
     assert_equal(bunch['maps'],
                  os.path.join(datadir, 'c57_fixed_labels_resized.mnc'))
     assert_not_equal(bunch.description, '')
+
+
+@with_setup(setup_mock, teardown_mock)
+@with_setup(tst.setup_tmpdata, tst.teardown_tmpdata)
+def test_fetch_masks_dorr_2008():
+    # create a dummy csv file for dorr labels
+    datadir = os.path.join(tst.tmpdir, 'dorr_2008')
+    os.mkdir(datadir)
+    dummy_csv = open(os.path.join(
+        datadir, 'c57_brain_atlas_labels.csv'), 'w')
+    dummy_csv.write("Structure,right label,left label"
+                    "\n1,amygdala,51,151\n19,corpus callosum,8,68"
+                    "\n27,fourth ventricle,118,118"
+                    "\n38,lateral ventricle,57,77")
+    dummy_csv.close()
+    dorr_atlas = atlas.fetch_atlas_dorr_2008(data_dir=tst.tmpdir, verbose=0)
+
+    # create a dummy atlas image
+    dummy_atlas_data = np.zeros((100, 100, 100))
+    dummy_atlas_data[:10, :10, :10] = 51
+    dummy_atlas_data[50:90, 50:90, 50:90] = 151
+    dummy_atlas_data[10:20, :10, 10:30] = 8
+    dummy_atlas_data[90:100, :10, 10:30] = 68
+    dummy_atlas_data[10:20, 50:90, 10:20] = 118
+    dummy_atlas_data[40:60, 30:40, 40:50] = 57
+    dummy_atlas_data[60:70, 30:40, 40:50] = 77
+    dummy_atlas_img = nibabel.Nifti1Image(dummy_atlas_data, np.eye(4))
+    dummy_atlas_img.to_filename(dorr_atlas.maps)
+
+    dorr_masks = atlas.fetch_masks_dorr_2008(data_dir=tst.tmpdir, verbose=0)
+    assert_true(isinstance(dorr_masks.brain, nibabel.Nifti1Image))
+    assert_true(isinstance(dorr_masks.gm, nibabel.Nifti1Image))
+    assert_true(isinstance(dorr_masks.cc, nibabel.Nifti1Image))
+    assert_true(isinstance(dorr_masks.ventricles, nibabel.Nifti1Image))
 
 
 @with_setup(setup_mock, teardown_mock)
