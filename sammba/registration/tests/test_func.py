@@ -34,6 +34,9 @@ def test_coregister_fmri_session():
     os.remove(animal_session.coreg_anat_)
     os.remove(animal_session.coreg_func_)
     if os.path.exists(tempdir):
+        for out_file in os.listdir(animal_session.output_dir_):
+            os.remove(os.path.join(animal_session.output_dir_, out_file))
+        os.removedirs(animal_session.output_dir_)
         os.removedirs(tempdir)
 
     # Check environement variables setting
