@@ -291,7 +291,6 @@ def anats_to_common(anat_filenames, write_dir, brain_volume,
         out_unifize = unifize(in_file=anat_file,
                               out_file='%s_Unifized_for_brain_extraction',
                               outputtype='NIFTI_GZ',
-                              quiet=not verbose,
                               **unifize_kwargs)
         unifized_files.append(out_unifize.outputs.out_file)
 

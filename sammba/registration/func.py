@@ -97,7 +97,7 @@ def coregister_fmri_session(session_data, t_r, write_dir, brain_volume,
 
     if use_rats_tool:
         if segmentation.Info().version() is None:
-            raise ValueError('Can not locate compute_mask')
+            raise ValueError('Can not locate RATS')
         else:
             ComputeMask = segmentation.MathMorphoMask
     else:

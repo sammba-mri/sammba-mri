@@ -1,6 +1,6 @@
 import os
 import shutil
-import numpy as np 
+import numpy as np
 import tempfile
 from numpy.testing import assert_array_equal, assert_array_almost_equal
 from nose.tools import assert_true, assert_false
@@ -67,24 +67,23 @@ def test_check_same_obliquity():
 def test_fix_obliquity():
     target_filename = os.path.join(os.path.dirname(testing_data.__file__),
                                    'anat.nii.gz')
-    if afni.Info().version():
-        # ZCutUp removes the obliquity
-        tempdir = tempfile.mkdtemp()
-        tmp_filename = os.path.join(tempdir, 'img_test_obliquity.nii.gz')
-        slicer = afni.ZCutUp().run
-        _ = slicer(in_file=target_filename,
-                   keep='0 27',
-                   out_file=tmp_filename)
-        assert_false(
-            utils._check_same_obliquity(tmp_filename, target_filename))
-        utils.fix_obliquity(tmp_filename, target_filename)
-        assert_true(
-            utils._check_same_obliquity(tmp_filename, target_filename))
+    # ZCutUp removes the obliquity
+    tempdir = tempfile.mkdtemp()
+    tmp_filename = os.path.join(tempdir, 'img_test_obliquity.nii.gz')
+    slicer = afni.ZCutUp().run
+    _ = slicer(in_file=target_filename,
+               keep='0 27',
+               out_file=tmp_filename)
+    assert_false(
+        utils._check_same_obliquity(tmp_filename, target_filename))
+    utils.fix_obliquity(tmp_filename, target_filename)
+    assert_true(
+        utils._check_same_obliquity(tmp_filename, target_filename))
 
-        if os.path.exists(tmp_filename):
-            os.remove(tmp_filename)
-        if os.path.exists(tempdir):
-            os.removedirs(tempdir)
+    if os.path.exists(tmp_filename):
+        os.remove(tmp_filename)
+    if os.path.exists(tempdir):
+        os.removedirs(tempdir)
 
 
 def test_check_same_geometry():
@@ -103,27 +102,26 @@ def test_copy_geometry():
                                  'func.nii.gz')
     anat_filename = os.path.join(os.path.dirname(testing_data.__file__),
                                  'anat.nii.gz')
-    if afni.Info().version():
-        tempdir = tempfile.mkdtemp()
-        # Check error is raised if resampling is not allowed
-        assert_raises_regex(
-            ValueError, 'images have different shapes', utils.copy_geometry,
-            anat_filename, func_filename,
-            out_filename=os.path.join(tempdir, 'geometry_test.nii.gz'),
-            in_place=False, allow_resampling=True)
+    tempdir = tempfile.mkdtemp()
+    # Check error is raised if resampling is not allowed
+    assert_raises_regex(
+        ValueError, 'images have different shapes', utils.copy_geometry,
+        anat_filename, func_filename,
+        out_filename=os.path.join(tempdir, 'geometry_test.nii.gz'),
+        in_place=False)
 
-        changed_filename = utils.copy_geometry(
-            anat_filename, func_filename,
-            out_filename=os.path.join(tempdir, 'geometry_test.nii.gz'),
-            in_place=False, allow_resampling=True)
-        assert_false(np.alltrue(utils._check_same_geometry(func_filename,
-                                                           anat_filename)))
-        assert_true(np.alltrue(utils._check_same_geometry(changed_filename,
-                                                          anat_filename)))
-        if os.path.exists(changed_filename):
-            os.remove(changed_filename)
-        if os.path.exists(tempdir):
-            os.removedirs(tempdir)
+    changed_filename = utils.copy_geometry(
+        anat_filename, func_filename,
+        out_filename=os.path.join(tempdir, 'geometry_test.nii.gz'),
+        in_place=False, allow_resampling=True)
+    assert_false(np.alltrue(utils._check_same_geometry(func_filename,
+                                                       anat_filename)))
+    assert_true(np.alltrue(utils._check_same_geometry(changed_filename,
+                                                      anat_filename)))
+    if os.path.exists(changed_filename):
+        os.remove(changed_filename)
+    if os.path.exists(tempdir):
+        os.removedirs(tempdir)
 
 
 def test_create_pipeline_graph():
