@@ -93,7 +93,7 @@ create_new_conda_env() {
     fi
 
     bash <(wget -q -O- http://neuro.debian.net/_files/neurodebian-travis.sh)
-    sudo apt-get install graphviz afni
+    travis_retry sudo apt-get install -y -qq graphviz afni
     source /etc/afni/afni.sh
     echo "AFNI plugin path $AFNI_PLUGINPATH."
     echo "AFNI binaries installed in $(which afni)"
@@ -102,10 +102,11 @@ create_new_conda_env() {
 if [[ "$DISTRIB" == "neurodebian" ]]; then
     create_new_venv
     bash <(wget -q -O- http://neuro.debian.net/_files/neurodebian-travis.sh)
-    sudo apt-get install -qq python-scipy python-nose python-nibabel\
+    sudo apt-get install -y -qq python-scipy python-nose python-nibabel\
          python-sklearn python-pandas python-nilearn python-patsy\
          python-networkx python-configparser python-future python-traits\
-         python-simplejson python-funcsigs python-click graphviz afni
+         python-simplejson python-funcsigs python-click graphviz
+    travis_retry sudo apt-get install -y -qq  afni
     source /etc/afni/afni.sh
     echo "AFNI plugin path $AFNI_PLUGINPATH."
     echo "AFNI binaries installed in $(which afni)"
