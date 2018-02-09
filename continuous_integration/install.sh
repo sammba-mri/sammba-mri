@@ -92,7 +92,11 @@ create_new_conda_env() {
         conda remove --yes --features mkl || echo "MKL not installed"
     fi
 
-    sudo apt-get install graphviz
+    bash <(wget -q -O- http://neuro.debian.net/_files/neurodebian-travis.sh)
+    sudo apt-get install graphviz afni
+    source /etc/afni/afni.sh
+    echo "AFNI plugin path $AFNI_PLUGINPATH."
+    echo "AFNI binaries installed in $(which afni)"
 }
 
 if [[ "$DISTRIB" == "neurodebian" ]]; then
