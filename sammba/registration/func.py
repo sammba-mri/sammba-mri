@@ -2,10 +2,10 @@ import os
 import numpy as np
 import nibabel
 from sammba.externals.nipype.caching import Memory
-from sammba.externals.nipype.interfaces import afni, fsl
+from sammba.externals.nipype.interfaces import afni
 from sammba.externals.nipype.utils.filemanip import fname_presuffix
 from sammba.interfaces import segmentation
-from .utils import fix_obliquity
+from .utils import fix_obliquity, copy_geometry
 from .fmri_session import FMRISession
 from .struct import anats_to_template
 
@@ -107,10 +107,8 @@ def coregister_fmri_session(session_data, t_r, write_dir, brain_volume,
         memory = Memory(write_dir)
         tshift = memory.cache(afni.TShift)
         clip_level = memory.cache(afni.ClipLevel)
-        threshold = memory.cache(fsl.Threshold)
         volreg = memory.cache(afni.Volreg)
         allineate = memory.cache(afni.Allineate)
-        copy_geom = memory.cache(fsl.CopyGeom)
         tstat = memory.cache(afni.TStat)
         compute_mask = memory.cache(ComputeMask)
         calc = memory.cache(afni.Calc)
@@ -123,20 +121,18 @@ def coregister_fmri_session(session_data, t_r, write_dir, brain_volume,
         slicer = memory.cache(afni.ZCutUp)
         warp_apply = memory.cache(afni.NwarpApply)
         qwarp = memory.cache(afni.Qwarp)
-        merge = memory.cache(fsl.Merge)
+        merge = memory.cache(afni.Zcat)
         overwrite = False
-        for step in [tshift, volreg, allineate, allineate2, copy_geom,
+        for step in [tshift, volreg, allineate, allineate2,
                      tstat, compute_mask, calc, unifize, resample,
                      slicer, warp_apply, qwarp, merge]:
             step.interface().set_default_terminal_output(terminal_output)
     else:
         tshift = afni.TShift(terminal_output=terminal_output).run
         clip_level = afni.ClipLevel().run
-        threshold = fsl.Threshold(terminal_output=terminal_output).run
         volreg = afni.Volreg(terminal_output=terminal_output).run
         allineate = afni.Allineate(terminal_output=terminal_output).run
         allineate2 = afni.Allineate(terminal_output=terminal_output).run  # TODO: remove after fixed bug
-        copy_geom = fsl.CopyGeom(terminal_output=terminal_output).run
         tstat = afni.TStat(terminal_output=terminal_output).run
         compute_mask = ComputeMask(terminal_output=terminal_output).run
         calc = afni.Calc(terminal_output=terminal_output).run
@@ -147,7 +143,7 @@ def coregister_fmri_session(session_data, t_r, write_dir, brain_volume,
         slicer = afni.ZCutUp(terminal_output=terminal_output).run
         warp_apply = afni.NwarpApply(terminal_output=terminal_output).run
         qwarp = afni.Qwarp(terminal_output=terminal_output).run
-        merge = fsl.Merge(terminal_output=terminal_output).run
+        merge = afni.Zcat(terminal_output=terminal_output).run
         overwrite = True
 
     session_data._check_inputs()
@@ -175,9 +171,11 @@ def coregister_fmri_session(session_data, t_r, write_dir, brain_volume,
     ################################################
     # XXX why do you need a thresholded image ?
     out_clip_level = clip_level(in_file=func_filename)
-    out_threshold = threshold(in_file=func_filename,
-                              thresh=out_clip_level.outputs.clip_val)
-    thresholded_filename = out_threshold.outputs.out_file
+    out_calc_threshold = calc(
+        in_file_a=func_filename,
+        expr='ispositive(a-{0}) * a'.format(out_clip_level.outputs.clip_val),
+        outputtype='NIFTI_GZ')
+    thresholded_filename = out_calc_threshold.outputs.out_file
 
     out_volreg = volreg(  # XXX dfile not saved
         in_file=thresholded_filename,
@@ -196,13 +194,13 @@ def coregister_fmri_session(session_data, t_r, write_dir, brain_volume,
                                                        suffix='Av'),
                               environ=environ)
 
+
     # 3dAllineate removes the obliquity. This is not a good way to readd it as
     # removes motion correction info in the header if it were an AFNI file...as
     # it happens it's NIfTI which does not store that so irrelevant!
-    out_copy_geom = copy_geom(dest_file=out_allineate.outputs.out_file,
-                              in_file=out_volreg.outputs.out_file)
-
-    allineated_filename = out_copy_geom.outputs.out_file
+    allineated_filename = copy_geometry(
+        filename_to_copy=out_volreg.outputs.out_file,
+        filename_to_change=out_allineate.outputs.out_file)
 
     # Create a (hopefully) nice mean image for use in the registration
     out_tstat = tstat(in_file=allineated_filename, args='-mean',
@@ -477,17 +475,17 @@ def coregister_fmri_session(session_data, t_r, write_dir, brain_volume,
                                     environ=environ)
         warped_func_slices.append(out_warp_apply.outputs.out_file)
 
-    # Fix the obliquity
-    for (sliced_func_filename, warped_func_slice) in zip(
-            sliced_func_filenames, warped_func_slices):
-        _ = fix_obliquity(warped_func_slice, sliced_func_filename,
-                          overwrite=overwrite, verbose=verbose)
-
     # Finally, merge all slices !
-    out_merge_func = merge(in_files=warped_func_slices, dimension='z')
+    out_merge_func = merge(in_files=warped_func_slices,
+                           outputtype='NIFTI_GZ',
+                           environ=environ)
+
+    # Fix the obliquity
+    _ = fix_obliquity(out_merge_func.outputs.out_file, allineated_filename,
+                      overwrite=overwrite, verbose=verbose)
 
     # Update the fmri data
-    setattr(session_data, "coreg_func_", out_merge_func.outputs.merged_file)
+    setattr(session_data, "coreg_func_", out_merge_func.outputs.out_file)
     setattr(session_data, "coreg_anat_", registered_anat_oblique_filename)
     setattr(session_data, "coreg_transform_", transform_filename)
     os.chdir(current_dir)
