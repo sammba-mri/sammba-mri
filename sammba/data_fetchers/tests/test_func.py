@@ -41,7 +41,7 @@ def test_fetch_zurich_test_retest():
     zurich_dir = os.path.join(tst.tmpdir, 'zurich_retest')
     os.mkdir(zurich_dir)
     json_file = os.path.join(zurich_dir, 'experiments.html')
-    with open(json_file, 'wb', encoding='utf8') as f:
+    with open(json_file, 'w') as f:
         json.dump(urls_table, f)
 
     # First session, all subjects
@@ -95,7 +95,7 @@ def test_fetch_zurich_anesthesiant():
     anest_dir = os.path.join(tst.tmpdir, 'zurich_anest')
     os.mkdir(anest_dir)
     json_file = os.path.join(anest_dir, 'experiments.html')
-    with open(json_file, 'wb', encoding='utf8') as f:
+    with open(json_file, 'w') as f:
         json.dump(urls_table, f)
 
     # 1 subject

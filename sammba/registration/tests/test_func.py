@@ -42,7 +42,7 @@ def test_coregister_fmri_session():
                         func.coregister_fmri_session, animal_session, 1.,
                         tempdir, 400, slice_timing=False, use_rats_tool=False)
     assert_raises_regex(RuntimeError,
-                        "Program Death",
+                        "buffer overflow detected",
                         func.coregister_fmri_session, animal_session, 1.,
                         tempdir, 400, slice_timing=False, use_rats_tool=False,
                         AFNI_ALLOW_ARBITRARY_FILENAMES='YES')
