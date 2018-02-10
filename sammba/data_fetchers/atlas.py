@@ -204,7 +204,7 @@ def fetch_masks_dorr_2008(image_format='nifti', downsample='30',
     brain_mask_img = image.new_img_like(atlas_img, brain_mask)
 
     corpus_callosum_labels = labels[
-        np.in1d(names, np.array(['R corpus callosum', 'L corpus callosum']))]
+        np.in1d(names.astype(str), ['R corpus callosum', 'L corpus callosum'])]
     print(corpus_callosum_labels)
     print(np.unique(atlas_data))
     corpus_callosum_mask = np.max(
@@ -216,7 +216,7 @@ def fetch_masks_dorr_2008(image_format='nifti', downsample='30',
 
     ventricles_names = ['R lateral ventricle', 'L lateral ventricle',
                         'third ventricle', 'fourth ventricle']
-    ventricles_labels = labels[np.in1d(names, ventricles_names)]
+    ventricles_labels = labels[np.in1d(names.astype(str), ventricles_names)]
     ventricles_mask = np.max(
         [atlas_data == value for value in ventricles_labels], axis=0)
     eroded_ventricles_mask = ndimage.binary_erosion(ventricles_mask,
