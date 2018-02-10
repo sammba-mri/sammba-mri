@@ -30,8 +30,7 @@ def test_anats_to_common():
     assert_array_almost_equal(transform,
                               [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0])
 
-    if os.path.exists(tempdir):
-        shutil.rmtree(tempdir)
+    shutil.rmtree(tempdir)
 
 
 def test_anats_to_template():
@@ -51,5 +50,4 @@ def test_anats_to_template():
     os.remove(register_result.transforms[0])
     os.remove(register_result.pre_transforms[0])
 
-    if os.path.exists(tempdir):
-        shutil.rmtree(tempdir)
+    shutil.rmtree(tempdir)

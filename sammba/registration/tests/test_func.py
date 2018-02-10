@@ -1,4 +1,5 @@
 import os
+import shutil
 import tempfile
 from nose.tools import assert_true, assert_equal
 from nilearn._utils.testing import assert_raises_regex
@@ -37,10 +38,7 @@ def test_coregister_fmri_session():
                         tempdir, 400, slice_timing=False, use_rats_tool=False,
                         AFNI_DECONFLICT='NO')
 
-    if os.path.exists(tempdir):
-        for out_file in os.listdir(animal_session.output_dir_):
-            os.remove(os.path.join(animal_session.output_dir_, out_file))
-        os.removedirs(animal_session.output_dir_)
+    shutil.rmtree(tempdir)
 
 
 def test_fmri_sessions_to_template():
@@ -81,7 +79,4 @@ def test_fmri_sessions_to_template():
     assert_true(os.path.isfile(registered_data[0].registered_func_))
     assert_true(os.path.isfile(registered_data[0].registered_anat_))
 
-    if os.path.exists(tempdir):
-        for out_file in os.listdir(registered_data[0].output_dir_):
-            os.remove(os.path.join(registered_data[0].output_dir_, out_file))
-        os.removedirs(registered_data[0].output_dir_)
+    shutil.rmtree(tempdir)
