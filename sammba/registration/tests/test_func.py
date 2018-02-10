@@ -30,28 +30,17 @@ def test_coregister_fmri_session():
     assert_equal(os.path.join(tempdir, 'test_coreg_dir'),
                  animal_session.output_dir_)
 
+    # Check environement variables setting
+    assert_raises_regex(RuntimeError,
+                        "already exists",
+                        func.coregister_fmri_session, animal_session, 1.,
+                        tempdir, 400, slice_timing=False, use_rats_tool=False,
+                        AFNI_DECONFLICT='NO')
+
     if os.path.exists(tempdir):
         for out_file in os.listdir(animal_session.output_dir_):
             os.remove(os.path.join(animal_session.output_dir_, out_file))
         os.removedirs(animal_session.output_dir_)
-
-    # Check environement variables setting
-    tempdir = tempfile.mkdtemp(suffix='?')
-    assert_raises_regex(RuntimeError,
-                        "badly formed filename",
-                        func.coregister_fmri_session, animal_session, 1.,
-                        tempdir, 400, slice_timing=False, use_rats_tool=False)
-    assert_raises_regex(RuntimeError,
-                        "buffer overflow detected",
-                        func.coregister_fmri_session, animal_session, 1.,
-                        tempdir, 400, slice_timing=False, use_rats_tool=False,
-                        AFNI_ALLOW_ARBITRARY_FILENAMES='YES')
-
-    if os.path.exists(tempdir):
-        output_dir = os.path.join(tempdir, 'animal001')
-        for out_file in os.listdir(output_dir):
-            os.remove(os.path.join(output_dir, out_file))
-        os.removedirs(output_dir)
 
 
 def test_fmri_sessions_to_template():
