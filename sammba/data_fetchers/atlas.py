@@ -204,7 +204,7 @@ def fetch_masks_dorr_2008(image_format='nifti', downsample='30',
     brain_mask_img = image.new_img_like(atlas_img, brain_mask)
 
     corpus_callosum_labels = labels[
-        np.in1d(names, ['R corpus callosum', 'L corpus callosum'])]
+        np.in1d(names, np.array(['R corpus callosum', 'L corpus callosum']))]
     print(corpus_callosum_labels)
     print(np.unique(atlas_data))
     corpus_callosum_mask = np.max(
