@@ -1,5 +1,6 @@
 import os
 import shutil
+import tempfile
 import numpy as np
 import nibabel
 from nilearn import image

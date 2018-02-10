@@ -32,11 +32,14 @@ def test_coregister_fmri_session():
                  animal_session.output_dir_)
 
     # Check environement variables setting
+    current_dir = os.getcwd()  # coregister_fmri_session changes the directory
     assert_raises_regex(RuntimeError,
                         "already exists",
                         func.coregister_fmri_session, animal_session, 1.,
                         tst.tmpdir, 400, slice_timing=False,
                         use_rats_tool=False, AFNI_DECONFLICT='NO')
+    os.chdir(current_dir)
+
 
 
 @with_setup(tst.setup_tmpdata, tst.teardown_tmpdata)
@@ -50,6 +53,18 @@ def test_fmri_sessions_to_template():
     template_file = anat_file
     t_r = 1.
     brain_volume = 400
+
+    registered_data = func.fmri_sessions_to_template([mammal_data], t_r,
+                                                     template_file,
+                                                     tst.tmpdir,
+                                                     brain_volume,
+                                                     slice_timing=False,
+                                                     verbose=True,
+                                                     use_rats_tool=False)
+    assert_true(os.path.isdir(registered_data[0].output_dir_))
+    assert_true(os.path.isfile(registered_data[0].registered_func_))
+    assert_true(os.path.isfile(registered_data[0].registered_anat_))
+
     assert_raises_regex(ValueError,
                         "'animals_data' input argument must be an iterable",
                         func.fmri_sessions_to_template, mammal_data, t_r,
@@ -65,14 +80,3 @@ def test_fmri_sessions_to_template():
                         func.fmri_sessions_to_template,
                         [mammal_data, mammal_data],
                         t_r, template_file, tst.tmpdir, brain_volume)
-
-    registered_data = func.fmri_sessions_to_template([mammal_data], t_r,
-                                                     template_file,
-                                                     tst.tmpdir,
-                                                     brain_volume,
-                                                     slice_timing=False,
-                                                     verbose=False,
-                                                     use_rats_tool=False)
-    assert_true(os.path.isdir(registered_data[0].output_dir_))
-    assert_true(os.path.isfile(registered_data[0].registered_func_))
-    assert_true(os.path.isfile(registered_data[0].registered_anat_))
