@@ -669,13 +669,11 @@ def fmri_sessions_to_template(sessions, t_r, head_template_filename,
     and has to be cited. For more information, see
     `RATS <http://www.iibi.uiowa.edu/content/rats-overview/>`_
     """
-    print(os.getcwd())
     if not hasattr(sessions, "__iter__"):
             raise ValueError(
                 "'animals_data' input argument must be an iterable. You "
                 "provided {0}".format(sessions.__class__))
 
-    print(os.getcwd())
     for n, data in enumerate(sessions):
         if not isinstance(data, FMRISession):
             raise ValueError('Each animal data must have type '
@@ -685,21 +683,16 @@ def fmri_sessions_to_template(sessions, t_r, head_template_filename,
             setattr(data, "animal_id", 'animal{0:03d}'.format(n + 1))
 
     # Check that ids are different
-    print(os.getcwd())
     animals_ids = [data.animal_id for data in sessions]
     if len(set(animals_ids)) != len(animals_ids):
         raise ValueError('Animals ids must be different. You'
                          ' provided {0}'.format(animals_ids))
-    print(write_dir)
-    print(os.getcwd())
     for n, animal_data in enumerate(sessions):
-        print(write_dir)
         animal_data._check_inputs()
         animal_output_dir = os.path.join(os.path.abspath(write_dir),
                                          animal_data.animal_id)
         animal_data._set_output_dir_(animal_output_dir)
         # XXX do a function for creating new attributes ?
-        print(os.getcwd())
         setattr(animal_data, "template_", head_template_filename)
         coregister_fmri_session(
             animal_data, t_r, write_dir, brain_volume,

@@ -205,6 +205,8 @@ def fetch_masks_dorr_2008(image_format='nifti', downsample='30',
 
     corpus_callosum_labels = labels[
         np.in1d(names, ['R corpus callosum', 'L corpus callosum'])]
+    print(corpus_callosum_labels)
+    print(np.unique(atlas_data))
     corpus_callosum_mask = np.max(
         [atlas_data == value for value in corpus_callosum_labels], axis=0)
     eroded_corpus_callosum_mask = ndimage.binary_erosion(corpus_callosum_mask,
