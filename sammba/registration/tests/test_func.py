@@ -38,7 +38,7 @@ def test_coregister_fmri_session():
     # Check environement variables setting
     tempdir = tempfile.mkdtemp(suffix='?')
     assert_raises_regex(RuntimeError,
-                        "Illegal new dataset name",
+                        "badly formed filename",
                         func.coregister_fmri_session, animal_session, 1.,
                         tempdir, 400, slice_timing=False, use_rats_tool=False)
     assert_raises_regex(RuntimeError,

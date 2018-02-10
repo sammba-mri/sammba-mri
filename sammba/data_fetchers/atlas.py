@@ -111,8 +111,8 @@ def fetch_atlas_dorr_2008(image_format='nifti', downsample='30',
         if right_index == left_index:
             lateral_rois.append((label, right_index))
         else:
-            left_rois.append(('L ' + label, left_index))
-            right_rois.append(('R ' + label, right_index))
+            left_rois.append(('L {}'.format(label), left_index))
+            right_rois.append(('R {}'.format(label), right_index))
 
     rois = lateral_rois + right_rois + left_rois
     labels, indices = zip(*rois)
