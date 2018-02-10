@@ -108,6 +108,7 @@ def fetch_atlas_dorr_2008(image_format='nifti', downsample='30',
     right_rois = []
     lateral_rois = []
     for (idx, label, right_index, left_index) in csv_data:
+        label = label.decode('UTF-8')  # for python3
         if right_index == left_index:
             lateral_rois.append((label, right_index))
         else:
@@ -115,7 +116,7 @@ def fetch_atlas_dorr_2008(image_format='nifti', downsample='30',
             right_rois.append(('R {}'.format(label), right_index))
 
     rois = lateral_rois + right_rois + left_rois
-    labels, indices = zip(*rois)
+    labels, indices = map(list, zip(*rois))
     t2 = files_[0]
     maps = files_[1]
     if downsample == '100':

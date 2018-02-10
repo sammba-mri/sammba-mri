@@ -58,6 +58,8 @@ def test_fetch_atlas_dorr_2008():
                               (.1, .1, .1))
     assert_equal(nibabel.load(bunch['maps']).get_data().dtype, np.dtype(int))
     assert_equal(len(tst.mock_url_request.urls), 2)
+    assert_equal(len(bunch['names']), 3)
+    assert_equal(len(bunch['labels']), 3)
 
     # test with 'minc' format
     bunch = atlas.fetch_atlas_dorr_2008(data_dir=tst.tmpdir, verbose=0,
@@ -67,6 +69,8 @@ def test_fetch_atlas_dorr_2008():
                  os.path.join(datadir, 'male-female-mouse-atlas.mnc'))
     assert_equal(bunch['maps'],
                  os.path.join(datadir, 'c57_fixed_labels_resized.mnc'))
+    assert_equal(len(bunch['names']), 3)
+    assert_equal(len(bunch['labels']), 3)
     assert_not_equal(bunch.description, '')
 
 
