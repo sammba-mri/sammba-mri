@@ -300,11 +300,6 @@ def _per_slice_qwarp(to_qwarp_file, reference_file, write_dir,
                           overwrite=overwrite, verbose=verbose)
 
     out_merge_func = merge(
-        in_files=resampled_warped_slices, dimension='z',
-        merged_file=resampled_warped_slices[0].replace('_sl0',
-                                                       '_perslice'))
-
-    out_merge_func = merge(
         in_files=resampled_warped_slices,
         out_file=resampled_warped_slices[0].replace('_sl0', '_perslice'),
         environ=environ)
@@ -367,7 +362,7 @@ def _per_slice_qwarp(to_qwarp_file, reference_file, write_dir,
         # Update the outputs
         output_files.extend(sliced_apply_to_files + warped_apply_to_slices)
 
-        merged_apply_to_file = out_merge_apply_to.outputs.merged_file
+        merged_apply_to_file = out_merge_apply_to.outputs.out_file
     else:
         merged_apply_to_file = None
 
@@ -375,5 +370,5 @@ def _per_slice_qwarp(to_qwarp_file, reference_file, write_dir,
         for out_file in output_files:
             os.remove(out_file)
 
-    return (out_merge_func.outputs.merged_file, warp_files,
+    return (out_merge_func.outputs.out_file, warp_files,
             merged_apply_to_file)

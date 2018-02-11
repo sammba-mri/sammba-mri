@@ -23,10 +23,10 @@ print(func_filename)
 
 ##############################################################################
 # We encapsulate them in an object called `FMRISession`
-from sammba.registration import FMRISession
+from sammba.registration import fmri
 
-animal_session = FMRISession(anat=anat_filename, func=func_filename,
-                             animal_id='1366')
+animal_session = fmri.FMRISession(anat=anat_filename, func=func_filename,
+                                  animal_id='1366')
 
 ##############################################################################
 # Define the write directory

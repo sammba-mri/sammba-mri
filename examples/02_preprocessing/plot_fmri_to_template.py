@@ -20,7 +20,7 @@ print(func_filename)
 
 ##############################################################################
 # We encapsulate them through an object called `FMRISession`
-from sammba.registration import FMRISession
+from sammba.registration.fmri import FMRISession
 
 animal_session = FMRISession(anat=anat_filename, func=func_filename,
                              animal_id='1366')
