@@ -12,7 +12,6 @@ import copy
 import numpy as np
 import nibabel
 from nilearn import image, masking
-from scipy import ndimage
 from scipy.ndimage.morphology import (generate_binary_structure,
                                       binary_closing,
                                       binary_fill_holes,
@@ -350,8 +349,15 @@ class HistogramMask(BaseInterface):
                 mask_data, structure=structure)
             n_voxels_mask = np.sum(mask_data > 0)
 
+        final_volume = n_voxels_mask * affine_det
+        if final_volume > 2 * self.inputs.volume_threshold:
+            raise ValueError('Failed brain extraction: final volume is {0} '
+                             ''.format(final_volume))
+        elif final_volume < .5 * self.inputs.volume_threshold:
+            raise ValueError('Failed brain extraction: final volume is {0} '
+                             ''.format(final_volume))
         if self.inputs.verbose:
-            print('final volume {0}'.format(n_voxels_mask * affine_det))
+            print('final volume {0}'.format(final_volume))
 
         mask_img = image.new_img_like(mask_img, mask_data, mask_img.affine)
         if isdefined(self.inputs.out_file):
@@ -430,4 +436,16 @@ class MathMorphoMask(CommandLine):
         else:
             outputs['out_file'] = os.path.abspath(
                 self._filename_from_source('out_file'))
+
+        mask_img = nibabel.load(outputs['out_file'])
+        affine_det = np.abs(np.linalg.det(mask_img.affine[:3, :3]))
+        n_voxels_mask = np.sum(mask_img.get_data() > 0)
+        final_volume = n_voxels_mask * affine_det
+        if final_volume > 2 * self.inputs.volume_threshold:
+            raise ValueError('Failed brain extraction: final volume is {0} '
+                             ''.format(final_volume))
+        elif final_volume < .5 * self.inputs.volume_threshold:
+            raise ValueError('Failed brain extraction: final volume is {0} '
+                             ''.format(final_volume))
+
         return outputs

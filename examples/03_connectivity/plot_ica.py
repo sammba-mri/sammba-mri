@@ -13,38 +13,59 @@ retest = data_fetchers.fetch_zurich_test_retest(subjects=range(5),
                                                 correct_headers=True)
 
 ##############################################################################
-# We encapsulate data for each mouse through an object called `FMRISession`
-from sammba.registration import FMRISession
-
-sessions = [FMRISession(anat=anat_filename, func=func_filename)
-            for anat_filename, func_filename in zip(retest.anat, retest.func)]
-
-##############################################################################
-# Load the template
-# -------------------
-dorr = data_fetchers.fetch_atlas_dorr_2008(downsample='100')
-template_filename = dorr.t2
-
-##############################################################################
 # Define the writing directory
 # ----------------------------
 import os
 
-write_dir = os.path.join(os.getcwd(), 'zurich_ica')
-if not os.path.exists(write_dir):
-    os.makedirs(write_dir)
+output_dir = os.path.abspath('zurich_ica')
+
+##############################################################################
+# Link data per animal
+# --------------------
+# We encapsulate data for each mouse through an object called `FMRISession`
+from sammba.registration import fmri
+
+sessions = []
+for (animal_id, anat_file, func_file) in zip(['0', '1', '2', '3', '4'],
+                                             retest.anat, retest.func):
+    session = fmri.FMRISession(anat=anat_file, func=func_file,
+                               animal_id=animal_id, t_r=1., brain_volume=400,
+                               output_dir=output_dir)
+    sessions.append(session)
+
+##############################################################################
+# Load the head template
+# ----------------------
+dorr = data_fetchers.fetch_atlas_dorr_2008(downsample='100')
+head_template_filename = dorr.t2
+
+##############################################################################
+# Compute the brain template
+# --------------------------
+import os
+from nilearn import image
+
+brain_template_filename = os.path.join(output_dir, 'dorr_brain.nii.gz')
+brain_template_img = image.math_img(
+    'img1 * (img2>0)', img1=head_template_filename, img2=dorr.maps)
+brain_template_img.to_filename(brain_template_filename)
+
+##############################################################################
+# Coregister anat to func
+# -----------------------
+for session in sessions:
+    session.coregister(prior_rigid_body_registration=True, caching=True)
 
 ##############################################################################
 # Register to the template
 # ------------------------
-from sammba.registration import fmri_sessions_to_template
+for session in sessions:
+    session.register_to_template(
+        head_template_filename=head_template_filename,
+        brain_template_filename=brain_template_filename,
+        func_voxel_size=(.2, .2, .2), maxlev=0, caching=True)
 
-fmri_sessions_to_template(sessions, head_template_filename=dorr.t2,
-                          t_r=1., write_dir=write_dir,
-                          brain_volume=400,
-                          prior_rigid_body_registration=True, caching=True)
-
-registered_funcs = [sess.registered_func_ for sess in sessions]
+registered_funcs = [session.registered_func_ for session in sessions]
 
 ##############################################################################
 # Run ICA
@@ -65,5 +86,5 @@ components_img = canica.masker_.inverse_transform(canica.components_)
 from nilearn import plotting
 
 plotting.plot_prob_atlas(components_img,
-                         anat_img=dorr.t2,
+                         anat_img=head_template_filename,
                          title='All ICA components')
