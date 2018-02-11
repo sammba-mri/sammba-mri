@@ -20,10 +20,10 @@ print(func_filename)
 
 ##############################################################################
 # We encapsulate them through an object called `FMRISession`
-from sammba.registration.fmri import FMRISession
+from sammba.registration import fmri
 
-animal_session = FMRISession(anat=anat_filename, func=func_filename,
-                             animal_id='1366')
+animal_session = fmri.FMRISession(anat=anat_filename, func=func_filename,
+                                  animal_id='1366')
 
 ##############################################################################
 # Choose the template
@@ -48,15 +48,15 @@ if not os.path.exists(write_dir):
 ##############################################################################
 # Perform the registration
 # ------------------------
-# We purposely choose a low maxlev, to speed-up computations
-from sammba.registration import fmri_sessions_to_template
+# First we need to coregister the functional and anatomical to the same space
+animal_session.coregister(t_r=1., brain_volume=400, write_dir=write_dir,
+                          prior_rigid_body_registration=True)
 
+# We purposely choose a low maxlev, to speed-up computations
 animal_session.register_to_template(t_r=1., brain_volume=400,
                                     head_template_filename=template_filename,
                                     write_dir=write_dir,
-                                    slice_timing=True,
                                     func_voxel_size=(.2, .2, .2),
-                                    prior_rigid_body_registration=True,
                                     maxlev=1, caching=True)
 
 ##############################################################################
