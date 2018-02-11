@@ -393,7 +393,7 @@ class FMRISession(object):
             _per_slice_qwarp(unbiased_mean_func_filename,
                              registered_anat_oblique_filename,
                              self.output_dir_, voxel_size_x, voxel_size_y,
-                             apply_to_filename=allineated_filename,
+                             apply_to_file=allineated_filename,
                              overwrite=overwrite,
                              caching=caching, terminal_output=terminal_output,
                              environ=environ)
