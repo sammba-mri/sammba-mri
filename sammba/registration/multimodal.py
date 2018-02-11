@@ -66,6 +66,7 @@ def extract_brain(head_file, write_dir, brain_volume, caching=False,
         in_file=head_file,
         volume_threshold=brain_volume,
         intensity_threshold=int(out_clip_level.outputs.clip_val))
+
     out_cacl = calc(in_file_a=head_file,
                     in_file_b=out_compute_mask.outputs.out_file,
                     expr='a*b',
@@ -80,7 +81,7 @@ def extract_brain(head_file, write_dir, brain_volume, caching=False,
 
 def _rigid_body_register(moving_head_file, moving_brain_file,
                          reference_head_file, reference_brain_file,
-                         write_dir, brain_volume, caching=False,
+                         write_dir, caching=False,
                          terminal_output='allatonce',
                          environ={}):
     if caching:
@@ -372,3 +373,78 @@ def _per_slice_qwarp(to_qwarp_file, reference_file, write_dir,
 
     return (out_merge_func.outputs.out_file, warp_files,
             merged_apply_to_file)
+
+
+def _transform_to_template(to_register_filename, template_filename, write_dir,
+                           transforms,
+                           voxel_size=None,
+                           caching=False, verbose=True):
+    """ Applies successive transforms to a given image to put it in
+    template space.
+
+    Parameters
+    ----------
+    to_register_filename : str
+        Path to functional volume, coregistered to a common space with the
+        anatomical volume.
+
+    template_filename : str
+        Template to register the functional to.
+
+    transforms : list of str
+        List of paths to the transforms to apply. First one from original space
+        and last one to template space.
+
+    anat_to_template_oned_filename : str
+        Path to the affine 1D transform from anatomical to template space.
+
+    anat_to_template_warp_filename : str
+        Path to the warp transform from anatomical to template space.
+
+    voxel_size : 3-tuple of floats, optional
+        Voxel size of the registered functional, in mm.
+
+    caching : bool, optional
+        Wether or not to use caching.
+
+    verbose : bool, optional
+        If True, all steps are verbose. Note that caching implies some
+        verbosity in any case.
+    """
+    if verbose:
+        terminal_output = 'allatonce'
+    else:
+        terminal_output = 'none'
+
+    if caching:
+        memory = Memory(write_dir)
+        warp_apply = memory.cache(afni.NwarpApply)
+        resample = memory.cache(afni.Resample)
+        warp_apply.interface().set_default_terminal_output(terminal_output)
+        resample.interface().set_default_terminal_output(terminal_output)
+    else:
+        resample = afni.Resample(terminal_output=terminal_output).run
+        warp_apply = afni.NwarpApply(terminal_output=terminal_output).run
+
+    current_dir = os.getcwd()
+    os.chdir(write_dir)
+    normalized_filename = fname_presuffix(to_register_filename,
+                                          suffix='_normalized')
+
+    if voxel_size is None:
+        resampled_template_filename = template_filename
+    else:
+        out_resample = resample(in_file=template_filename,
+                                voxel_size=voxel_size,
+                                outputtype='NIFTI_GZ')
+        resampled_template_filename = out_resample.outputs.out_file
+
+    warp = "'"
+    warp += " ".join(transforms)
+    warp += "'"
+    _ = warp_apply(in_file=to_register_filename,
+                   master=resampled_template_filename,
+                   warp=warp,
+                   out_file=normalized_filename)
+    os.chdir(current_dir)
+    return normalized_filename
