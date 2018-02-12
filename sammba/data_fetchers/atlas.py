@@ -2,12 +2,14 @@ import json
 import numpy as np
 import os
 import nibabel
+from scipy import ndimage
 from sklearn.datasets.base import Bunch
 from nilearn import image
 from nilearn.datasets.utils import _get_dataset_dir, _fetch_files
 from .utils import _get_dataset_descr
 from sammba.externals.nipype.utils.filemanip import fname_presuffix
 from nilearn._utils.niimg_conversions import check_niimg
+from nilearn._utils import niimg
 
 
 def fetch_atlas_dorr_2008(image_format='nifti', downsample='30',
@@ -136,6 +138,99 @@ def fetch_atlas_dorr_2008(image_format='nifti', downsample='30',
                   description=fdescr)
 
     return Bunch(**params)
+
+
+def fetch_masks_dorr_2008(image_format='nifti', downsample='30',
+                          data_dir=None, resume=True, verbose=1):
+    """Downloads DORR 2008 atlas first, then uses its labels to produce tissue
+    masks.
+
+    Parameters
+    ----------
+    image_format : one of {'nifti', 'minc'}, optional
+        Format to download
+
+    downsample : one of {'30', '100'}, optional
+        Downsampling resolution in microns.
+
+    data_dir : str, optional
+        Path of the data directory. Use to forec data storage in a non-
+        standard location. Default: None (meaning: default)
+
+    resume : bool, optional
+        whether to resumed download of a partly-downloaded file.
+
+    verbose : int, optional
+        verbosity level (0 means no message).
+
+    Returns
+    -------
+    mask_imgs: sklearn.datasets.base.Bunch
+        dictionary-like object, contains:
+
+        - 'brain' : nibabel.nifti1.Nifti1Image brain mask image.
+
+        - 'gm' : nibabel.nifti1.Nifti1Image grey matter mask image.
+
+        - 'cc' : nibabel.nifti1.Nifti1Image eroded corpus callosum image.
+
+        - 'ventricles' : nibabel.nifti1.Nifti1Image eroded ventricles mask
+        image.
+
+    Notes
+    -----
+    This function relies on DORR 2008 atlas where we particularly pick
+    ventricles and corpus callosum regions. Then, do a bit post processing
+    such as binary closing operation to more compact brain and grey matter
+    mask image and binary erosion to non-contaminated corpus callosum
+    and ventricles mask images.
+    Note: It is advised to check the mask images with your own data processing.
+
+    See Also
+    --------
+    sammba.data_fetchers.fetch_atlas_dorr_2008: for details regarding
+        the DORR 2008 atlas.
+    """
+    # Fetching DORR 2008 atlas
+    dorr = fetch_atlas_dorr_2008(
+        image_format=image_format, downsample=downsample, data_dir=data_dir,
+        resume=resume, verbose=verbose)
+    maps, names, values = dorr['maps'], dorr['names'], dorr['values']
+    atlas_img = check_niimg(maps)
+    atlas_data = niimg._safe_get_data(atlas_img)
+
+    brain_mask = (atlas_data > 0)
+    brain_mask = ndimage.binary_closing(brain_mask, iterations=2)
+    brain_mask_img = image.new_img_like(atlas_img, brain_mask)
+
+    corpus_callosum_values = values[
+        np.in1d(names, ['R corpus callosum', 'L corpus callosum'])]
+    corpus_callosum_mask = np.isin(atlas_data, corpus_callosum_values)
+    eroded_corpus_callosum_mask = ndimage.binary_erosion(corpus_callosum_mask,
+                                                         iterations=2)
+    corpus_callosum_mask_img = image.new_img_like(atlas_img,
+                                                  eroded_corpus_callosum_mask)
+
+    ventricles_names = ['R lateral ventricle', 'L lateral ventricle',
+                        'third ventricle', 'fourth ventricle']
+    ventricles_values = values[np.in1d(names, ventricles_names)]
+    ventricles_mask = np.isin(atlas_data, ventricles_values)
+    eroded_ventricles_mask = ndimage.binary_erosion(ventricles_mask,
+                                                    iterations=2)
+    ventricles_mask_img = image.new_img_like(atlas_img, eroded_ventricles_mask)
+
+    gm_mask = (atlas_data > 0)
+    gm_mask[ventricles_mask] = 0
+    gm_mask[corpus_callosum_mask] = 0
+    gm_mask = ndimage.binary_closing(gm_mask, iterations=2)
+    gm_mask_img = image.new_img_like(atlas_img, gm_mask)
+
+    mask_imgs = {'brain': brain_mask_img,
+                 'gm': gm_mask_img,
+                 'cc': corpus_callosum_mask_img,
+                 'ventricles': ventricles_mask_img}
+
+    return Bunch(**mask_imgs)
 
 
 def fetch_atlas_waxholm_rat_2014(data_dir=None, url=None, resume=True,
