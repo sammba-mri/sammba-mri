@@ -52,7 +52,7 @@ print(registered_anats)
 from nilearn import plotting, image
 
 average_img = image.mean_img(registered_anats)
-display = plotting.plot_anat(average_img, dim=-1.8, title='affine register')
+display = plotting.plot_anat(average_img, dim=-1.6, title='affine register')
 display.add_edges(registered_anats[0])
 plotting.show()
 

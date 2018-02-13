@@ -1,5 +1,6 @@
 import os
 import shutil
+import numpy as np 
 import tempfile
 from numpy.testing import assert_array_equal, assert_array_almost_equal
 from nose.tools import assert_true, assert_false
@@ -82,6 +83,45 @@ def test_fix_obliquity():
 
         if os.path.exists(tmp_filename):
             os.remove(tmp_filename)
+        if os.path.exists(tempdir):
+            os.removedirs(tempdir)
+
+
+def test_check_same_geometry():
+    img_filename1 = os.path.join(os.path.dirname(testing_data.__file__),
+                                 'anat.nii.gz')
+    img_filename2 = os.path.join(os.path.dirname(testing_data.__file__),
+                                 'func.nii.gz')
+    assert_true(np.alltrue(utils._check_same_geometry(img_filename1,
+                                                      img_filename1)))
+    assert_false(np.alltrue(utils._check_same_geometry(img_filename1,
+                                                       img_filename2)))
+
+
+def test_copy_geometry():
+    func_filename = os.path.join(os.path.dirname(testing_data.__file__),
+                                 'func.nii.gz')
+    anat_filename = os.path.join(os.path.dirname(testing_data.__file__),
+                                 'anat.nii.gz')
+    if afni.Info().version():
+        tempdir = tempfile.mkdtemp()
+        # Check error is raised if resampling is not allowed
+        assert_raises_regex(
+            ValueError, 'images have different shapes', utils.copy_geometry,
+            anat_filename, func_filename,
+            out_filename=os.path.join(tempdir, 'geometry_test.nii.gz'),
+            in_place=False, allow_resampling=True)
+
+        changed_filename = utils.copy_geometry(
+            anat_filename, func_filename,
+            out_filename=os.path.join(tempdir, 'geometry_test.nii.gz'),
+            in_place=False, allow_resampling=True)
+        assert_false(np.alltrue(utils._check_same_geometry(func_filename,
+                                                           anat_filename)))
+        assert_true(np.alltrue(utils._check_same_geometry(changed_filename,
+                                                          anat_filename)))
+        if os.path.exists(changed_filename):
+            os.remove(changed_filename)
         if os.path.exists(tempdir):
             os.removedirs(tempdir)
 

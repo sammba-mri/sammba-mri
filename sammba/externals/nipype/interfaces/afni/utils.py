@@ -1427,7 +1427,7 @@ class MergeInputSpec(AFNICommandInputSpec):
         name_template='%s_merge',
         desc='output image file name',
         argstr='-prefix %s',
-        name_source='in_file')
+        name_source='in_files')
     doall = traits.Bool(
         desc='apply options to all sub-bricks in dataset',
         argstr='-doall')
@@ -2680,9 +2680,10 @@ class ZcatInputSpec(AFNICommandInputSpec):
         mandatory=True,
         copyfile=False)
     out_file = File(
-        name_template='zcat',
+        name_template='%s_zcat',
         desc='output dataset prefix name (default \'zcat\')',
-        argstr='-prefix %s')
+        argstr='-prefix %s',
+        name_source='in_files')
     datum = traits.Enum(
         'byte','short','float',
         argstr='-datum %s',

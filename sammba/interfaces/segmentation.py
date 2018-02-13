@@ -88,15 +88,16 @@ class HistogramMaskInputSpec(BaseInterfaceInputSpec):
     intensity_threshold = traits.Int(
         desc="Intensity threshold. "
              "[default: 500]")
-    terminal_output = traits.Enum('stream', 'allatonce', 'file', 'none',
-                                  deprecated='1.0.0',
-                                  desc=('Control terminal output: `stream` - '
-                                        'displays to terminal immediately (default), '
-                                        '`allatonce` - waits till command is '
-                                        'finished to display output, `file` - '
-                                        'writes output to file, `none` - output'
-                                        ' is ignored'),
-                                  nohash=True)
+    terminal_output = traits.Enum(
+        'stream', 'allatonce', 'file', 'none',
+        deprecated='1.0.0',
+        desc=('Control terminal output: `stream` - '
+              'displays to terminal immediately (default), '
+              '`allatonce` - waits till command is '
+              'finished to display output, `file` - '
+              'writes output to file, `none` - output'
+              ' is ignored'),
+        nohash=True)
     lower_cutoff = traits.Float(
         .2,
         desc="lower fraction of the histogram to be discarded. In case of "
