@@ -121,6 +121,11 @@ def anats_to_common(anat_filenames, write_dir, brain_volume,
         raise ValueError(
             'Registration kind must be one of {0}, you entered {1}'.format(
                 registration_kinds, registration_kind))
+                
+    if registration_kind is 'nonlinear' and len(anat_filenames) < 5:
+        raise ValueError('At least 5 input files are required to make a ' 
+                         'template by non-linear \n registration. Only ' 
+                         '{0} have been provided.'.format(len(anat_filenames)))
 
     if use_rats_tool:
         if segmentation.Info().version() is None:
@@ -162,9 +167,11 @@ def anats_to_common(anat_filenames, write_dir, brain_volume,
         qwarp2 = memory.cache(afni.Qwarp)  # workaround to initialize inputs
         nwarp_cat = memory.cache(afni.NwarpCat)
         warp_apply = memory.cache(afni.NwarpApply)
+        nwarp_adjust = memory.cache(afni.NwarpAdjust)
         for step in [copy, unifize, compute_mask, calc, refit,
                      tcat, tstat, undump, resample, allineate, allineate2,
-                     mask_tool, catmatvec, qwarp, nwarp_cat, warp_apply]:
+                     mask_tool, catmatvec, qwarp, nwarp_cat, warp_apply,
+                     nwarp_adjust]:
             step.interface().set_default_terminal_output(terminal_output)
     else:
         copy = afni.Copy(terminal_output=terminal_output).run
@@ -186,6 +193,7 @@ def anats_to_common(anat_filenames, write_dir, brain_volume,
         qwarp2 = afni.Qwarp(terminal_output=terminal_output).run
         nwarp_cat = afni.NwarpCat(terminal_output=terminal_output).run
         warp_apply = afni.NwarpApply(terminal_output=terminal_output).run
+        nwarp_adjust = afni.NwarpAdjust(terminal_output=terminal_output).run
 
     current_dir = os.getcwd()
     os.chdir(write_dir)
@@ -582,7 +590,7 @@ def anats_to_common(anat_filenames, write_dir, brain_volume,
             elif n_iter < len(nonlinear_levels):
                 out_qwarp = qwarp(
                     in_file=centered_head_file,
-                    base_file=out_tstat_warp_head.outputs.out_file,
+                    base_file=nwarp_adjusted_mean,
                     noneg=True,
                     iwarp=True,
                     weight=nonlinear_weight_file,
@@ -595,7 +603,7 @@ def anats_to_common(anat_filenames, write_dir, brain_volume,
             else:
                 out_qwarp = qwarp2(
                     in_file=centered_head_file,
-                    base_file=out_tstat_warp_head.outputs.out_file,
+                    base_file=nwarp_adjusted_mean,
                     noneg=True,
                     iwarp=True,
                     weight=nonlinear_weight_file,
@@ -617,6 +625,11 @@ def anats_to_common(anat_filenames, write_dir, brain_volume,
         out_tstat_warp_head = tstat(in_file=out_tcat.outputs.out_file,
                                     outputtype='NIFTI_GZ')
 
+        nwarp_adjusted_mean = 'warped_{0}_adjusted_mean.nii.gz'.format(n_iter)
+        out_nwarp_adjust = nwarp_adjust(warps=warp_files,
+                                        in_files=centered_head_files,
+                                        out_file=nwarp_adjusted_mean)                            
+                                    
     ###########################################################################
     # Register to template
     # --------------------
