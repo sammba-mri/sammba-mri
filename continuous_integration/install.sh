@@ -27,7 +27,6 @@ create_new_venv() {
     pip install prov
     pip install nose
     pip install doctest-ignore-unicode
-    sudo apt-get install graphviz
 }
 
 print_conda_requirements() {
@@ -92,15 +91,25 @@ create_new_conda_env() {
         # Make sure that MKL is not used
         conda remove --yes --features mkl || echo "MKL not installed"
     fi
+
+    bash <(wget -q -O- http://neuro.debian.net/_files/neurodebian-travis.sh)
+    travis_retry sudo apt-get install -y -qq graphviz afni
+    source /etc/afni/afni.sh
+    echo "AFNI plugin path $AFNI_PLUGINPATH."
+    echo "AFNI binaries installed in $(which afni)"
 }
 
 if [[ "$DISTRIB" == "neurodebian" ]]; then
     create_new_venv
     bash <(wget -q -O- http://neuro.debian.net/_files/neurodebian-travis.sh)
-    sudo apt-get install -qq python-scipy python-nose python-nibabel\
+    sudo apt-get install -y -qq python-scipy python-nose python-nibabel\
          python-sklearn python-pandas python-nilearn python-patsy\
          python-networkx python-configparser python-future python-traits\
          python-simplejson python-funcsigs python-click graphviz
+    travis_retry sudo apt-get install -y -qq  afni
+    source /etc/afni/afni.sh
+    echo "AFNI plugin path $AFNI_PLUGINPATH."
+    echo "AFNI binaries installed in $(which afni)"
 
 elif [[ "$DISTRIB" == "conda" ]]; then
     create_new_conda_env
