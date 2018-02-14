@@ -23,29 +23,16 @@ print(func_filename)
 
 ##############################################################################
 # We encapsulate them in an object called `FMRISession`
-from sammba.registration import FMRISession
+from sammba.registration import FuncSession
 
-animal_session = FMRISession(anat=anat_filename, func=func_filename,
-                             animal_id='1366')
-
-##############################################################################
-# Define the write directory
-# --------------------------
-# Note that this directory needs to be empty, to ovoid overwrting conflicts.
-import os
-
-write_dir = os.path.join(os.getcwd(), 'zurich_fmri')
-if not os.path.exists(write_dir):
-    os.makedirs(write_dir)
+animal_session = FuncSession(anat=anat_filename, func=func_filename,
+                             animal_id='1366', brain_volume=400, t_r=1.,
+                             output_dir='zurich_fmri')
 
 ##############################################################################
 # Functional to anatomical registration
 # -------------------------------------
-from sammba.registration import coregister_fmri_session
-
-coregister_fmri_session(animal_session, 1., write_dir, 400,
-                        slice_timing=True,
-                        prior_rigid_body_registration=True)
+animal_session.coregister(prior_rigid_body_registration=True)
 
 ###############################################################################
 # Check out the results
