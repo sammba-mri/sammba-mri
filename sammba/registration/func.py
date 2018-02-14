@@ -280,18 +280,18 @@ class FuncSession(object):
         if prior_rigid_body_registration:
             anat_brain_filename = extract_brain(
                 unbiased_anat_filename, self.output_dir, self.brain_volume,
-                caching=False, use_rats_tool=use_rats_tool,
+                caching=caching, use_rats_tool=use_rats_tool,
                 terminal_output=terminal_output, environ=environ)
             func_brain_filename = extract_brain(
                 unbiased_mean_func_filename, self.output_dir,
-                self.brain_volume, caching=False, use_rats_tool=use_rats_tool,
+                self.brain_volume, caching=caching, use_rats_tool=use_rats_tool,
                 terminal_output=terminal_output, environ=environ)
             allineated_anat_filename, rigid_transform_file = \
                 _rigid_body_register(unbiased_anat_filename,
                                      anat_brain_filename,
                                      unbiased_mean_func_filename,
                                      func_brain_filename, self.output_dir,
-                                     caching=False,
+                                     caching=caching,
                                      terminal_output=terminal_output,
                                      environ=environ)
             output_files.extend([rigid_transform_file,
@@ -518,7 +518,7 @@ def coregister_fmri_session(session_data, t_r, write_dir, brain_volume,
 
     if use_rats_tool:
         if segmentation.Info().version() is None:
-            raise ValueError('Can not locate compute_mask')
+            raise ValueError('Can not locate RATS')
         else:
             ComputeMask = segmentation.MathMorphoMask
     else:
@@ -983,7 +983,7 @@ def _func_to_template(func_coreg_filename, template_filename, write_dir,
         resample = afni.Resample(terminal_output=terminal_output).run
 
     current_dir = os.getcwd()
-    os.chdir(write_dir)
+    os.chdir(write_dir)  # XXX to remove
     normalized_filename = fname_presuffix(func_coreg_filename,
                                           suffix='_normalized')
     if voxel_size is None:
@@ -1121,7 +1121,6 @@ def fmri_sessions_to_template(sessions, t_r, head_template_filename,
         animal_data._set_output_dir_(animal_output_dir)
         # XXX do a function for creating new attributes ?
         setattr(animal_data, "template_", head_template_filename)
-
         coregister_fmri_session(
             animal_data, t_r, write_dir, brain_volume,
             use_rats_tool=use_rats_tool,

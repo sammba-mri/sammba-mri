@@ -49,7 +49,7 @@ def fetch_atlas_dorr_2008(image_format='nifti', downsample='30',
 
         - 'names' : str list containing the names of the regions.
 
-        - 'values' : int list containing the label value of each region.
+        - 'labels' : int list containing the label value of each region.
 
         - 'description' : description about the atlas and the template.
 
@@ -108,14 +108,15 @@ def fetch_atlas_dorr_2008(image_format='nifti', downsample='30',
     right_rois = []
     lateral_rois = []
     for (idx, label, right_index, left_index) in csv_data:
+        label = label.decode('UTF-8')  # for python3
         if right_index == left_index:
             lateral_rois.append((label, right_index))
         else:
-            left_rois.append(('L ' + label, left_index))
-            right_rois.append(('R ' + label, right_index))
+            left_rois.append(('L {}'.format(label), left_index))
+            right_rois.append(('R {}'.format(label), right_index))
 
     rois = lateral_rois + right_rois + left_rois
-    labels, indices = zip(*rois)
+    labels, indices = map(list, zip(*rois))
     t2 = files_[0]
     maps = files_[1]
     if downsample == '100':
@@ -134,7 +135,7 @@ def fetch_atlas_dorr_2008(image_format='nifti', downsample='30',
 
     params = dict(t2=t2, maps=maps,
                   names=np.array(labels)[np.argsort(indices)],
-                  values=np.sort(indices),
+                  labels=np.sort(indices),
                   description=fdescr)
 
     return Bunch(**params)
@@ -195,17 +196,21 @@ def fetch_masks_dorr_2008(image_format='nifti', downsample='30',
     dorr = fetch_atlas_dorr_2008(
         image_format=image_format, downsample=downsample, data_dir=data_dir,
         resume=resume, verbose=verbose)
-    maps, names, values = dorr['maps'], dorr['names'], dorr['values']
+    maps, names, labels = dorr['maps'], dorr['names'], dorr['labels']
     atlas_img = check_niimg(maps)
-    atlas_data = niimg._safe_get_data(atlas_img)
+    atlas_data = niimg._safe_get_data(atlas_img).astype(int)
 
     brain_mask = (atlas_data > 0)
     brain_mask = ndimage.binary_closing(brain_mask, iterations=2)
     brain_mask_img = image.new_img_like(atlas_img, brain_mask)
 
-    corpus_callosum_values = values[
-        np.in1d(names, ['R corpus callosum', 'L corpus callosum'])]
-    corpus_callosum_mask = np.isin(atlas_data, corpus_callosum_values)
+    corpus_callosum_labels = labels[
+        np.in1d(names.astype(str), ['R corpus callosum', 'L corpus callosum'])]
+    print(np.in1d(names.astype(str), ['R corpus callosum', 'L corpus callosum']))
+    print(corpus_callosum_labels)
+    print(np.unique(atlas_data))
+    corpus_callosum_mask = np.max(
+        [atlas_data == value for value in corpus_callosum_labels], axis=0)
     eroded_corpus_callosum_mask = ndimage.binary_erosion(corpus_callosum_mask,
                                                          iterations=2)
     corpus_callosum_mask_img = image.new_img_like(atlas_img,
@@ -213,8 +218,9 @@ def fetch_masks_dorr_2008(image_format='nifti', downsample='30',
 
     ventricles_names = ['R lateral ventricle', 'L lateral ventricle',
                         'third ventricle', 'fourth ventricle']
-    ventricles_values = values[np.in1d(names, ventricles_names)]
-    ventricles_mask = np.isin(atlas_data, ventricles_values)
+    ventricles_labels = labels[np.in1d(names.astype(str), ventricles_names)]
+    ventricles_mask = np.max(
+        [atlas_data == value for value in ventricles_labels], axis=0)
     eroded_ventricles_mask = ndimage.binary_erosion(ventricles_mask,
                                                     iterations=2)
     ventricles_mask_img = image.new_img_like(atlas_img, eroded_ventricles_mask)

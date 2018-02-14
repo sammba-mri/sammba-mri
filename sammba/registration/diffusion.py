@@ -1,21 +1,20 @@
 import os
+import numpy as np
 from nilearn._utils.compat import _basestring
 from ..externals.nipype.caching import Memory
 from ..externals.nipype.interfaces import afni
 from ..externals.nipype.utils.filemanip import fname_presuffix
-from .struct import anats_to_template
-from .multimodal import (extract_brain, _rigid_body_register, _warp,
-                         _transform_to_template)
+from .multimodal import (extract_brain, _rigid_body_register, _warp)
 
 
-class CESTSession(object):
+class DWISession(object):
     """
-    Encapsulation for CEST data, relative to preprocessing.
+    Encapsulation for diffusion data, relative to preprocessing.
 
     Parameters
     ----------
-    cest : str
-        Path to the CEST image
+    dwi : str
+        Path to the DW image
 
     anat : str
         Path to anatomical image
@@ -33,9 +32,11 @@ class CESTSession(object):
         `animal_id` of the given `output_dir`.
     """
 
-    def __init__(self, cest=None, anat=None, brain_volume=None,
+    def __init__(self, dwi=None, bvals=None, anat=None,
+                 brain_volume=None,
                  animal_id=None, output_dir=None):
-        self.cest = cest
+        self.dwi = dwi
+        self.bvals = bvals
         self.anat = anat
         self.brain_volume = brain_volume
         self.animal_id = animal_id
@@ -46,9 +47,13 @@ class CESTSession(object):
             setattr(self, k, v)
 
     def _check_inputs(self):
-        if not os.path.isfile(self.cest):
-            raise IOError('cest must be an existing image file,'
-                          'you gave {0}'.format(self.cest))
+        if not os.path.isfile(self.dwi):
+            raise IOError('dwi must be an existing DW image file,'
+                          'you gave {0}'.format(self.dwi))
+
+        if not os.path.isfile(self.bvals):
+            raise IOError('bvals must be an existing b-values file,'
+                          'you gave {0}'.format(self.bvals))
 
         if not os.path.isfile(self.anat):
             raise IOError('anat must be an existing image file,'
@@ -68,14 +73,14 @@ class CESTSession(object):
         if not os.path.isdir(self.output_dir):
             os.makedirs(self.output_dir)
 
-    def coregister(self, use_rats_tool=True,
+    def coregister(self, use_rats_tool=True, max_b=10.,
                    prior_rigid_body_registration=False,
                    caching=False, voxel_size_x=.1, voxel_size_y=.1,
                    verbose=True, **environ_kwargs):
         """
-        Coregistration of the animal's CEST and anatomical images.
-        The anatomical volume is aligned to the CEST, first with a
-        rigid body registration and then a nonlinear warp.
+        Coregistration of the animal's anatomical to the average of
+        B0 scans from the diffusion image.
+        Be aware that motion and eddy-current correction are not achieved here.
 
         Parameters
         ----------
@@ -83,8 +88,11 @@ class CESTSession(object):
             If True, brain mask is computed using RATS Mathematical Morphology.
             Otherwise, a histogram-based brain segmentation is used.
 
+        max_b : float, optional
+            Value under which b-values are assumed zero.
+
         prior_rigid_body_registration : bool, optional
-            If True, a rigid-body registration of the anat to the CEST is
+            If True, a rigid-body registration of the anat to the diffusion is
             performed prior to the warp. Useful if the images headers have
             missing/wrong information.
 
@@ -108,16 +116,17 @@ class CESTSession(object):
         -------
         The following attributes are added
             - `coreg_anat_` : str
-                              Path to paths to the coregistered CEST image.
+                              Path to paths to the coregistered anatomical
+                              image.
             - `coreg_transform_` : str
-                                   Path to the transform from anat to CEST.
+                                   Path to the transform from anat to DW image.
         Notes
         -----
         If `use_rats_tool` is turned on, RATS tool is used for brain extraction
         and has to be cited. For more information, see
         `RATS <http://www.iibi.uiowa.edu/content/rats-overview/>`_
         """
-        cest_filename = self.cest
+        dwi_filename = self.dwi
         anat_filename = self.anat
 
         environ = {'AFNI_DECONFLICT': 'OVERWRITE'}
@@ -131,11 +140,15 @@ class CESTSession(object):
 
         if caching:
             memory = Memory(self.output_dir)
+            tcat_subbrick = memory.cache(afni.TCatSubBrick)
+            tstat = memory.cache(afni.TStat)
             unifize = memory.cache(afni.Unifize)
             catmatvec = memory.cache(afni.CatMatvec)
             unifize.interface().set_default_terminal_output(terminal_output)
             overwrite = False
         else:
+            tcat_subbrick = afni.TCatSubBrick(terminal_output=terminal_output).run
+            tstat = afni.TStat(terminal_output=terminal_output).run
             unifize = afni.Unifize(terminal_output=terminal_output).run
             catmatvec = afni.CatMatvec().run
             overwrite = True
@@ -148,13 +161,26 @@ class CESTSession(object):
         os.chdir(images_dir)
         output_files = []
 
-        ###########################################
-        # Corret anat and CEST for intensity bias #
-        ###########################################
-        # Correct the CEST for intensities bias
-        out_bias_correct = unifize(in_file=cest_filename,
+        ####################
+        # Average B0 volumes
+        ####################
+        b_values = np.loadtxt(self.bvals)
+        b0_frames = np.argwhere(b_values <= max_b).flatten().tolist()
+        out_tcat_subbrick = tcat_subbrick(in_files=[(dwi_filename,
+                                                    "'{}'".format(b0_frames))],
+                                          outputtype='NIFTI_GZ',
+                                          environ=environ)
+        out_tstat = tstat(in_file=out_tcat_subbrick.outputs.out_file,
+                          outputtype='NIFTI_GZ')
+        b0_filename = out_tstat.outputs.out_file
+
+        ##########################################
+        # Corret anat and DWI for intensity bias #
+        ##########################################
+        # Correct the B0 average for intensities bias
+        out_bias_correct = unifize(in_file=b0_filename,
                                    outputtype='NIFTI_GZ', environ=environ)
-        unbiased_cest_filename = out_bias_correct.outputs.out_file
+        unbiased_b0_filename = out_bias_correct.outputs.out_file
 
         # Bias correct the antomical image
         out_unifize = unifize(in_file=anat_filename, outputtype='NIFTI_GZ',
@@ -162,49 +188,47 @@ class CESTSession(object):
         unbiased_anat_filename = out_unifize.outputs.out_file
 
         # Update outputs
-        output_files.extend([unbiased_cest_filename,
+        output_files.extend([unbiased_b0_filename,
                              unbiased_anat_filename])
 
-        ########################################
-        # Rigid-body registration anat -> cest #
-        ########################################
+        ###########################################
+        # Rigid-body registration anat -> mean B0 #
+        ###########################################
         if prior_rigid_body_registration:
             anat_brain_filename = extract_brain(
                 unbiased_anat_filename, self.output_dir, self.brain_volume,
                 caching=caching, use_rats_tool=use_rats_tool,
                 terminal_output=terminal_output, environ=environ)
-            cest_brain_filename = extract_brain(
-                unbiased_cest_filename, self.output_dir,
+            b0_brain_filename = extract_brain(
+                unbiased_b0_filename, self.output_dir,
                 self.brain_volume, caching=caching, use_rats_tool=use_rats_tool,
                 terminal_output=terminal_output, environ=environ)
             allineated_anat_filename, rigid_transform_file = \
                 _rigid_body_register(unbiased_anat_filename,
                                      anat_brain_filename,
-                                     unbiased_cest_filename,
-                                     cest_brain_filename, self.output_dir,
+                                     unbiased_b0_filename,
+                                     b0_brain_filename, self.output_dir,
                                      caching=caching,
                                      terminal_output=terminal_output,
                                      environ=environ)
-            output_files.extend([anat_brain_filename,
-                                 cest_brain_filename,
-                                 rigid_transform_file,
+            output_files.extend([rigid_transform_file,
                                  allineated_anat_filename])
         else:
             allineated_anat_filename = unbiased_anat_filename
 
-        #######################################
-        # Nonlinear registration anat -> CEST #
-        #######################################
+        ##########################################
+        # Nonlinear registration anat -> mean B0 #
+        ##########################################
         registered_anat_oblique_filename, mat_filename, warp_output_files =\
-            _warp(allineated_anat_filename, unbiased_cest_filename,
+            _warp(allineated_anat_filename, unbiased_b0_filename,
                   self.output_dir, caching=caching,
                   terminal_output=terminal_output, overwrite=overwrite,
                   environ=environ)
 
-        # Concatenate all the anat to CEST tranforms
+        # Concatenate all the anat to mean B0 tranforms
         output_files.extend(warp_output_files)
         transform_filename = fname_presuffix(registered_anat_oblique_filename,
-                                             suffix='_anat_to_cest.aff12.1D',
+                                             suffix='_anat_to_b0.aff12.1D',
                                              use_ext=False)
         _ = catmatvec(in_file=[(mat_filename, 'ONELINE')],
                       oneline=True,
@@ -214,91 +238,7 @@ class CESTSession(object):
             for out_file in output_files:
                 os.remove(out_file)
 
-        # Update the CEST data
+        # Update the fmri data
         setattr(self, "coreg_anat_", registered_anat_oblique_filename)
         setattr(self, "coreg_transform_", transform_filename)
         os.chdir(current_dir)
-
-    def register_to_template(self, head_template_filename,
-                             brain_template_filename=None,
-                             dilated_head_mask_filename=None,
-                             prior_rigid_body_registration=False,
-                             slice_timing=True,
-                             cest_voxel_size=None,
-                             maxlev=None,
-                             caching=False, verbose=True):
-        """ Registration of subject's CEST and anatomical images to
-        a given template.
-
-        Parameters
-        ----------
-        head_template_filename : str
-            Template to register the CEST to.
-
-        brain_template_filename : str, optional
-            Path to a brain template, passed to
-            sammba.registration.anats_to_template
-
-        dilated_head_mask_filename : str, optional
-            Path to a dilated head mask, passed to
-            sammba.registration.anats_to_template
-
-        cest_voxel_size : 3-tuple of floats, optional
-            Voxel size of the registered CEST, in mm.
-
-        maxlev : int or None, optional
-            Maximal level for the warp when registering anat to template.
-            Passed to
-            sammba.registration.anats_to_template
-
-        caching : bool, optional
-            Wether or not to use caching.
-
-        verbose : bool, optional
-            If True, all steps are verbose. Note that caching implies some
-            verbosity in any case.
-
-        Returns
-        -------
-        The following attributes are added/updated
-            - `template_` : str
-                           Path to the given registration template.
-            - `registered_cest_` : str
-                                   Path to the CEST registered to template.
-            - `registered_anat_` : str
-                                   Path to the anat registered to template.
-
-        See also
-        --------
-        sammba.registration.anats_to_template
-        """
-        self._check_inputs()
-        images_dir = os.path.join(os.path.abspath(self.output_dir),
-                                  self.animal_id)
-
-        if not hasattr(self, 'coreg_transform_'):
-            raise ValueError('Anatomical image has not been registered '
-                             'to CEAT. Please use `coreg` function first')
-
-        # XXX do a function for creating new attributes ?
-        setattr(self, "template_", head_template_filename)
-        anats_registration = anats_to_template(
-            [self.anat],
-            head_template_filename,
-            images_dir,
-            self.brain_volume,
-            brain_template_filename=brain_template_filename,
-            dilated_head_mask_filename=dilated_head_mask_filename,
-            maxlev=maxlev,
-            caching=caching, verbose=verbose)
-        setattr(self, "registered_anat_", anats_registration.registered[0])
-
-        normalized_cest_filename = _transform_to_template(
-            self.cest,
-            head_template_filename,
-            images_dir,
-            [self.coreg_transform_, anats_registration.pre_transforms[0],
-             anats_registration.transforms[0]],
-            voxel_size=cest_voxel_size, caching=caching, verbose=verbose)
-
-        setattr(self, "registered_cest_", normalized_cest_filename)
