@@ -20,7 +20,7 @@ def test_coregister_fmri_session():
     animal_session = FMRISession(anat=anat_file, func=func_file,
                                  animal_id='test_coreg_dir')
 
-    func.coregister_fmri_session(animal_session, 1., tst.tmpdir, 600,
+    func.coregister_fmri_session(animal_session, 1., tst.tmpdir, 400,
                                  slice_timing=False, verbose=False,
                                  use_rats_tool=False)
     assert_true(_check_same_fov(nibabel.load(animal_session.coreg_func_),
@@ -52,7 +52,7 @@ def test_fmri_sessions_to_template():
 
     template_file = anat_file
     t_r = 1.
-    brain_volume = 400
+    brain_volume = 600
 
     registered_data = func.fmri_sessions_to_template([mammal_data], t_r,
                                                      template_file,
