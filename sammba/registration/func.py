@@ -278,18 +278,18 @@ class FuncSession(object):
         if prior_rigid_body_registration:
             anat_brain_filename = extract_brain(
                 unbiased_anat_filename, self.output_dir, self.brain_volume,
-                caching=False, use_rats_tool=use_rats_tool,
+                caching=caching, use_rats_tool=use_rats_tool,
                 terminal_output=terminal_output, environ=environ)
             func_brain_filename = extract_brain(
                 unbiased_mean_func_filename, self.output_dir,
-                self.brain_volume, caching=False, use_rats_tool=use_rats_tool,
+                self.brain_volume, caching=caching, use_rats_tool=use_rats_tool,
                 terminal_output=terminal_output, environ=environ)
             allineated_anat_filename, rigid_transform_file = \
                 _rigid_body_register(unbiased_anat_filename,
                                      anat_brain_filename,
                                      unbiased_mean_func_filename,
                                      func_brain_filename, self.output_dir,
-                                     caching=False,
+                                     caching=caching,
                                      terminal_output=terminal_output,
                                      environ=environ)
             output_files.extend([rigid_transform_file,

@@ -2157,6 +2157,15 @@ class TCatSubBrick(AFNICommand):
     input_spec = TCatSBInputSpec
     output_spec = AFNICommandOutputSpec
 
+    def _list_outputs(self):
+        outputs = self.output_spec().get()
+        if isdefined(self.inputs.out_file):
+            outputs['out_file'] = op.abspath(self.inputs.out_file)
+        else:
+            outputs['out_file'] = op.abspath(
+                self._gen_fname(self.inputs.in_files[0][0], suffix='_tcat'))
+        return outputs
+
     def _gen_filename(self, name):
         if name == 'out_file':
             return self._gen_fname(self.inputs.in_files[0][0], suffix='_tcat')
