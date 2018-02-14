@@ -139,8 +139,10 @@ class FuncSession(object):
         if self.output_dir is None:
             self.output_dir = os.getcwd()
 
-        if not os.path.isdir(self.output_dir):
-            os.makedirs(self.output_dir)
+        output_dir = os.path.abspath(self.output_dir)
+        images_dir = os.path.join(output_dir, self.animal_id)
+        if not os.path.isdir(images_dir):
+            os.makedirs(images_dir)
 
     def coregister(self, use_rats_tool=True,
                    slice_timing=True,
