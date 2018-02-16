@@ -9,7 +9,7 @@ from sammba.externals.nipype.utils.filemanip import fname_presuffix
 from sammba.interfaces import segmentation
 from .utils import fix_obliquity, copy_geometry
 from .struct import anats_to_template
-from .base import (extract_brain, _rigid_body_register, _warp,
+from .base import (BaseSession, extract_brain, _rigid_body_register, _warp,
                    _per_slice_qwarp, _transform_to_template)
 
 
