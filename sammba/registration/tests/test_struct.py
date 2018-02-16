@@ -39,7 +39,7 @@ def test_anats_to_template():
     unifize = afni.Unifize().run
     out_unifize = unifize(in_file=anat_file, outputtype='NIFTI_GZ')
     unifized_anat_file = out_unifize.outputs.out_file
-    register_result = struct.anats_to_template([unifized_anat_file], anat_file,
+    register_result = struct.anats_to_template([anat_file], unifized_anat_file,
                                                tst.tmpdir,
                                                600, use_rats_tool=False,
                                                maxlev=0, verbose=0)
