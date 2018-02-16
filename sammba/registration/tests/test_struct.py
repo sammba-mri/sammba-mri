@@ -41,5 +41,5 @@ def test_anats_to_template():
                                                maxlev=0, verbose=0)
     transform = np.loadtxt(register_result.pre_transforms[0])
     assert_array_almost_equal(transform,
-                              [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0], decimal=2)
+                              [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0], decimal=1)
     assert_true(os.path.isfile(register_result.transforms[0]))
