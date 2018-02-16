@@ -6,6 +6,7 @@ from numpy.testing import assert_array_almost_equal
 from nilearn._utils.testing import assert_raises_regex
 from nilearn.datasets.tests import test_utils as tst
 from sammba.registration import struct
+from sammba.externals.nipype.interfaces import afni
 from nilearn._utils.niimg_conversions import _check_same_fov
 from sammba.registration.utils import _check_same_obliquity
 from sammba import testing_data
@@ -35,11 +36,14 @@ def test_anats_to_template():
                              'anat.nii.gz')
 
     # test common space of one image is itself
-    register_result = struct.anats_to_template([anat_file], anat_file,
+    unifize = afni.Unifize().run
+    out_unifize = unifize(in_file=anat_file, outputtype='NIFTI_GZ')
+    unifized_anat_file = out_unifize.outputs.out_file
+    register_result = struct.anats_to_template([unifized_anat_file], anat_file,
                                                tst.tmpdir,
                                                600, use_rats_tool=False,
                                                maxlev=0, verbose=0)
     transform = np.loadtxt(register_result.pre_transforms[0])
     assert_array_almost_equal(transform,
-                              [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0], decimal=1)
+                              [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0])
     assert_true(os.path.isfile(register_result.transforms[0]))
