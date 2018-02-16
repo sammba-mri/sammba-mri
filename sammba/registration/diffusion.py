@@ -4,7 +4,8 @@ from nilearn._utils.compat import _basestring
 from ..externals.nipype.caching import Memory
 from ..externals.nipype.interfaces import afni
 from ..externals.nipype.utils.filemanip import fname_presuffix
-from .base import (BaseSession, extract_brain, _rigid_body_register, _warp)
+from .base import (BaseSession, extract_brain, _rigid_body_register, _warp,
+                   _per_slice_qwarp)
 
 
 class DWISession(BaseSession):
@@ -43,7 +44,7 @@ class DWISession(BaseSession):
 
     def _check_inputs(self):
         if not os.path.isfile(self.dwi):
-            raise IOError('dwi must be an existing DW image file,'
+            raise IOError('dwi must be an existing image file,'
                           'you gave {0}'.format(self.dwi))
 
         if not os.path.isfile(self.bvals):
@@ -67,8 +68,11 @@ class DWISession(BaseSession):
                    verbose=True, **environ_kwargs):
         """
         Coregistration of the animal's anatomical to the average of
-        B0 scans from the diffusion image.
+        B0 scans from the DW image.
         Be aware that motion and eddy-current correction are not achieved here.
+        The DW image is aligned to the anatomical, first with a
+        rigid body registration and then on a per-slice basis (only a fine
+        correction, this is mostly for correction of EPI distortion).
 
         Parameters
         ----------
@@ -103,6 +107,8 @@ class DWISession(BaseSession):
         Returns
         -------
         The following attributes are added
+            - `coreg_dwi_` : str
+                             Path to paths to the coregistered DW image.
             - `coreg_anat_` : str
                               Path to paths to the coregistered anatomical
                               image.
@@ -222,11 +228,25 @@ class DWISession(BaseSession):
                       oneline=True,
                       out_file=transform_filename)
 
+        #####################################################
+        # Per-slice non-linear registration mean B0 -> anat #
+        #####################################################
+        warped_b0_filename, warp_filenames, warped_dwi_filename =\
+            _per_slice_qwarp(unbiased_b0_filename,
+                             registered_anat_oblique_filename,
+                             self.output_dir, voxel_size_x, voxel_size_y,
+                             apply_to_file=dwi_filename,
+                             overwrite=overwrite,
+                             caching=caching, terminal_output=terminal_output,
+                             environ=environ)
+        # Update the outputs
+        output_files.append(warped_b0_filename)
         if not caching:
             for out_file in output_files:
                 os.remove(out_file)
 
-        # Update the fmri data
+        # Update the diffusion data
+        setattr(self, "coreg_dwi_", warped_dwi_filename)
         setattr(self, "coreg_anat_", registered_anat_oblique_filename)
         setattr(self, "coreg_transform_", transform_filename)
         os.chdir(current_dir)
