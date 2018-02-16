@@ -6,6 +6,7 @@ from nilearn._utils.testing import assert_raises_regex
 from nilearn._utils.niimg_conversions import _check_same_fov
 from sammba.registration import FMRISession, func
 from sammba.registration.utils import _check_same_obliquity
+from sammba.externals.nipype.interfaces import afni
 from sammba import testing_data
 import nibabel
 
@@ -41,7 +42,6 @@ def test_coregister_fmri_session():
     os.chdir(current_dir)
 
 
-
 @with_setup(tst.setup_tmpdata, tst.teardown_tmpdata)
 def test_fmri_sessions_to_template():
     anat_file = os.path.join(os.path.dirname(testing_data.__file__),
@@ -49,8 +49,9 @@ def test_fmri_sessions_to_template():
     func_file = os.path.join(os.path.dirname(testing_data.__file__),
                              'func.nii.gz')
     mammal_data = FMRISession(anat=anat_file, func=func_file)
-
-    template_file = anat_file
+    unifize = afni.Unifize().run
+    out_unifize = unifize(in_file=anat_file, outputtype='NIFTI_GZ')
+    template_file = out_unifize.outputs.out_file
     t_r = 1.
     brain_volume = 600
 
