@@ -1,6 +1,9 @@
 import os
 import numpy as np
 import nibabel
+from sklearn.base import _pprint
+from sklearn.utils.fixes import signature
+from nilearn._utils.compat import _basestring
 from ..externals.nipype.caching import Memory
 from ..externals.nipype.interfaces import afni
 from ..externals.nipype.utils.filemanip import fname_presuffix
@@ -67,10 +70,12 @@ def extract_brain(head_file, write_dir, brain_volume, caching=False,
         volume_threshold=brain_volume,
         intensity_threshold=int(out_clip_level.outputs.clip_val))
 
+    masked_file = fname_presuffix(head_file, suffix='_brain',
+                                  newpath=write_dir)
     out_cacl = calc(in_file_a=head_file,
                     in_file_b=out_compute_mask.outputs.out_file,
                     expr='a*b',
-                    out_file=fname_presuffix(head_file, suffix='_brain'),
+                    out_file=masked_file,
                     environ=environ)
 
     if not caching:
@@ -103,11 +108,12 @@ def _rigid_body_register(moving_head_file, moving_brain_file,
         reference=moving_brain_file,
         out_matrix=fname_presuffix(reference_brain_file,
                                    suffix='_shr.aff12.1D',
-                                   use_ext=False),
+                                   use_ext=False,
+                                   newpath=write_dir),
         center_of_mass='',
         warp_type='shift_rotate',
         out_file=fname_presuffix(reference_brain_file,
-                                 suffix='_shr'),
+                                 suffix='_shr', newpath=write_dir),
         environ=environ)
     rigid_transform_file = out_allineate.outputs.out_matrix
     output_files = [out_allineate.outputs.out_file]
@@ -126,7 +132,7 @@ def _rigid_body_register(moving_head_file, moving_brain_file,
         master=reference_head_file,
         in_matrix=catmatvec_out_file,
         out_file=fname_presuffix(moving_head_file,
-                                 suffix='_shr'),
+                                 suffix='_shr', newpath=write_dir),
         environ=environ)
 
     # Remove intermediate output
@@ -163,8 +169,7 @@ def _warp(to_warp_file, reference_file, write_dir, caching=False,
         overwrite=overwrite, verbose=verbose)
 
     # Concatenate all the anat to func tranforms
-    mat_file = fname_presuffix(warped_file,
-                                   suffix='_warp.mat', use_ext=False)
+    mat_file = fname_presuffix(warped_file, suffix='_warp.mat', use_ext=False)
     output_files = []
     if not os.path.isfile(mat_file):
         np.savetxt(mat_file, [out_warp.runtime.stdout], fmt='%s')
@@ -201,7 +206,8 @@ def _per_slice_qwarp(to_qwarp_file, reference_file, write_dir,
                             keep='{0} {0}'.format(slice_n),
                             out_file=fname_presuffix(
                                 reference_file,
-                                suffix='_sl%d' % slice_n),
+                                suffix='_sl%d' % slice_n,
+                                newpath=write_dir),
                             environ=environ)
         _ = fix_obliquity(out_slicer.outputs.out_file,
                           reference_file,
@@ -217,7 +223,8 @@ def _per_slice_qwarp(to_qwarp_file, reference_file, write_dir,
                             keep='{0} {0}'.format(slice_n),
                             out_file=fname_presuffix(
                                 to_qwarp_file,
-                                suffix='_sl%d' % slice_n),
+                                suffix='_sl%d' % slice_n,
+                                newpath=write_dir),
                             environ=environ)
         _ = fix_obliquity(out_slicer.outputs.out_file,
                           to_qwarp_file,
@@ -325,7 +332,8 @@ def _per_slice_qwarp(to_qwarp_file, reference_file, write_dir,
                                 keep='{0} {0}'.format(slice_n),
                                 out_file=fname_presuffix(
                                     apply_to_file,
-                                    suffix='_sl%d' % slice_n),
+                                    suffix='_sl%d' % slice_n,
+                                    newpath=write_dir),
                                 environ=environ)
             _ = fix_obliquity(out_slicer.outputs.out_file,
                               apply_to_file,
@@ -429,7 +437,8 @@ def _transform_to_template(to_register_filename, template_filename, write_dir,
     current_dir = os.getcwd()
     os.chdir(write_dir)
     normalized_filename = fname_presuffix(to_register_filename,
-                                          suffix='_normalized')
+                                          suffix='_normalized',
+                                          newpath=write_dir)
 
     if voxel_size is None:
         resampled_template_filename = template_filename
@@ -448,3 +457,82 @@ def _transform_to_template(to_register_filename, template_filename, write_dir,
                    out_file=normalized_filename)
     os.chdir(current_dir)
     return normalized_filename
+
+
+class BaseSession(object):
+    """
+    Base class for all sessions.
+
+    Parameters
+    ----------
+    anat : str
+        Path to anatomical image
+
+    animal_id : str
+        Animal id
+
+    brain_volume : int
+        Volume of the brain used for brain extraction.
+        Typically 400 for mouse and 1800 for rat.
+
+    output_dir : str, optional
+        Path to the output directory. If not specified, current directory is
+        used. Final and intermediate images are stored in the subdirectory
+        `animal_id` of the given `output_dir`.
+    """
+    @classmethod
+    def _get_param_names(cls):
+        """Get parameter names for the session"""
+        # fetch the constructor or the original constructor before
+        # deprecation wrapping if any
+        init = getattr(cls.__init__, 'deprecated_original', cls.__init__)
+        if init is object.__init__:
+            # No explicit constructor to introspect
+            return []
+
+        # introspect the constructor arguments to find the model parameters
+        # to represent
+        init_signature = signature(init)
+        # Consider the constructor parameters excluding 'self'
+        parameters = [p for p in init_signature.parameters.values()
+                      if p.name != 'self' and p.kind != p.VAR_KEYWORD]
+        for p in parameters:
+            if p.kind == p.VAR_POSITIONAL:
+                raise RuntimeError("scikit-learn estimators should always "
+                                   "specify their parameters in the signature"
+                                   " of their __init__ (no varargs)."
+                                   " %s with constructor %s doesn't "
+                                   " follow this convention."
+                                   % (cls, init_signature))
+        # Extract and sort argument names excluding 'self'
+        return sorted([p.name for p in parameters])
+
+    def get_params(self):
+        """Get parameters of the session.
+
+        Returns
+        -------
+        params : mapping of string to any
+            Parameter names mapped to their values.
+        """
+        out = dict()
+        for key in self._get_param_names():
+            value = getattr(self, key, None)
+            out[key] = value
+        return out
+
+    def _set_items(self, **kwargs):
+        for k, v in kwargs.items():
+            setattr(self, k, v)
+
+    def __repr__(self):
+        class_name = self.__class__.__name__
+        return '%s(%s)' % (class_name, _pprint(self.get_params(),
+                           offset=len(class_name),),)
+
+    def _set_output_dir(self):
+        if self.output_dir is None:
+            self.output_dir = os.getcwd()
+
+        if not os.path.isdir(self.output_dir):
+            os.makedirs(self.output_dir)

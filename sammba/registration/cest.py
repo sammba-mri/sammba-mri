@@ -4,11 +4,11 @@ from ..externals.nipype.caching import Memory
 from ..externals.nipype.interfaces import afni
 from ..externals.nipype.utils.filemanip import fname_presuffix
 from .struct import anats_to_template
-from .multimodal import (extract_brain, _rigid_body_register, _warp,
-                         _transform_to_template)
+from .base import (BaseSession, extract_brain, _rigid_body_register,
+                   _warp, _transform_to_template)
 
 
-class CESTSession(object):
+class CESTSession(BaseSession):
     """
     Encapsulation for CEST data, relative to preprocessing.
 
@@ -41,10 +41,6 @@ class CESTSession(object):
         self.animal_id = animal_id
         self.output_dir = output_dir
 
-    def _set_items(self, **kwargs):
-        for k, v in kwargs.items():
-            setattr(self, k, v)
-
     def _check_inputs(self):
         if not os.path.isfile(self.cest):
             raise IOError('cest must be an existing image file,'
@@ -60,13 +56,6 @@ class CESTSession(object):
         if not isinstance(self.animal_id, _basestring):
             raise ValueError('animal_id must be a string, you provided '
                              '{0}'.format(self.animal_id))
-
-    def _set_output_dir(self):
-        if self.output_dir is None:
-            self.output_dir = os.getcwd()
-
-        if not os.path.isdir(self.output_dir):
-            os.makedirs(self.output_dir)
 
     def coregister(self, use_rats_tool=True,
                    prior_rigid_body_registration=False,
