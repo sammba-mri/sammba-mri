@@ -4,10 +4,10 @@ from nilearn._utils.compat import _basestring
 from ..externals.nipype.caching import Memory
 from ..externals.nipype.interfaces import afni
 from ..externals.nipype.utils.filemanip import fname_presuffix
-from .multimodal import (extract_brain, _rigid_body_register, _warp)
+from .base import (BaseSession, extract_brain, _rigid_body_register, _warp)
 
 
-class DWISession(object):
+class DWISession(BaseSession):
     """
     Encapsulation for diffusion data, relative to preprocessing.
 
@@ -31,7 +31,6 @@ class DWISession(object):
         used. Final and intermediate images are stored in the subdirectory
         `animal_id` of the given `output_dir`.
     """
-
     def __init__(self, dwi=None, bvals=None, anat=None,
                  brain_volume=None,
                  animal_id=None, output_dir=None):
@@ -41,10 +40,6 @@ class DWISession(object):
         self.brain_volume = brain_volume
         self.animal_id = animal_id
         self.output_dir = output_dir
-
-    def _set_items(self, **kwargs):
-        for k, v in kwargs.items():
-            setattr(self, k, v)
 
     def _check_inputs(self):
         if not os.path.isfile(self.dwi):
@@ -65,13 +60,6 @@ class DWISession(object):
         if not isinstance(self.animal_id, _basestring):
             raise ValueError('animal_id must be a string, you provided '
                              '{0}'.format(self.animal_id))
-
-    def _set_output_dir(self):
-        if self.output_dir is None:
-            self.output_dir = os.getcwd()
-
-        if not os.path.isdir(self.output_dir):
-            os.makedirs(self.output_dir)
 
     def coregister(self, use_rats_tool=True, max_b=10.,
                    prior_rigid_body_registration=False,
@@ -196,11 +184,11 @@ class DWISession(object):
         ###########################################
         if prior_rigid_body_registration:
             anat_brain_filename = extract_brain(
-                unbiased_anat_filename, self.output_dir, self.brain_volume,
+                anat_filename, self.output_dir, self.brain_volume,
                 caching=caching, use_rats_tool=use_rats_tool,
                 terminal_output=terminal_output, environ=environ)
             b0_brain_filename = extract_brain(
-                unbiased_b0_filename, self.output_dir,
+                b0_filename, self.output_dir,
                 self.brain_volume, caching=caching, use_rats_tool=use_rats_tool,
                 terminal_output=terminal_output, environ=environ)
             allineated_anat_filename, rigid_transform_file = \

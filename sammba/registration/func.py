@@ -10,8 +10,8 @@ from sammba.interfaces import segmentation
 from .fmri_session import FMRISession
 from .utils import fix_obliquity, copy_geometry
 from .struct import anats_to_template
-from .multimodal import (extract_brain, _rigid_body_register, _warp,
-                         _per_slice_qwarp, _transform_to_template)
+from .base import (extract_brain, _rigid_body_register, _warp,
+                   _per_slice_qwarp, _transform_to_template)
 
 
 def _realign(func_filename, write_dir, caching=False,
@@ -54,7 +54,8 @@ def _realign(func_filename, write_dir, caching=False,
                               master=func_filename,
                               in_matrix=out_volreg.outputs.oned_matrix_save,
                               out_file=fname_presuffix(func_filename,
-                                                       suffix='Av'),
+                                                       suffix='Av',
+                                                       newpath=write_dir),
                               environ=environ)
 
     # 3dAllineate removes the obliquity. This is not a good way to readd it as
@@ -79,7 +80,7 @@ def _realign(func_filename, write_dir, caching=False,
             out_volreg.outputs.oned_file)
 
 
-class FuncSession(object):
+class FuncSession(BaseSession):
     """
     Encapsulation for fMRI data, relative to preprocessing.
 
@@ -116,10 +117,6 @@ class FuncSession(object):
         self.t_r = t_r
         self.output_dir = output_dir
 
-    def _set_items(self, **kwargs):
-        for k, v in kwargs.items():
-            setattr(self, k, v)
-
     def _check_inputs(self):
         if not os.path.isfile(self.func):
             raise IOError('func must be an existing image file,'
@@ -135,15 +132,6 @@ class FuncSession(object):
         if not isinstance(self.animal_id, _basestring):
             raise ValueError('animal_id must be a string, you provided '
                              '{0}'.format(self.animal_id))
-
-    def _set_output_dir(self):
-        if self.output_dir is None:
-            self.output_dir = os.getcwd()
-
-        output_dir = os.path.abspath(self.output_dir)
-        images_dir = os.path.join(output_dir, self.animal_id)
-        if not os.path.isdir(images_dir):
-            os.makedirs(images_dir)
 
     def coregister(self, use_rats_tool=True,
                    slice_timing=True,
@@ -995,7 +983,8 @@ def _func_to_template(func_coreg_filename, template_filename, write_dir,
     current_dir = os.getcwd()
     os.chdir(write_dir)  # XXX to remove
     normalized_filename = fname_presuffix(func_coreg_filename,
-                                          suffix='_normalized')
+                                          suffix='_normalized',
+                                          newpath=write_dir)
     if voxel_size is None:
         func_template_filename = template_filename
     else:
