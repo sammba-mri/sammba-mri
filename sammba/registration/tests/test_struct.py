@@ -38,12 +38,12 @@ def test_anats_to_template():
     # test common space of one image is itself
     unifize = afni.Unifize().run
     out_unifize = unifize(in_file=anat_file, outputtype='NIFTI_GZ')
-    unifized_anat_file = out_unifize.outputs.out_file
-    register_result = struct.anats_to_template([anat_file], unifized_anat_file,
+    template_file = out_unifize.outputs.out_file
+    register_result = struct.anats_to_template([anat_file], template_file,
                                                tst.tmpdir,
-                                               600, use_rats_tool=False,
+                                               400, use_rats_tool=False,
                                                maxlev=0, verbose=0)
     transform = np.loadtxt(register_result.pre_transforms[0])
     assert_array_almost_equal(transform,
-                              [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0])
+                              [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0], decimal=2)
     assert_true(os.path.isfile(register_result.transforms[0]))
