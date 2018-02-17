@@ -1,9 +1,9 @@
 import os
 import numpy as np
-from nilearn._utils.compat import _basestring
 from ..externals.nipype.caching import Memory
 from ..externals.nipype.interfaces import afni
 from ..externals.nipype.utils.filemanip import fname_presuffix
+from .utils import _get_output_type
 from .base import (BaseSession, extract_brain, _rigid_body_register, _warp,
                    _per_slice_qwarp)
 
@@ -20,12 +20,9 @@ class DWISession(BaseSession):
     anat : str
         Path to anatomical image
 
-    animal_id : str
-        Animal id
-
-    brain_volume : int
+    brain_volume : int, optional
         Volume of the brain used for brain extraction.
-        Typically 400 for mouse and 1800 for rat.
+        Typically 400 for mouse and 1650 for rat.
 
     output_dir : str, optional
         Path to the output directory. If not specified, current directory is
@@ -33,13 +30,11 @@ class DWISession(BaseSession):
         `animal_id` of the given `output_dir`.
     """
     def __init__(self, dwi=None, bvals=None, anat=None,
-                 brain_volume=None,
-                 animal_id=None, output_dir=None):
+                 brain_volume=None, output_dir=None):
         self.dwi = dwi
         self.bvals = bvals
         self.anat = anat
         self.brain_volume = brain_volume
-        self.animal_id = animal_id
         self.output_dir = output_dir
 
     def _check_inputs(self):
@@ -54,13 +49,6 @@ class DWISession(BaseSession):
         if not os.path.isfile(self.anat):
             raise IOError('anat must be an existing image file,'
                           'you gave {0}'.format(self.anat))
-
-        if self.brain_volume is None:
-            raise ValueError('you must provide the expected brain volume.')
-
-        if not isinstance(self.animal_id, _basestring):
-            raise ValueError('animal_id must be a string, you provided '
-                             '{0}'.format(self.animal_id))
 
     def coregister(self, use_rats_tool=True, max_b=10.,
                    prior_rigid_body_registration=False,
@@ -138,7 +126,8 @@ class DWISession(BaseSession):
             tstat = memory.cache(afni.TStat)
             unifize = memory.cache(afni.Unifize)
             catmatvec = memory.cache(afni.CatMatvec)
-            unifize.interface().set_default_terminal_output(terminal_output)
+            for step in [copy, tcat_subbrick, tstat, unifize]:
+                step.interface().set_default_terminal_output(terminal_output)
             overwrite = False
         else:
             tcat_subbrick = afni.TCatSubBrick(terminal_output=terminal_output).run
@@ -149,10 +138,6 @@ class DWISession(BaseSession):
 
         self._check_inputs()
         self._set_output_dir()
-        images_dir = os.path.join(os.path.abspath(self.output_dir),
-                                  self.animal_id)
-        current_dir = os.getcwd()
-        os.chdir(images_dir)
         output_files = []
 
         ####################
@@ -160,25 +145,30 @@ class DWISession(BaseSession):
         ####################
         b_values = np.loadtxt(self.bvals)
         b0_frames = np.argwhere(b_values <= max_b).flatten().tolist()
-        out_tcat_subbrick = tcat_subbrick(in_files=[(dwi_filename,
-                                                    "'{}'".format(b0_frames))],
-                                          outputtype='NIFTI_GZ',
-                                          environ=environ)
-        out_tstat = tstat(in_file=out_tcat_subbrick.outputs.out_file,
-                          outputtype='NIFTI_GZ')
+        out_tcat_subbrick = tcat_subbrick(
+            in_files=[(self.dwi, "'{}'".format(b0_frames))],
+            out_file=fname_presuffix(self.dwi, suffix='_b0s'),
+            environ=environ)
+        out_tstat = tstat(
+            in_file=out_tcat_subbrick.outputs.out_file,
+            out_file=fname_presuffix(self.dwi, suffix='_b0s_mean'))
         b0_filename = out_tstat.outputs.out_file
 
         ##########################################
         # Corret anat and DWI for intensity bias #
         ##########################################
         # Correct the B0 average for intensities bias
-        out_bias_correct = unifize(in_file=b0_filename,
-                                   outputtype='NIFTI_GZ', environ=environ)
+        out_bias_correct = unifize(
+            in_file=b0_filename,
+            out_file=fname_presuffix(b0_filename, suffix='_unifized'),
+            environ=environ)
         unbiased_b0_filename = out_bias_correct.outputs.out_file
 
         # Bias correct the antomical image
-        out_unifize = unifize(in_file=anat_filename, outputtype='NIFTI_GZ',
-                              environ=environ)
+        out_unifize = unifize(
+            in_file=self.anat,
+            out_file=fname_presuffix(self.anat, suffix='_unifized'),
+            environ=environ)
         unbiased_anat_filename = out_unifize.outputs.out_file
 
         # Update outputs
@@ -189,19 +179,14 @@ class DWISession(BaseSession):
         # Rigid-body registration anat -> mean B0 #
         ###########################################
         if prior_rigid_body_registration:
-            anat_brain_filename = extract_brain(
-                anat_filename, self.output_dir, self.brain_volume,
-                caching=caching, use_rats_tool=use_rats_tool,
-                terminal_output=terminal_output, environ=environ)
-            b0_brain_filename = extract_brain(
-                b0_filename, self.output_dir,
-                self.brain_volume, caching=caching, use_rats_tool=use_rats_tool,
-                terminal_output=terminal_output, environ=environ)
+            if self.brain_volume is None:
+                raise ValueError("'brain_volume' value is needed to perform "
+                                 "rigid-body registration")
             allineated_anat_filename, rigid_transform_file = \
                 _rigid_body_register(unbiased_anat_filename,
-                                     anat_brain_filename,
                                      unbiased_b0_filename,
-                                     b0_brain_filename, self.output_dir,
+                                     self.output_dir, self.brain_volume,
+                                     use_rats_tool=use_rats_tool,
                                      caching=caching,
                                      terminal_output=terminal_output,
                                      environ=environ)
@@ -249,4 +234,3 @@ class DWISession(BaseSession):
         setattr(self, "coreg_dwi_", warped_dwi_filename)
         setattr(self, "coreg_anat_", registered_anat_oblique_filename)
         setattr(self, "coreg_transform_", transform_filename)
-        os.chdir(current_dir)

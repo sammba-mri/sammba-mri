@@ -7,7 +7,7 @@ from sammba.externals.nipype.caching import Memory
 from sammba.externals.nipype.interfaces import afni
 from sammba.externals.nipype.utils.filemanip import fname_presuffix
 from sammba.interfaces import segmentation
-from .utils import fix_obliquity, copy_geometry
+from .utils import fix_obliquity, copy_geometry, _get_output_type
 from .struct import anats_to_template
 from .base import (BaseSession, extract_brain, _rigid_body_register, _warp,
                    _per_slice_qwarp, _transform_to_template)
@@ -91,28 +91,23 @@ class FuncSession(BaseSession):
     anat : str
         Path to anatomical image
 
-    animal_id : str
-        Animal id
-
-    brain_volume : int
+    brain_volume : int, optional
         Volume of the brain used for brain extraction.
-        Typically 400 for mouse and 1800 for rat.
+        Typically 400 for mouse and 1650 for rat.
 
     t_r : float, optional
         Repetition time for the EPI, in seconds.
 
     output_dir : str, optional
         Path to the output directory. If not specified, current directory is
-        used. Final and intermediate images are stored in the subdirectory
-        `animal_id` of the given `output_dir`.
+        used.
     """
 
     def __init__(self, func=None, anat=None, brain_volume=None,
-                 animal_id=None, t_r=None, output_dir=None):
+                 t_r=None, output_dir=None):
         self.func = func
         self.anat = anat
         self.brain_volume = brain_volume
-        self.animal_id = animal_id
         self.t_r = t_r
         self.output_dir = output_dir
 
@@ -125,17 +120,10 @@ class FuncSession(BaseSession):
             raise IOError('anat must be an existing image file,'
                           'you gave {0}'.format(self.anat))
 
-        if self.brain_volume is None:
-            raise ValueError('you must provide the expected brain volume.')
-
-        if not isinstance(self.animal_id, _basestring):
-            raise ValueError('animal_id must be a string, you provided '
-                             '{0}'.format(self.animal_id))
-
     def coregister(self, use_rats_tool=True,
                    slice_timing=True,
                    prior_rigid_body_registration=False,
-                   caching=False, voxel_size_x=.1, voxel_size_y=.1,
+                   voxel_size_x=.1, voxel_size_y=.1, caching=False,
                    verbose=True, **environ_kwargs):
         """
         Coregistration of the subject's functional and anatomical images.
@@ -187,8 +175,6 @@ class FuncSession(BaseSession):
         and has to be cited. For more information, see
         `RATS <http://www.iibi.uiowa.edu/content/rats-overview/>`_
         """
-        func_filename = self.func
-        anat_filename = self.anat
 
         environ = {'AFNI_DECONFLICT': 'OVERWRITE'}
         for (key, value) in environ_kwargs.items():
@@ -204,7 +190,7 @@ class FuncSession(BaseSession):
             tshift = memory.cache(afni.TShift)
             unifize = memory.cache(afni.Unifize)
             catmatvec = memory.cache(afni.CatMatvec)
-            for step in [tshift, unifize]:
+            for step in [tshift, unifize, copy]:
                 step.interface().set_default_terminal_output(terminal_output)
             overwrite = False
         else:
@@ -215,10 +201,7 @@ class FuncSession(BaseSession):
 
         self._check_inputs()
         self._set_output_dir()
-        images_dir = os.path.join(os.path.abspath(self.output_dir),
-                                  self.animal_id)
-        current_dir = os.getcwd()
-        os.chdir(images_dir)
+
         output_files = []
 
         #######################################
@@ -228,11 +211,12 @@ class FuncSession(BaseSession):
             if self.t_r is None:
                 raise ValueError('`t_r` is needed for slice timing correction')
 
-            out_tshift = tshift(in_file=func_filename,
-                                outputtype='NIFTI_GZ',
-                                tpattern='altplus',
-                                tr=str(self.t_r),
-                                environ=environ)
+            out_tshift = tshift(
+                in_file=self.func,
+                out_file=fname_presuffix(self.func, suffix='_tshifted'),
+                tpattern='altplus',
+                tr=str(self.t_r),
+                environ=environ)
             func_filename = out_tshift.outputs.out_file
             output_files.append(func_filename)
 
@@ -245,16 +229,19 @@ class FuncSession(BaseSession):
 
         # Update outputs
         output_files.extend([allineated_filename, mean_aligned_filename])
+
         ###########################################
         # Corret anat and func for intensity bias #
         ###########################################
         # Correct the functional average for intensities bias
-        out_bias_correct = unifize(in_file=mean_aligned_filename,
-                                   outputtype='NIFTI_GZ', environ=environ)
+        out_bias_correct = unifize(
+            in_file=mean_aligned_filename,
+            out_file=fname_presuffix(mean_aligned_filename, suffix='_unifized'),
+            environ=environ)
         unbiased_mean_func_filename = out_bias_correct.outputs.out_file
 
         # Bias correct the antomical image
-        out_unifize = unifize(in_file=anat_filename, outputtype='NIFTI_GZ',
+        out_unifize = unifize(in_file=anat_filename, outputtype=outputtype,
                               environ=environ)
         unbiased_anat_filename = out_unifize.outputs.out_file
 
@@ -266,19 +253,14 @@ class FuncSession(BaseSession):
         # Rigid-body registration anat -> mean func #
         #############################################
         if prior_rigid_body_registration:
-            anat_brain_filename = extract_brain(
-                unbiased_anat_filename, self.output_dir, self.brain_volume,
-                caching=caching, use_rats_tool=use_rats_tool,
-                terminal_output=terminal_output, environ=environ)
-            func_brain_filename = extract_brain(
-                unbiased_mean_func_filename, self.output_dir,
-                self.brain_volume, caching=caching, use_rats_tool=use_rats_tool,
-                terminal_output=terminal_output, environ=environ)
+            if self.brain_volume is None:
+                raise ValueError("'brain_volume' value is needed to perform "
+                                 "rigid-body registration")
             allineated_anat_filename, rigid_transform_file = \
                 _rigid_body_register(unbiased_anat_filename,
-                                     anat_brain_filename,
                                      unbiased_mean_func_filename,
-                                     func_brain_filename, self.output_dir,
+                                     self.output_dir, self.brain_volume,
+                                     use_rats_tool=use_rats_tool,
                                      caching=caching,
                                      terminal_output=terminal_output,
                                      environ=environ)
@@ -325,7 +307,6 @@ class FuncSession(BaseSession):
         setattr(self, "coreg_func_", warped_func_filename)
         setattr(self, "coreg_anat_", registered_anat_oblique_filename)
         setattr(self, "coreg_transform_", transform_filename)
-        os.chdir(current_dir)
 
     def register_to_template(self, head_template_filename,
                              brain_template_filename=None,
@@ -381,9 +362,6 @@ class FuncSession(BaseSession):
         sammba.registration.anats_to_template
         """
         self._check_inputs()
-        images_dir = os.path.join(os.path.abspath(self.output_dir),
-                                  self.animal_id)
-
         if not hasattr(self, 'coreg_func_') or not hasattr(self,
                                                            'coreg_transform_'):
             raise ValueError('Anatomical and functional have not been '
@@ -394,7 +372,7 @@ class FuncSession(BaseSession):
         anats_registration = anats_to_template(
             [self.anat],
             head_template_filename,
-            images_dir,
+            self.output_dir,
             self.brain_volume,
             brain_template_filename=brain_template_filename,
             dilated_head_mask_filename=dilated_head_mask_filename,
@@ -405,7 +383,7 @@ class FuncSession(BaseSession):
         normalized_func_filename = _transform_to_template(
             self.coreg_func_,
             head_template_filename,
-            images_dir,
+            self.output_dir,
             [self.coreg_transform_, anats_registration.pre_transforms[0],
              anats_registration.transforms[0]],
             voxel_size=func_voxel_size, caching=caching, verbose=verbose)

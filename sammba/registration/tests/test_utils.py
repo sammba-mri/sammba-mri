@@ -12,6 +12,13 @@ from sammba.registration import utils
 from sammba import testing_data
 
 
+def test_get_output_type():
+    assert_true(utils._get_output_type('/tmp/func.nii'), 'NIFTI')
+    assert_true(utils._get_output_type('/tmp/func.nii.gz'), 'NIFTI_GZ')
+    assert_raises_regex(ValueError, "Unknown extension",
+                        utils._get_output_type, 'func.img')
+
+
 @with_setup(tst.setup_tmpdata, tst.teardown_tmpdata)
 def test_reset_affines():
     # test qform is replaced by sfrom with default parameters

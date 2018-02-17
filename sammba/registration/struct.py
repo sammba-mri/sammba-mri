@@ -674,7 +674,7 @@ def anats_to_template(anat_filenames, head_template_filename, write_dir,
 
     brain_volume : int
         Volume of the brain used for brain extraction.
-        Typically 400 for mouse and 1800 for rat.
+        Typically 400 for mouse and 1650 for rat.
 
     use_rats_tool : bool, optional
         If True, brain mask is computed using RATS Mathematical Morphology.

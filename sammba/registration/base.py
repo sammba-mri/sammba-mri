@@ -3,7 +3,6 @@ import numpy as np
 import nibabel
 from sklearn.base import _pprint
 from sklearn.utils.fixes import signature
-from nilearn._utils.compat import _basestring
 from ..externals.nipype.caching import Memory
 from ..externals.nipype.interfaces import afni
 from ..externals.nipype.utils.filemanip import fname_presuffix
@@ -84,10 +83,9 @@ def extract_brain(head_file, write_dir, brain_volume, caching=False,
     return out_cacl.outputs.out_file
 
 
-def _rigid_body_register(moving_head_file, moving_brain_file,
-                         reference_head_file, reference_brain_file,
-                         write_dir, caching=False,
-                         terminal_output='allatonce',
+def _rigid_body_register(moving_head_file, reference_head_file,
+                         write_dir, brain_volume, use_rats_tool=True,
+                         caching=False, terminal_output='allatonce',
                          environ={}):
     if caching:
         memory = Memory(write_dir)
@@ -100,6 +98,14 @@ def _rigid_body_register(moving_head_file, moving_brain_file,
         allineate = afni.Allineate(terminal_output=terminal_output).run
         allineate2 = afni.Allineate(terminal_output=terminal_output).run  # TODO: remove after fixed bug
         catmatvec = afni.CatMatvec().run
+
+    moving_brain_file = extract_brain(
+        moving_head_file, write_dir, brain_volume, use_rats_tool=use_rats_tool,
+        caching=caching, terminal_output=terminal_output, environ=environ)
+    reference_brain_file = extract_brain(
+        reference_head_file, write_dir, brain_volume,
+        use_rats_tool=use_rats_tool, caching=caching,
+        environ=environ, terminal_output=terminal_output)
 
     # Compute the transformation from functional to anatomical brain
     # XXX: why in this sense
@@ -160,7 +166,7 @@ def _warp(to_warp_file, reference_file, write_dir, caching=False,
                     oblique_parent=reference_file,
                     interp='quintic',
                     gridset=reference_file,
-                    outputtype='NIFTI_GZ',
+                    out_file=fname_presuffix(to_warp_file, suffix='_warped'),
                     verbose=verbose,
                     environ=environ)
     warped_file = out_warp.outputs.out_file
@@ -188,7 +194,7 @@ def _per_slice_qwarp(to_qwarp_file, reference_file, write_dir,
         warp_apply = memory.cache(afni.NwarpApply)
         qwarp = memory.cache(afni.Qwarp)
         merge = memory.cache(afni.Zcat)
-        for step in [resample, slicer, warp_apply, qwarp, merge]:
+        for step in [resample, slicer, warp_apply, copy, qwarp, merge]:
             step.interface().set_default_terminal_output(terminal_output)
     else:
         resample = afni.Resample(terminal_output=terminal_output).run
@@ -239,20 +245,22 @@ def _per_slice_qwarp(to_qwarp_file, reference_file, write_dir,
     voxel_size_z = reference_img.header.get_zooms()[2]
     resampled_sliced_reference_files = []
     for sliced_reference_file in sliced_reference_files:
-        out_resample = resample(in_file=sliced_reference_file,
-                                voxel_size=(voxel_size_x, voxel_size_y,
-                                            voxel_size_z),
-                                outputtype='NIFTI_GZ',
-                                environ=environ)
+        out_resample = resample(
+            in_file=sliced_reference_file,
+            voxel_size=(voxel_size_x, voxel_size_y, voxel_size_z),
+            out_file=fname_presuffix(sliced_reference_file,
+                                     suffix='_resampled'),
+            environ=environ)
         resampled_sliced_reference_files.append(out_resample.outputs.out_file)
 
     resampled_sliced_to_qwarp_files = []
     for sliced_to_qwarp_file in sliced_to_qwarp_files:
-        out_resample = resample(in_file=sliced_to_qwarp_file,
-                                voxel_size=(voxel_size_x, voxel_size_y,
-                                            voxel_size_z),
-                                outputtype='NIFTI_GZ',
-                                environ=environ)
+        out_resample = resample(
+            in_file=sliced_to_qwarp_file,
+            voxel_size=(voxel_size_x, voxel_size_y, voxel_size_z),
+            out_file=fname_presuffix(sliced_to_qwarp_file,
+                                     suffix='_resampled'),
+            environ=environ)
         resampled_sliced_to_qwarp_files.append(
             out_resample.outputs.out_file)
 
@@ -266,29 +274,37 @@ def _per_slice_qwarp(to_qwarp_file, reference_file, write_dir,
             resampled_sliced_reference_files):
         warped_slice = fname_presuffix(resampled_sliced_to_qwarp_file,
                                        suffix='_qw')
-        out_qwarp = qwarp(in_file=resampled_sliced_to_qwarp_file,
-                          base_file=resampled_sliced_reference_file,
-                          iwarp=True,  # XXX: is this necessary
-                          noneg=True,
-                          blur=[0],
-                          nmi=True,
-                          noXdis=True,
-                          allineate=True,
-                          allineate_opts='-parfix 1 0 -parfix 2 0 -parfix 3 0 '
-                                         '-parfix 4 0 -parfix 5 0 -parfix 6 0 '
-                                         '-parfix 7 0 -parfix 9 0 '
-                                         '-parfix 10 0 -parfix 12 0',
-                          out_file=warped_slice,
-                          environ=environ)
-        warped_slices.append(out_qwarp.outputs.warped_source)
-        warp_files.append(out_qwarp.outputs.source_warp)
-        output_files.append(out_qwarp.outputs.base_warp)
-        # There are files geenrated by the allineate option
-        output_files.extend([
-            fname_presuffix(out_qwarp.outputs.warped_source,
-                            suffix='_Allin.nii', use_ext=False),
-            fname_presuffix(out_qwarp.outputs.warped_source,
-                            suffix='_Allin.aff12.1D', use_ext=False)])
+        to_qwarp_data = nibabel.load(resampled_sliced_to_qwarp_file).get_data()
+        ref_data = nibabel.load(resampled_sliced_reference_file).get_data()
+
+        if to_qwarp_data.max() == 0 or ref_data.max() == 0:
+            # deal with slices where there is no signal
+            warped_slices.append(resampled_sliced_to_qwarp_file)
+        else:
+            out_qwarp = qwarp(
+                in_file=resampled_sliced_to_qwarp_file,
+                base_file=resampled_sliced_reference_file,
+                iwarp=True,  # XXX: is this necessary
+                noneg=True,
+                blur=[0],
+                nmi=True,
+                noXdis=True,
+                allineate=True,
+                allineate_opts='-parfix 1 0 -parfix 2 0 -parfix 3 0 '
+                               '-parfix 4 0 -parfix 5 0 -parfix 6 0 '
+                               '-parfix 7 0 -parfix 9 0 '
+                               '-parfix 10 0 -parfix 12 0',
+                out_file=warped_slice,
+                environ=environ)
+            warped_slices.append(out_qwarp.outputs.warped_source)
+            warp_files.append(out_qwarp.outputs.source_warp)
+            output_files.append(out_qwarp.outputs.base_warp)
+            # There are files geenrated by the allineate option
+            output_files.extend([
+                fname_presuffix(out_qwarp.outputs.warped_source,
+                                suffix='_Allin.nii', use_ext=False),
+                fname_presuffix(out_qwarp.outputs.warped_source,
+                                suffix='_Allin.aff12.1D', use_ext=False)])
 
     # Resample the mean volume back to the initial resolution,
     voxel_size = nibabel.load(to_qwarp_file).header.get_zooms()
@@ -462,23 +478,6 @@ def _transform_to_template(to_register_filename, template_filename, write_dir,
 class BaseSession(object):
     """
     Base class for all sessions.
-
-    Parameters
-    ----------
-    anat : str
-        Path to anatomical image
-
-    animal_id : str
-        Animal id
-
-    brain_volume : int
-        Volume of the brain used for brain extraction.
-        Typically 400 for mouse and 1800 for rat.
-
-    output_dir : str, optional
-        Path to the output directory. If not specified, current directory is
-        used. Final and intermediate images are stored in the subdirectory
-        `animal_id` of the given `output_dir`.
     """
     @classmethod
     def _get_param_names(cls):
