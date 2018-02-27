@@ -320,8 +320,13 @@ def anats_to_common(anat_filenames, write_dir, brain_volume,
     out_undump = undump(in_file=out_tstat.outputs.out_file,
                         out_file=os.path.join(write_dir, 'undump.nii.gz'),
                         outputtype='NIFTI_GZ')
-    out_refit = refit(in_file=out_undump.outputs.out_file,
-                      xorigin='cen', yorigin='cen', zorigin='cen')
+    import subprocess
+    subprocess.check_output(['3drefit', '-xorigin', 'cen', '-yorigin', 'cen',
+                             '-zorigin', 'cen', out_undump.outputs.out_file])
+    # FOR SOME WEIRD REASON THE BELOW CODE DOES NOT WORK, HENCE THE USE OF
+    # SUBPROCESS ABOVE    
+    # out_refit = refit(in_file=out_undump.outputs.out_file,
+                      # xorigin='cen', yorigin='cen', zorigin='cen')
 
     # shift brains to place their new centers at the same central position. 
     # make a quality check video and mean
