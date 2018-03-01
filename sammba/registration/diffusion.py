@@ -1,11 +1,189 @@
 import os
 import numpy as np
+from nipype.workflows.data import get_flirt_schedule
 from ..externals.nipype.caching import Memory
 from ..externals.nipype.interfaces import afni
 from ..externals.nipype.utils.filemanip import fname_presuffix
-from .utils import _get_output_type
-from .base import (BaseSession, extract_brain, _rigid_body_register, _warp,
-                   _per_slice_qwarp)
+from .base import (BaseSession, _delete_orientation, _rigid_body_register,
+                   _warp, _per_slice_qwarp)
+from nipype.workflows.dmri.fsl.utils import (b0_indices, time_avg, apply_all_corrections, b0_average,
+                    hmc_split, dwi_flirt, eddy_rotate_bvecs, rotate_bvecs,
+                    insert_mat, extract_bval, recompose_dwi, recompose_xfm,
+                    siemens2rads, rads2radsec, demean_image,
+                    cleanup_edge_pipeline, add_empty_vol, vsm2warp,
+                    compute_readout, _checkinitxfm)
+
+from nipype.interfaces import fsl, ants
+
+def _to_float(in_file, out_file=None):
+    import os
+    import nibabel
+    import numpy as np
+
+    if out_file is None:
+        fname, ext = os.path.splitext(os.path.basename(in_file))
+        if ext == ".gz":
+            fname, ext2 = os.path.splitext(fname)
+            ext = ext2 + ext
+        out_file = os.path.abspath("%s_float%s" % (fname, ext))
+
+    img = nibabel.load(in_file)
+    data = img.get_data().astype(np.float)
+    float_img = nibabel.Nifti1Image(data, img.affine, img.header)
+    float_img.to_filename(out_file)
+    return out_file
+
+
+def _dwi_flirt(reference, in_file, ref_mask, in_bval, in_xfms=None,
+               excl_nodiff=False, flirt_param={}):
+
+    bias_correct = ants.N4BiasFieldCorrection().run
+    out_bias_correct = bias_correct(input_image=reference,
+                                    mask_image=ref_mask,
+                                    dimension=3)
+
+    apply_mask = fsl.maths.ApplyMask().run
+    out_apply_mask_b0 = apply_mask(in_file=out_bias_correct.outputs.output_image,
+                                   mask_file=ref_mask)
+
+    dilate = fsl.maths.MathsCommand().run
+    out_dilate = dilate(in_file=ref_mask,
+                        nan2zeros=True,
+                        args='-kernel sphere 5 -dilM')
+
+    init_xfms = _checkinitxfm(in_bval, excl_nodiff, in_xfms=in_xfms)
+
+
+    split = fsl.Split().run
+    out_split = split(in_file=in_file, dimension='t')
+    preproc_files = []
+    matrix_files = []
+    for splitted_file, init_xfm in zip(out_split.outputs.out_files, init_xfms):
+        apply_mask = fsl.ApplyMask().run
+        out_apply_mask_dwi = apply_mask(in_file=in_file,
+                                        mask_file=out_dilate.outputs.out_file)
+
+        flirt = fsl.FLIRT(**flirt_param).run
+        out_flirt = flirt(in_weight=out_dilate.outputs.out_file,
+                          ref_weight=out_dilate.outputs.out_file,
+                          reference=out_apply_mask_b0.outputs.out_file,
+                          in_file=out_apply_mask_dwi.outputs.out_file,
+                          in_matrix_file=init_xfm)
+        threshold = fsl.Threshold().run
+        matrix_files.append(out_flirt.outputs.out_matrix_file)
+        out_threshold = threshold(in_file=out_flirt.outputs.out_file,
+                                  thresh=0.0)
+        preproc_files.append(out_threshold.outputs.out_file)
+
+    merge = fsl.Merge(dimension='t').run
+    out_merge = merge(in_files=preproc_files)
+    out_merge.outputs.merged_files
+    return wf
+
+
+def _correct_head_motion(dwi_file, bvecs_file, bvals_file, brain_mask_file,
+                         reference_frame=0):
+    """
+    Correct for head motion artifacts in dMRI sequences.
+    It takes a series of diffusion weighted images and rigidly co-registers
+    them to one reference image. Finally, the `b`-matrix is rotated accordingly
+    [Leemans09]_ making use of the rotation matrix obtained by FLIRT.
+
+    Search angles have been limited to 4 degrees, based on results in
+    [Yendiki13]_.
+
+    A list of rigid transformation matrices is provided, so that transforms
+    can be chained.
+    This is useful to correct for artifacts with only one interpolation process
+    (as previously discussed `here
+    <https://github.com/nipy/nipype/pull/530#issuecomment-14505042>`_),
+    and also to compute nuisance regressors as proposed by [Yendiki13]_.
+
+    .. warning:: This workflow rotates the `b`-vectors, so please be advised
+      that not all the dicom converters ensure the consistency between the
+      resulting nifti orientation and the gradients table (e.g. dcm2nii
+      checks it).
+
+    .. admonition:: References
+
+      .. [Leemans09] Leemans A, and Jones DK, `The B-matrix must be rotated
+        when correcting for subject motion in DTI data
+        <http://dx.doi.org/10.1002/mrm.21890>`_,
+        Magn Reson Med. 61(6):1336-49. 2009. doi: 10.1002/mrm.21890.
+
+      .. [Yendiki13] Yendiki A et al., `Spurious group differences due to head
+        motion in a diffusion MRI study
+        <http://dx.doi.org/10.1016/j.neuroimage.2013.11.027>`_.
+        Neuroimage. 21(88C):79-90. 2013. doi: 10.1016/j.neuroimage.2013.11.027
+
+    Inputs::
+
+        inputnode.in_file - input dwi file
+        inputnode.in_mask - weights mask of reference image (a file with data \
+range in [0.0, 1.0], indicating the weight of each voxel when computing the \
+metric.
+        inputnode.in_bval - b-values file
+        inputnode.in_bvec - gradients file (b-vectors)
+        inputnode.ref_num (optional, default=0) index of the b0 volume that \
+should be taken as reference
+
+    Outputs::
+
+        outputnode.out_file - corrected dwi file
+        outputnode.out_bvec - rotated gradient vectors table
+        outputnode.out_xfms - list of transformation matrices
+
+    """
+
+    params = dict(dof=6, 
+#                  bgvalue=0,  # commented by salma, doesn't work for fsl<5 
+                  save_log=True, no_search=True,
+                  # cost='mutualinfo', cost_func='mutualinfo', bins=64,
+                  schedule=get_flirt_schedule('hmc'))
+
+    [out_ref, out_mov, out_bval, volid] = hmc_split(in_file=dwi_file, in_bval=bvals_file, ref_num=reference_frame)
+
+    out_files, out_matrices =  _dwi_flirt(out_ref, out_mov, brain_mask_file, in_bval, in_xfms=None,
+               excl_nodiff=False, flirt_param=params)
+
+    all_matrices = insert_mat(inlist=out_matrices, volid=volid)
+    rotated_bvecs = rotate_bvecs()
+    inputnode = pe.Node(niu.IdentityInterface(
+        fields=['in_file', 'ref_num', 'in_bvec', 'in_bval', 'in_mask']),
+        name='inputnode')
+    split = pe.Node(niu.Function(
+        output_names=['out_ref', 'out_mov', 'out_bval', 'volid'],
+        input_names=['in_file', 'in_bval', 'ref_num'], function=hmc_split),
+        name='SplitDWI')
+    flirt = dwi_flirt(flirt_param=params)
+    insmat = pe.Node(niu.Function(input_names=['inlist', 'volid'],
+                                  output_names=['out'], function=insert_mat),
+                     name='InsertRefmat')
+    rot_bvec = pe.Node(niu.Function(
+        function=rotate_bvecs, input_names=['in_bvec', 'in_matrix'],
+        output_names=['out_file']), name='Rotate_Bvec')
+    outputnode = pe.Node(niu.IdentityInterface(
+        fields=['out_file', 'out_bvec', 'out_xfms']), name='outputnode')
+
+    wf = pe.Workflow(name=name)
+    wf.connect([
+        (inputnode, split, [('in_file', 'in_file'),
+                            ('in_bval', 'in_bval'),
+                            ('ref_num', 'ref_num')]),
+        (inputnode, flirt, [('in_mask', 'inputnode.ref_mask')]),
+        (split, flirt, [('out_ref', 'inputnode.reference'),
+                        ('out_mov', 'inputnode.in_file'),
+                        ('out_bval', 'inputnode.in_bval')]),
+        (flirt, insmat, [('outputnode.out_xfms', 'inlist')]),
+        (split, insmat, [('volid', 'volid')]),
+        (inputnode, rot_bvec, [('in_bvec', 'in_bvec')]),
+        (insmat, rot_bvec, [('out', 'in_matrix')]),
+        (rot_bvec, outputnode, [('out_file', 'out_bvec')]),
+        (flirt, outputnode, [('outputnode.out_file', 'out_file')]),
+        (insmat, outputnode, [('out', 'out_xfms')])
+    ])
+    return wf
+
 
 
 class DWISession(BaseSession):
@@ -50,7 +228,8 @@ class DWISession(BaseSession):
             raise IOError('anat must be an existing image file,'
                           'you gave {0}'.format(self.anat))
 
-    def coregister(self, use_rats_tool=True, max_b=10.,
+    def coregister(self, delete_orientation=False, use_rats_tool=True,
+                   max_b=10.,
                    prior_rigid_body_registration=False,
                    caching=False, voxel_size_x=.1, voxel_size_y=.1,
                    verbose=True, **environ_kwargs):
@@ -64,6 +243,11 @@ class DWISession(BaseSession):
 
         Parameters
         ----------
+        delete_orientation : bool, optional
+            If True, set maximal resolution to .1 for anat image and .2 for DW
+            image (while keeping the same proportions) and set origin to zero.
+            Useful if orientation meta-data in headers is corrupted.
+
         use_rats_tool : bool, optional
             If True, brain mask is computed using RATS Mathematical Morphology.
             Otherwise, a histogram-based brain segmentation is used.
@@ -90,7 +274,8 @@ class DWISession(BaseSession):
             verbosity in any case.
 
         environ_kwargs : extra arguments keywords
-            Extra arguments keywords, passed to interfaces environ variable.
+            Extra arguments keywords, passed to all interfaces environ
+            variable.
 
         Returns
         -------
@@ -108,8 +293,8 @@ class DWISession(BaseSession):
         and has to be cited. For more information, see
         `RATS <http://www.iibi.uiowa.edu/content/rats-overview/>`_
         """
-        dwi_filename = self.dwi
-        anat_filename = self.anat
+        self._check_inputs()
+        self._set_output_dir()
 
         environ = {'AFNI_DECONFLICT': 'OVERWRITE'}
         for (key, value) in environ_kwargs.items():
@@ -126,7 +311,7 @@ class DWISession(BaseSession):
             tstat = memory.cache(afni.TStat)
             unifize = memory.cache(afni.Unifize)
             catmatvec = memory.cache(afni.CatMatvec)
-            for step in [copy, tcat_subbrick, tstat, unifize]:
+            for step in [tstat, tcat_subbrick, unifize]:
                 step.interface().set_default_terminal_output(terminal_output)
             overwrite = False
         else:
@@ -136,9 +321,22 @@ class DWISession(BaseSession):
             catmatvec = afni.CatMatvec().run
             overwrite = True
 
-        self._check_inputs()
-        self._set_output_dir()
         output_files = []
+
+        if delete_orientation:
+            dwi_filename = _delete_orientation(self.dwi,
+                                               write_dir=self.output_dir,
+                                               min_zoom=.2,
+                                               caching=caching,
+                                               verbose=verbose)
+            anat_filename = _delete_orientation(self.anat,
+                                                write_dir=self.output_dir,
+                                                min_zoom=.1,
+                                                caching=caching,
+                                                verbose=verbose)
+        else:
+            dwi_filename = self.dwi
+            anat_filename = self.anat
 
         ####################
         # Average B0 volumes
@@ -146,17 +344,20 @@ class DWISession(BaseSession):
         b_values = np.loadtxt(self.bvals)
         b0_frames = np.argwhere(b_values <= max_b).flatten().tolist()
         out_tcat_subbrick = tcat_subbrick(
-            in_files=[(self.dwi, "'{}'".format(b0_frames))],
-            out_file=fname_presuffix(self.dwi, suffix='_b0s'),
+            in_files=[(dwi_filename, "'{}'".format(b0_frames))],
+            out_file=fname_presuffix(dwi_filename, suffix='_b0s',
+                                     newpath=self.output_dir),
             environ=environ)
         out_tstat = tstat(
             in_file=out_tcat_subbrick.outputs.out_file,
-            out_file=fname_presuffix(self.dwi, suffix='_b0s_mean'))
+            out_file=fname_presuffix(dwi_filename, suffix='_b0s_mean',
+                                     newpath=self.output_dir))
         b0_filename = out_tstat.outputs.out_file
+        output_files.extend([out_tcat_subbrick.outputs.out_file, b0_filename])
 
-        ##########################################
-        # Corret anat and DWI for intensity bias #
-        ##########################################
+        ###########################################
+        # Correct anat and DWI for intensity bias #
+        ###########################################
         # Correct the B0 average for intensities bias
         out_bias_correct = unifize(
             in_file=b0_filename,
@@ -166,8 +367,9 @@ class DWISession(BaseSession):
 
         # Bias correct the antomical image
         out_unifize = unifize(
-            in_file=self.anat,
-            out_file=fname_presuffix(self.anat, suffix='_unifized'),
+            in_file=anat_filename,
+            out_file=fname_presuffix(anat_filename, suffix='_unifized',
+                                     newpath=self.output_dir),
             environ=environ)
         unbiased_anat_filename = out_unifize.outputs.out_file
 
@@ -185,9 +387,9 @@ class DWISession(BaseSession):
             allineated_anat_filename, rigid_transform_file = \
                 _rigid_body_register(unbiased_anat_filename,
                                      unbiased_b0_filename,
-                                     self.output_dir, self.brain_volume,
+                                     self.brain_volume,
                                      use_rats_tool=use_rats_tool,
-                                     caching=caching,
+                                     caching=caching, verbose=verbose,
                                      terminal_output=terminal_output,
                                      environ=environ)
             output_files.extend([rigid_transform_file,
@@ -200,18 +402,19 @@ class DWISession(BaseSession):
         ##########################################
         registered_anat_oblique_filename, mat_filename, warp_output_files =\
             _warp(allineated_anat_filename, unbiased_b0_filename,
-                  self.output_dir, caching=caching,
+                  caching=caching,
                   terminal_output=terminal_output, overwrite=overwrite,
+                  verbose=verbose,
                   environ=environ)
 
-        # Concatenate all the anat to mean B0 tranforms
-        output_files.extend(warp_output_files)
+        # Save the anat to mean B0 tranform
         transform_filename = fname_presuffix(registered_anat_oblique_filename,
                                              suffix='_anat_to_b0.aff12.1D',
                                              use_ext=False)
         _ = catmatvec(in_file=[(mat_filename, 'ONELINE')],
                       oneline=True,
                       out_file=transform_filename)
+        output_files.extend(warp_output_files)
 
         #####################################################
         # Per-slice non-linear registration mean B0 -> anat #
@@ -219,18 +422,21 @@ class DWISession(BaseSession):
         warped_b0_filename, warp_filenames, warped_dwi_filename =\
             _per_slice_qwarp(unbiased_b0_filename,
                              registered_anat_oblique_filename,
-                             self.output_dir, voxel_size_x, voxel_size_y,
+                             voxel_size_x, voxel_size_y,
                              apply_to_file=dwi_filename,
-                             overwrite=overwrite,
+                             write_dir=self.output_dir,
+                             overwrite=overwrite, verbose=verbose,
                              caching=caching, terminal_output=terminal_output,
                              environ=environ)
-        # Update the outputs
         output_files.append(warped_b0_filename)
+
         if not caching:
             for out_file in output_files:
                 os.remove(out_file)
 
-        # Update the diffusion data
-        setattr(self, "coreg_dwi_", warped_dwi_filename)
-        setattr(self, "coreg_anat_", registered_anat_oblique_filename)
-        setattr(self, "coreg_transform_", transform_filename)
+        # Update the diffusion session
+        self.coreg_dwi_ = warped_dwi_filename
+        self.coreg_anat_ = registered_anat_oblique_filename
+        self.coreg_transform_ = transform_filename
+
+        return self

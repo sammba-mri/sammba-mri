@@ -10,15 +10,12 @@ from ..interfaces import segmentation
 from .utils import fix_obliquity
 
 
-def extract_brain(head_file, write_dir, brain_volume, caching=False,
+def extract_brain(head_file, brain_volume, caching=False,
                   terminal_output='allatonce', environ={},
                   use_rats_tool=True):
     """
     Parameters
     ----------
-    write_dir : str
-        Directory to save the output and temporary images.
-
     brain_volume : int
         Volume of the brain used for brain extraction.
         Typically 400 for mouse and 1800 for rat.
@@ -52,7 +49,7 @@ def extract_brain(head_file, write_dir, brain_volume, caching=False,
         ComputeMask = segmentation.HistogramMask
 
     if caching:
-        memory = Memory(write_dir)
+        memory = Memory(os.path.dirname(head_file))
         clip_level = memory.cache(afni.ClipLevel)
         compute_mask = memory.cache(ComputeMask)
         calc = memory.cache(afni.Calc)
@@ -69,8 +66,7 @@ def extract_brain(head_file, write_dir, brain_volume, caching=False,
         volume_threshold=brain_volume,
         intensity_threshold=int(out_clip_level.outputs.clip_val))
 
-    masked_file = fname_presuffix(head_file, suffix='_brain',
-                                  newpath=write_dir)
+    masked_file = fname_presuffix(head_file, suffix='_brain')
     out_cacl = calc(in_file_a=head_file,
                     in_file_b=out_compute_mask.outputs.out_file,
                     expr='a*b',
@@ -83,10 +79,47 @@ def extract_brain(head_file, write_dir, brain_volume, caching=False,
     return out_cacl.outputs.out_file
 
 
+def _delete_orientation(in_file, write_dir, min_zoom=.1, caching=False,
+                        verbose=True):
+    if verbose:
+        terminal_output = 'stream'
+    else:
+        terminal_output = 'none'
+
+    if caching:
+        memory = Memory(write_dir)
+        copy = memory.cache(afni.Copy)
+        refit = memory.cache(afni.Refit)
+        center_mass = memory.cache(afni.CenterMass)
+        for step in [copy, refit]:
+            step.interface().set_default_terminal_output(terminal_output)
+    else:
+        copy = afni.Copy(terminal_output=terminal_output).run
+        refit = afni.Refit(terminal_output=terminal_output).run
+        center_mass = afni.CenterMass().run
+
+    out_copy = copy(in_file=in_file,
+                    out_file=fname_presuffix(in_file, newpath=write_dir))
+
+    zooms = nibabel.load(in_file).header.get_zooms()[:3]
+    out_refit = refit(in_file=out_copy.outputs.out_file,
+                      xyzscale=min_zoom / min(zooms))
+    out_center_mass = center_mass(in_file=out_refit.outputs.out_file,
+                                  cm_file=fname_presuffix(in_file,
+                                                          suffix='.txt',
+                                                          use_ext=False,
+                                                          newpath=write_dir),
+                                  set_cm=(0, 0, 0))
+    return out_center_mass.outputs.out_file
+
+
 def _rigid_body_register(moving_head_file, reference_head_file,
-                         write_dir, brain_volume, use_rats_tool=True,
+                         brain_volume, use_rats_tool=True, write_dir=None,
                          caching=False, terminal_output='allatonce',
                          environ={}):
+    if write_dir is None:
+        write_dir = os.path.dirname(moving_head_file)
+
     if caching:
         memory = Memory(write_dir)
         allineate = memory.cache(afni.Allineate)
@@ -100,10 +133,10 @@ def _rigid_body_register(moving_head_file, reference_head_file,
         catmatvec = afni.CatMatvec().run
 
     moving_brain_file = extract_brain(
-        moving_head_file, write_dir, brain_volume, use_rats_tool=use_rats_tool,
+        moving_head_file, brain_volume, use_rats_tool=use_rats_tool,
         caching=caching, terminal_output=terminal_output, environ=environ)
     reference_brain_file = extract_brain(
-        reference_head_file, write_dir, brain_volume,
+        reference_head_file, brain_volume,
         use_rats_tool=use_rats_tool, caching=caching,
         environ=environ, terminal_output=terminal_output)
 
@@ -115,18 +148,17 @@ def _rigid_body_register(moving_head_file, reference_head_file,
         out_matrix=fname_presuffix(reference_brain_file,
                                    suffix='_shr.aff12.1D',
                                    use_ext=False,
-                                   newpath=write_dir),
+                                   new_path=write_dir),
         center_of_mass='',
         warp_type='shift_rotate',
-        out_file=fname_presuffix(reference_brain_file,
-                                 suffix='_shr', newpath=write_dir),
+        out_file=fname_presuffix(reference_brain_file, suffix='_shr'),
         environ=environ)
     rigid_transform_file = out_allineate.outputs.out_matrix
     output_files = [out_allineate.outputs.out_file]
 
     # apply the inverse transform to register the anatomical to the func
-    catmatvec_out_file = fname_presuffix(rigid_transform_file,
-                                         suffix='INV')
+    catmatvec_out_file = fname_presuffix(rigid_transform_file, suffix='INV',
+                                         new_path=write_dir)
     if not os.path.isfile(catmatvec_out_file):
         _ = catmatvec(in_file=[(rigid_transform_file, 'I')],
                       oneline=True,
@@ -137,8 +169,8 @@ def _rigid_body_register(moving_head_file, reference_head_file,
         in_file=moving_head_file,
         master=reference_head_file,
         in_matrix=catmatvec_out_file,
-        out_file=fname_presuffix(moving_head_file,
-                                 suffix='_shr', newpath=write_dir),
+        out_file=fname_presuffix(moving_head_file, suffix='_shr',
+                                 new_path=write_dir),
         environ=environ)
 
     # Remove intermediate output
@@ -149,13 +181,12 @@ def _rigid_body_register(moving_head_file, reference_head_file,
     return out_allineate_apply.outputs.out_file, rigid_transform_file
 
 
-def _warp(to_warp_file, reference_file, write_dir, caching=False,
+def _warp(to_warp_file, reference_file, caching=False,
           terminal_output='allatonce', environ={}, verbose=True,
           overwrite=True):
     if caching:
-        memory = Memory(write_dir)
+        memory = Memory(os.path.dirname(to_warp_file))
         warp = memory.cache(afni.Warp)
-        warp.interface().set_default_terminal_output(terminal_output)
     else:
         warp = afni.Warp().run
 
@@ -167,7 +198,7 @@ def _warp(to_warp_file, reference_file, write_dir, caching=False,
                     interp='quintic',
                     gridset=reference_file,
                     out_file=fname_presuffix(to_warp_file, suffix='_warped'),
-                    verbose=verbose,
+                    verbose=True,
                     environ=environ)
     warped_file = out_warp.outputs.out_file
     warped_oblique_file = fix_obliquity(
@@ -183,10 +214,14 @@ def _warp(to_warp_file, reference_file, write_dir, caching=False,
     return warped_oblique_file, mat_file, output_files
 
 
-def _per_slice_qwarp(to_qwarp_file, reference_file, write_dir,
+def _per_slice_qwarp(to_qwarp_file, reference_file,
                      voxel_size_x, voxel_size_y, apply_to_file=None,
+                     write_dir=None,
                      caching=False, overwrite=True,
                      verbose=True, terminal_output='allatonce', environ={}):
+    if write_dir is None:
+        write_dir = os.path.dirname(to_qwarp_file),
+
     if caching:
         memory = Memory(write_dir)
         resample = memory.cache(afni.Resample)
@@ -194,7 +229,7 @@ def _per_slice_qwarp(to_qwarp_file, reference_file, write_dir,
         warp_apply = memory.cache(afni.NwarpApply)
         qwarp = memory.cache(afni.Qwarp)
         merge = memory.cache(afni.Zcat)
-        for step in [resample, slicer, warp_apply, copy, qwarp, merge]:
+        for step in [resample, slicer, warp_apply, qwarp, merge]:
             step.interface().set_default_terminal_output(terminal_output)
     else:
         resample = afni.Resample(terminal_output=terminal_output).run
@@ -206,14 +241,16 @@ def _per_slice_qwarp(to_qwarp_file, reference_file, write_dir,
     # Slice anatomical image
     reference_img = nibabel.load(reference_file)
     reference_n_slices = reference_img.header.get_data_shape()[2]
+    per_slice_dir = os.path.join(write_dir, 'per_slice')
+    if not os.path.isdir(per_slice_dir):
+        os.makedirs(per_slice_dir)
     sliced_reference_files = []
     for slice_n in range(reference_n_slices):
         out_slicer = slicer(in_file=reference_file,
                             keep='{0} {0}'.format(slice_n),
                             out_file=fname_presuffix(
-                                reference_file,
-                                suffix='_sl%d' % slice_n,
-                                newpath=write_dir),
+                                reference_file, newpath=per_slice_dir,
+                                suffix='_sl%d' % slice_n),
                             environ=environ)
         _ = fix_obliquity(out_slicer.outputs.out_file,
                           reference_file,
@@ -228,9 +265,8 @@ def _per_slice_qwarp(to_qwarp_file, reference_file, write_dir,
         out_slicer = slicer(in_file=to_qwarp_file,
                             keep='{0} {0}'.format(slice_n),
                             out_file=fname_presuffix(
-                                to_qwarp_file,
-                                suffix='_sl%d' % slice_n,
-                                newpath=write_dir),
+                                to_qwarp_file, newpath=per_slice_dir,
+                                suffix='_sl%d' % slice_n),
                             environ=environ)
         _ = fix_obliquity(out_slicer.outputs.out_file,
                           to_qwarp_file,
@@ -273,18 +309,18 @@ def _per_slice_qwarp(to_qwarp_file, reference_file, write_dir,
             resampled_sliced_to_qwarp_files,
             resampled_sliced_reference_files):
         warped_slice = fname_presuffix(resampled_sliced_to_qwarp_file,
-                                       suffix='_qw')
+                                       suffix='_qwarped')
         to_qwarp_data = nibabel.load(resampled_sliced_to_qwarp_file).get_data()
         ref_data = nibabel.load(resampled_sliced_reference_file).get_data()
 
         if to_qwarp_data.max() == 0 or ref_data.max() == 0:
             # deal with slices where there is no signal
             warped_slices.append(resampled_sliced_to_qwarp_file)
+            warp_files.append(None)
         else:
             out_qwarp = qwarp(
                 in_file=resampled_sliced_to_qwarp_file,
                 base_file=resampled_sliced_reference_file,
-                iwarp=True,  # XXX: is this necessary
                 noneg=True,
                 blur=[0],
                 nmi=True,
@@ -298,7 +334,6 @@ def _per_slice_qwarp(to_qwarp_file, reference_file, write_dir,
                 environ=environ)
             warped_slices.append(out_qwarp.outputs.warped_source)
             warp_files.append(out_qwarp.outputs.source_warp)
-            output_files.append(out_qwarp.outputs.base_warp)
             # There are files geenrated by the allineate option
             output_files.extend([
                 fname_presuffix(out_qwarp.outputs.warped_source,
@@ -312,7 +347,8 @@ def _per_slice_qwarp(to_qwarp_file, reference_file, write_dir,
     for warped_slice in warped_slices:
         out_resample = resample(in_file=warped_slice,
                                 voxel_size=voxel_size,
-                                outputtype='NIFTI_GZ',
+                                out_file=fname_presuffix(warped_slice,
+                                                         suffix='_resampled'),
                                 environ=environ)
         resampled_warped_slices.append(out_resample.outputs.out_file)
 
@@ -325,7 +361,7 @@ def _per_slice_qwarp(to_qwarp_file, reference_file, write_dir,
 
     out_merge_func = merge(
         in_files=resampled_warped_slices,
-        out_file=resampled_warped_slices[0].replace('_sl0', '_perslice'),
+        out_file=fname_presuffix(to_qwarp_file, suffix='_perslice'),
         environ=environ)
 
     # Fix the obliquity
@@ -347,9 +383,8 @@ def _per_slice_qwarp(to_qwarp_file, reference_file, write_dir,
             out_slicer = slicer(in_file=apply_to_file,
                                 keep='{0} {0}'.format(slice_n),
                                 out_file=fname_presuffix(
-                                    apply_to_file,
-                                    suffix='_sl%d' % slice_n,
-                                    newpath=write_dir),
+                                    apply_to_file, newpath=per_slice_dir,
+                                    suffix='_sl%d' % slice_n),
                                 environ=environ)
             _ = fix_obliquity(out_slicer.outputs.out_file,
                               apply_to_file,
@@ -359,14 +394,17 @@ def _per_slice_qwarp(to_qwarp_file, reference_file, write_dir,
         warped_apply_to_slices = []
         for (sliced_apply_to_file, warp_file) in zip(
                 sliced_apply_to_files, warp_files):
-            out_warp_apply = warp_apply(in_file=sliced_apply_to_file,
-                                        master=sliced_apply_to_file,
-                                        warp=warp_file,
-                                        out_file=fname_presuffix(
-                                            sliced_apply_to_file,
-                                            suffix='_qw'),
-                                        environ=environ)
-            warped_apply_to_slices.append(out_warp_apply.outputs.out_file)
+            if warp_file is None:
+                warped_apply_to_slices.append(sliced_apply_to_file)
+            else:
+                out_warp_apply = warp_apply(in_file=sliced_apply_to_file,
+                                            master=sliced_apply_to_file,
+                                            warp=warp_file,
+                                            out_file=fname_presuffix(
+                                                    sliced_apply_to_file,
+                                                    suffix='_qwarped'),
+                                            environ=environ)
+                warped_apply_to_slices.append(out_warp_apply.outputs.out_file)
 
         # Fix the obliquity
         for (sliced_apply_to_file, warped_apply_to_slice) in zip(
@@ -377,7 +415,8 @@ def _per_slice_qwarp(to_qwarp_file, reference_file, write_dir,
         # Finally, merge all slices !
         out_merge_apply_to = merge(
             in_files=warped_apply_to_slices,
-            out_file=warped_apply_to_slices[0].replace('_sl0', '_perslice'),
+            out_file=fname_presuffix(apply_to_file, suffix='_perslice',
+                                     newpath=write_dir),
             environ=environ)
 
         # Fix the obliquity
@@ -392,7 +431,7 @@ def _per_slice_qwarp(to_qwarp_file, reference_file, write_dir,
         merged_apply_to_file = None
 
     if not caching:
-        for out_file in output_files:
+        for out_file in np.unique(output_files):
             os.remove(out_file)
 
     return (out_merge_func.outputs.out_file, warp_files,
@@ -506,7 +545,7 @@ class BaseSession(object):
         # Extract and sort argument names excluding 'self'
         return sorted([p.name for p in parameters])
 
-    def get_params(self):
+    def _get_params(self):
         """Get parameters of the session.
 
         Returns
@@ -520,13 +559,13 @@ class BaseSession(object):
             out[key] = value
         return out
 
-    def _set_items(self, **kwargs):
+    def _set_params(self, **kwargs):
         for k, v in kwargs.items():
             setattr(self, k, v)
 
     def __repr__(self):
         class_name = self.__class__.__name__
-        return '%s(%s)' % (class_name, _pprint(self.get_params(),
+        return '%s(%s)' % (class_name, _pprint(self._get_params(),
                            offset=len(class_name),),)
 
     def _set_output_dir(self):

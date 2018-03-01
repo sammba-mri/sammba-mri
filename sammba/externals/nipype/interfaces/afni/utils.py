@@ -2115,8 +2115,7 @@ class TCatSBInputSpec(AFNICommandInputSpec):
              'so the contents are protected from the command line interpreter.',
         argstr='%s%s ...',
         position=-1,
-        mandatory=True,
-        copyfile=False)
+        mandatory=True)
     out_file = File(
         desc='output image file name',
         argstr='-prefix %s',
@@ -2163,12 +2162,14 @@ class TCatSubBrick(AFNICommand):
             outputs['out_file'] = op.abspath(self.inputs.out_file)
         else:
             outputs['out_file'] = op.abspath(
-                self._gen_fname(self.inputs.in_files[0][0], suffix='_tcat'))
+                self._gen_fname(self.inputs.in_files[0][0],
+                                suffix='_tcat'))
         return outputs
 
     def _gen_filename(self, name):
         if name == 'out_file':
-            return self._gen_fname(self.inputs.in_files[0][0], suffix='_tcat')
+            return self._gen_fname(self.inputs.in_files[0][0],
+                                   suffix='_tcat')
 
 
 class TStatInputSpec(AFNICommandInputSpec):
