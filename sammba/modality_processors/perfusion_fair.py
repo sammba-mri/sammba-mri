@@ -10,28 +10,55 @@ import pandas as pd
 import nibabel as nib
 import numpy as np
 from scipy.optimize import least_squares as ls
-from multiprocessing import Pool
+from multiprocessing import cpu_count, Pool
 from functools import partial
 import tqdm
 
 
-def perf_fair_read_ptbl(perf_fair_fname):
+def perf_fair_read_ptbl(nii_fname):
     """
-    Extract important information about the perfusion FAIR acquisition
-    parameters from the *_ptbl.txt file created by
-    sammba.io_conversions.dcm_to_nii.
+    Extract perfusion FAIR acquisition parameters (TIs, order of selective and
+    non-selective inversions) from the *_ptbl.txt file of a *.nii.gz file. Note
+    that both are created simultaneously when sammba.io_conversions.dcm_to_nii
+    is used for DICOM to NIfTI-1 conversion. If a different converter was used
+    that does not export this data, or does it differently, this function will
+    not work.
 
     Parameters
     ----------
-    filename : str
+    nii_fname : str
         Path to the perfusion *.nii.gz file converted by
         sammba.io_conversions.dcm_to_nii, NOT to the *_ptbl.txt file itself.
-        The *_ptbl.txt file name is determined automatically fro; that of the
+        The *_ptbl.txt file name is determined automatically from that of the
         *.nii.gz.
 
     Returns
     -------
-    Dictionary of parameters useful to perfusion fitting functions.    
+    Dictionary of parameters needed for perfusion fitting:
+    ti:
+        simple list of all TIs
+    long_ti:
+        full list of TIs, the same length and in the same order as the
+        acquisitions (the final dimension of the NIfTI-1 file)
+    fc:
+        full list of inversion type descriptions ("Selective" or
+        "Non-selective"), the same length and in the same order as the
+        acquisitions (the final dimension of the NIfTI-1 file). fc is a DICOM
+        acronym for frame comment, the DICOM field used for storing the
+        inversion type descriptions
+    picker_sel:
+        list of positions of selective inversions in the acquisition
+    picker_nonsel:
+        list of positions of non-selective inversions in the acquisition
+        
+    Notes
+    -----    
+    Assuming the acqusition is as currently specified, for a given TI, there is
+    always one selective inversion and one non-selective inversion. The
+    perf_fair_fitter function assumes this. If this is not the case then it
+    will fail, and so will the whole perfusion processing procedure. So the
+    length of ti must be the same as picker_sel and picker_nonsel. The long_ti
+    and fc outputs are diagnostic in case something goes wrong.
     """
     
     # the *_ptbl.txt file will have the same name as the perfusion file itself,
@@ -44,8 +71,8 @@ def perf_fair_read_ptbl(perf_fair_fname):
     # their own formatted text file which this function would not be able to
     # process
     
-    bfx = perf_fair_fname.split('_')[-1].split('.')[0]
-    ptbl = pd.read_table(perf_fair_fname.replace(bfx + '.nii.gz', bfx + '_ptbl.txt'))
+    bfx = nii_fname.split('_')[-1].split('.')[0]
+    ptbl = pd.read_table(nii_fname.replace(bfx + '.nii.gz', bfx + '_ptbl.txt'))
     ti = ptbl.TI[ptbl.slice == 1][ptbl.FC == 'Selective Inversion'].tolist()
     long_ti = ptbl.TI[ptbl.slice == 1].tolist()
     fc = ptbl.FC[ptbl.slice == 1].tolist()
@@ -55,10 +82,11 @@ def perf_fair_read_ptbl(perf_fair_fname):
             'picker_sel':picker_sel, 'picker_nonsel':picker_nonsel}
 
 
-#the perfusion fluid-attenuated inversion-recovery function
-#the jacobian should be callable but I do not know enough maths to create it
-def _fair_t1_func(x, ti, s0):
-    return x[0] + np.absolute(x[1] * (1.0 - 2.0 * np.exp(-ti / x[2]))) - s0
+# the perfusion fluid-attenuated inversion-recovery function
+# the jacobian should be callable but I do not know enough maths to create it
+# pars = parameters
+def _fair_t1_func(pars, s0, ti):
+    return pars[0] + np.absolute(pars[1] * (1 - 2 * np.exp(-ti / pars[2]))) - s0
 
 
 def fair_t1_fit(s0, ti, t1_guess):
@@ -102,11 +130,11 @@ def fair_t1_fit(s0, ti, t1_guess):
     """
     
     return ls(_fair_t1_func, np.array([0, np.mean(s0), t1_guess]),
-              bounds=([0, 0, 0], np.inf), args=(np.array(ti), s0))
+              bounds=([0, 0, 0], np.inf), args=(s0, np.array(ti)))
 
 
-def perf_fair_fitter(s0, t1_blood, lambda_blood, ti, multiplier, t1_guess,
-                     picker_sel, picker_nonsel, outtype='simple'):
+def perf_fair_fitter(s0, t1_blood, ti, t1_guess, picker_sel, picker_nonsel,
+                     lambda_blood=0.9, multiplier=60000000, outtype='simple'):
     """
     Wrapper to execute fair_t1_fit on a real signal vector containing both
     selective and non-selective inversions. Also calculates rCBF and absolute
@@ -119,19 +147,14 @@ def perf_fair_fitter(s0, t1_blood, lambda_blood, ti, multiplier, t1_guess,
         
     t1_blood : int or float
         T1 of blood in ms at the acquisition field strength. Empirical
-        constant; an example value is 2800 at 11.7T (Duong ref).
-        
-    lambda_blood : int or float
-        The assumed blood tissue partition coefficient of water in ml per g.
-        Empirical constant; usually 0.9.
+        constant; an example value is 2800 at 11.7T
+        (https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3752414/table/T1,
+        Table 1 of Blood longitudinal (T1) and transverse (T2) relaxation time
+        constants at 11.7 Tesla, MAGMA. 2012 Jun; 25(3): 245–249,
+        Ai-Ling Lin, Qin Qin, Xia Zhao, and Timothy Q. Duong).
         
     ti : list of int or float
         The inversion times. Must have the same length as s0.
-        
-    multiplier : int or float
-        The absolute CBF result is initially produced in units of ml per g per
-        ms. The multiplier converts to desired units. Usually it is 6000000 to
-        convert to ml per 100g per min.    
         
     t1_guess : int or float
         An initial starting value for T1. The mean of TIs is a good guess.
@@ -143,6 +166,15 @@ def perf_fair_fitter(s0, t1_blood, lambda_blood, ti, multiplier, t1_guess,
     picker_nonsel : list or numpy array of int
         Vector indicating positions of non-selectively inverted signals in s0.
         The lengths of picker_sel and picker_sel must sum to the length of s0.
+
+    lambda_blood : float, optional
+        The assumed blood tissue partition coefficient of water in ml per g.
+        Empirical constant; usually 0.9.
+        
+    multiplier : int or float, optional
+        The absolute CBF result is initially produced in units of ml per g per
+        ms. The multiplier converts to desired units. Usually it is 6000000 to
+        convert to ml per 100g per min.
         
     outtype : {'simple', 'complicated'}, optional
         Changes return type. If 'simple', return a list of parameter, rCBF and
@@ -166,7 +198,8 @@ def perf_fair_fitter(s0, t1_blood, lambda_blood, ti, multiplier, t1_guess,
     # errors are of much use any way so will stay with
     # scipy.optimize.least_squares.
     
-    if outtype not in ['simple', 'complicated']: return 'unrecognized outtype'
+    if outtype not in ['simple', 'complicated']:
+        raise ValueError('unrecognized outtype')
     
     s0_sel = np.array(s0)[np.array(picker_sel)]
     s0_nonsel = np.array(s0)[np.array(picker_nonsel)]
@@ -197,8 +230,9 @@ def perf_fair_fitter(s0, t1_blood, lambda_blood, ti, multiplier, t1_guess,
                     'rCBF nan', 'CBF nan']
 
 
-def perf_fair_fitter_mp(all_s0, t1_blood, lambda_blood, ti, multiplier,
-                        t1_guess, picker_sel, picker_nonsel, ncpu):
+def perf_fair_fitter_mp(all_s0, t1_blood, ti, t1_guess, picker_sel,
+                        picker_nonsel, lambda_blood=0.9, multiplier=60000000,
+                        ncpu=None):
     """
     Wrapper to execute perf_fair_fitter (outtype='simple') in parallel on
     multiple signal vectors, tracking execution with a progress bar.
@@ -212,19 +246,14 @@ def perf_fair_fitter_mp(all_s0, t1_blood, lambda_blood, ti, multiplier,
         
     t1_blood : int or float
         T1 of blood in ms at the acquisition field strength. Empirical
-        constant; an example value is 2800 at 11.7T (Duong ref).
-        
-    lambda_blood : int or float
-        The assumed blood tissue partition coefficient of water in ml per g.
-        Empirical constant; usually 0.9.
+        constant; an example value is 2800 at 11.7T
+        (https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3752414/table/T1,
+        Table 1 of Blood longitudinal (T1) and transverse (T2) relaxation time
+        constants at 11.7 Tesla, MAGMA. 2012 Jun; 25(3): 245–249,
+        Ai-Ling Lin, Qin Qin, Xia Zhao, and Timothy Q. Duong).
         
     ti : list of int or float
         The inversion times. Must have the same length as s0.
-        
-    multiplier : int or float
-        The absolute CBF result is initially produced in units of ml per g per
-        ms. The multiplier converts to desired units. Usually it is 6000000 to
-        convert to ml per 100g per min.    
         
     t1_guess : int or float
         An initial starting value for T1. The mean of TIs is a good guess.
@@ -237,8 +266,18 @@ def perf_fair_fitter_mp(all_s0, t1_blood, lambda_blood, ti, multiplier,
         Vector indicating positions of non-selectively inverted signals in s0.
         The lengths of picker_sel and picker_sel must sum to the length of s0.
         
-    ncpu : int
-        Number of processes to launch in parallel.    
+    lambda_blood : float, optional
+        The assumed blood tissue partition coefficient of water in ml per g.
+        Empirical constant; usually 0.9.
+    
+    multiplier : int or float, optional
+        The absolute CBF result is initially produced in units of ml per g per
+        ms. The multiplier converts to desired units. Usually it is 6000000 to
+        convert to ml per 100g per min.
+        
+    ncpu : int, optional
+        Number of processes to launch in parallel. Defaults to using all but
+        one of the available CPUs.
     
     Returns
     -------
@@ -248,24 +287,25 @@ def perf_fair_fitter_mp(all_s0, t1_blood, lambda_blood, ti, multiplier,
     # inspiration provided by:
     # https://stackoverflow.com/q/5442910
     # https://stackoverflow.com/a/45276885
+
+    if ncpu is None: ncpu = cpu_count() - 1
     
-    # if __name__ == '__main__': this might be dangerous
-    if 2 > 1: # to keep the indent in case above line is reinstated
-        # cannot use a with statement in python 2.7; may cause problems
-        pool = Pool(processes=ncpu)
-        return list(tqdm.tqdm(pool.imap(partial(perf_fair_fitter,
-                                                t1_blood=t1_blood,
-                                                lambda_blood=lambda_blood,
-                                                ti=ti,
-                                                multiplier=multiplier,
-                                                t1_guess=t1_guess,
-                                                picker_sel=picker_sel,
-                                                picker_nonsel=picker_nonsel),
-                                        all_s0), total = len(all_s0)))
+    # cannot use a with statement in python 2.7; may cause problems
+    pool = Pool(processes=ncpu)
+    return list(tqdm.tqdm(pool.imap(partial(perf_fair_fitter,
+                                            t1_blood=t1_blood,
+                                            ti=ti,
+                                            t1_guess=t1_guess,
+                                            picker_sel=picker_sel,
+                                            picker_nonsel=picker_nonsel,
+                                            lambda_blood=lambda_blood,
+                                            multiplier=multiplier),
+                                    all_s0), total = len(all_s0)))
 
 
-def perf_fair_nii_proc(nii_in_fname, nii_out_fname, t1_blood, lambda_blood, ti,
-                       multiplier, t1_guess, picker_sel, picker_nonsel, ncpu):
+def perf_fair_nii_proc(nii_in_fname, t1_blood, ti, t1_guess, picker_sel,
+                       picker_nonsel, lambda_blood=0.9, multiplier=6000000,
+                       ncpu=None, nii_out_fname=None):
     """
     Wrapper to execute perf_fair_fitter_mp on a NIfTI-1 image.
     
@@ -274,24 +314,16 @@ def perf_fair_nii_proc(nii_in_fname, nii_out_fname, t1_blood, lambda_blood, ti,
     nii_in_fname : str
         Input file path.
         
-    nii_out_fname : str
-        Output file path.
-        
     t1_blood : int or float
         T1 of blood in ms at the acquisition field strength. Empirical
-        constant; an example value is 2800 at 11.7T (Duong ref).
-        
-    lambda_blood : int or float
-        The assumed blood tissue partition coefficient of water in ml per g.
-        Empirical constant; usually 0.9.
+        constant; an example value is 2800 at 11.7T
+        (https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3752414/table/T1,
+        Table 1 of Blood longitudinal (T1) and transverse (T2) relaxation time
+        constants at 11.7 Tesla, MAGMA. 2012 Jun; 25(3): 245–249,
+        Ai-Ling Lin, Qin Qin, Xia Zhao, and Timothy Q. Duong).
         
     ti : list of int or float
         The inversion times. Must have the same length as s0.
-        
-    multiplier : int or float
-        The absolute CBF result is initially produced in units of ml per g per
-        ms. The multiplier converts to desired units. Usually it is 6000000 to
-        convert to ml per 100g per min.    
         
     t1_guess : int or float
         An initial starting value for T1. The mean of TIs is a good guess.
@@ -303,9 +335,23 @@ def perf_fair_nii_proc(nii_in_fname, nii_out_fname, t1_blood, lambda_blood, ti,
     picker_nonsel : list or numpy array of int
         Vector indicating positions of non-selectively inverted signals in s0.
         The lengths of picker_sel and picker_sel must sum to the length of s0.
+
+    lambda_blood : float, optional
+        The assumed blood tissue partition coefficient of water in ml per g.
+        Empirical constant; usually 0.9.
+    
+    multiplier : int or float, optional
+        The absolute CBF result is initially produced in units of ml per g per
+        ms. The multiplier converts to desired units. Usually it is 6000000 to
+        convert to ml per 100g per min.
         
-    ncpu : int
-        Number of processes to launch in parallel.    
+    ncpu : int, optional
+        Number of processes to launch in parallel. Defaults to using all but
+        one of the available CPUs.
+
+    nii_out_fname : str
+        Output file path. If none, will be the same as the input file path,
+        but suffixed with _proc.
     
     Returns
     -------
@@ -315,16 +361,19 @@ def perf_fair_nii_proc(nii_in_fname, nii_out_fname, t1_blood, lambda_blood, ti,
     nii_in = nib.load(nii_in_fname)
     in_mat = nii_in.get_data()
     all_s0 = in_mat.reshape((np.product(in_mat.shape[:-1]), in_mat.shape[-1]))
-    r = perf_fair_fitter_mp(all_s0, t1_blood, lambda_blood, ti, multiplier,
-                            t1_guess, picker_sel, picker_nonsel, ncpu)
+    r = perf_fair_fitter_mp(all_s0, t1_blood, ti, t1_guess, picker_sel,
+                            picker_nonsel, lambda_blood, multiplier, ncpu)
     r = np.array(r)
     img = nib.Nifti1Image(np.reshape(r, in_mat.shape[:-1] + (r.shape[1],)),
                           nii_in.get_affine())
-    img.to_filename(nii_out_fname)
+    
+    if nii_out_fname is None:
+        nii_out_fname = nii_in_fname.replace('.nii.gz', '_proc.nii.gz')
+    return img.to_filename(nii_out_fname)
 
 
-def perf_fair_niiptbl_proc(nii_in_fname, nii_out_fname, t1_blood, lambda_blood,
-                           multiplier, ncpu):
+def perf_fair_niiptbl_proc(nii_in_fname, t1_blood, lambda_blood=0.9,
+                           multiplier=6000000, ncpu=None, nii_out_fname=None):
     """
     Wrapper to execute perf_fair_nii_proc supplied with acquisition parameters
     automatically extracted using perf_fair_read_ptbl. So TI and inversion type
@@ -340,19 +389,28 @@ def perf_fair_niiptbl_proc(nii_in_fname, nii_out_fname, t1_blood, lambda_blood,
         
     t1_blood : int or float
         T1 of blood in ms at the acquisition field strength. Empirical
-        constant; an example value is 2800 at 11.7T (Duong ref).
+        constant; an example value is 2800 at 11.7T
+        (https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3752414/table/T1,
+        Table 1 of Blood longitudinal (T1) and transverse (T2) relaxation time
+        constants at 11.7 Tesla, MAGMA. 2012 Jun; 25(3): 245–249,
+        Ai-Ling Lin, Qin Qin, Xia Zhao, and Timothy Q. Duong).
         
-    lambda_blood : int or float
+    lambda_blood : float, optional
         The assumed blood tissue partition coefficient of water in ml per g.
         Empirical constant; usually 0.9.
-        
-    multiplier : int or float
+    
+    multiplier : int or float, optional
         The absolute CBF result is initially produced in units of ml per g per
         ms. The multiplier converts to desired units. Usually it is 6000000 to
         convert to ml per 100g per min.
         
-    ncpu : int
-        Number of processes to launch in parallel.    
+    ncpu : int, optional
+        Number of processes to launch in parallel. Defaults to using all but
+        one of the available CPUs.
+
+    nii_out_fname : str
+        Output file path. If none, will be the same as the input file path,
+        but suffixed with _proc.
     
     Returns
     -------
@@ -364,6 +422,6 @@ def perf_fair_niiptbl_proc(nii_in_fname, nii_out_fname, t1_blood, lambda_blood,
     picker_sel=ptbl_dict['picker_sel']
     picker_nonsel=ptbl_dict['picker_nonsel']
     t1_guess=np.mean(ptbl_dict['TI'])
-    perf_fair_nii_proc(nii_in_fname, nii_out_fname, t1_blood, lambda_blood, ti,
-                       multiplier, t1_guess, picker_sel, picker_nonsel, ncpu)
-
+    perf_fair_nii_proc(nii_in_fname, t1_blood, ti, t1_guess, picker_sel,
+                       picker_nonsel, lambda_blood, multiplier, ncpu,
+                       nii_out_fname)
