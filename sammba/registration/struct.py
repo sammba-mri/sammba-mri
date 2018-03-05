@@ -155,6 +155,7 @@ def anats_to_common(anat_filenames, write_dir, brain_volume,
         calc = memory.cache(afni.Calc)
         center_mass = memory.cache(afni.CenterMass)
         refit = memory.cache(afni.Refit)
+        refit2 = memory.cache(afni.Refit)
         tcat = memory.cache(afni.TCat)
         tstat = memory.cache(afni.TStat)
         undump = memory.cache(afni.Undump)
@@ -167,8 +168,7 @@ def anats_to_common(anat_filenames, write_dir, brain_volume,
         qwarp2 = memory.cache(afni.Qwarp)  # workaround to initialize inputs
         nwarp_cat = memory.cache(afni.NwarpCat)
         warp_apply = memory.cache(afni.NwarpApply)
-        nwarp_adjust = memory.cache(afni.NwarpAdjust)
-        for step in [copy, unifize, compute_mask, calc, refit,
+        for step in [copy, unifize, compute_mask, calc, refit, refit2,
                      tcat, tstat, undump, resample, allineate, allineate2,
                      mask_tool, catmatvec, qwarp, nwarp_cat, warp_apply,
                      nwarp_adjust]:
@@ -181,6 +181,7 @@ def anats_to_common(anat_filenames, write_dir, brain_volume,
         calc = afni.Calc(terminal_output=terminal_output).run
         center_mass = afni.CenterMass().run  # XXX fix nipype bug with 'none'
         refit = afni.Refit(terminal_output=terminal_output).run
+        refit2 = afni.Refit(terminal_output=terminal_output).run
         tcat = afni.TCat(terminal_output=terminal_output).run
         tstat = afni.TStat(terminal_output=terminal_output).run
         undump = afni.Undump(terminal_output=terminal_output).run
@@ -320,8 +321,8 @@ def anats_to_common(anat_filenames, write_dir, brain_volume,
     out_undump = undump(in_file=out_tstat.outputs.out_file,
                         out_file=os.path.join(write_dir, 'undump.nii.gz'),
                         outputtype='NIFTI_GZ')
-    out_refit = refit(in_file=out_undump.outputs.out_file,
-                      xorigin='cen', yorigin='cen', zorigin='cen')
+    out_refit = refit2(in_file=out_undump.outputs.out_file,
+                       xorigin='cen', yorigin='cen', zorigin='cen')
 
     # shift brains to place their new centers at the same central position. 
     # make a quality check video and mean
@@ -351,7 +352,6 @@ def anats_to_common(anat_filenames, write_dir, brain_volume,
                     **verbosity_kwargs)
     out_tstat_centered_brain = tstat(in_file=out_tcat.outputs.out_file,
                                      outputtype='NIFTI_GZ')
-    
 
     ###########################################################################
     # At this point, we have achieved a translation-only registration of the 
