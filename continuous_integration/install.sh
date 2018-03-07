@@ -100,9 +100,9 @@ create_new_conda_env() {
     travis_retry sudo apt-get install -y -qq  ants
     #source /usr/lib/ants/ants.sh
     export ANTSPATH=${ANTSPATH:="/usr/lib/ants"}
-    echo "ANTS path $(ANTSPATH)."
+    echo "ANTS path $ANTSPATH."
     export PATH=${PATH}:/usr/bin/ANTS
-    export PATH=${PATH}:=/usr/lib/ants
+    export PATH=${PATH}:/usr/lib/ants
     echo "ANTS binaries installed in $(which ANTS)"
 }
 
@@ -120,9 +120,9 @@ if [[ "$DISTRIB" == "neurodebian" ]]; then
     travis_retry sudo apt-get install -y -qq  ants
     #source /usr/lib/ants/ants.sh
     export ANTSPATH=${ANTSPATH:="/usr/lib/ants"}
-    echo "ANTS path $(ANTSPATH)."
+    echo "ANTS path $ANTSPATH."
     export PATH=${PATH}:/usr/bin/ANTS
-    export PATH=${PATH}:=/usr/lib/ants
+    export PATH=${PATH}:/usr/lib/ants
     echo "ANTS binaries installed in $(which ANTS)"
 elif [[ "$DISTRIB" == "conda" ]]; then
     create_new_conda_env
