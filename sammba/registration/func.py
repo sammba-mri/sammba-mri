@@ -103,6 +103,9 @@ def coregister_fmri_session(session_data, t_r, write_dir, brain_volume,
     else:
         ComputeMask = segmentation.HistogramMask
 
+    if ants.base.Info().version() is None:
+        raise ValueError('Can not locate ANTS')
+
     if caching:
         memory = Memory(write_dir)
         tshift = memory.cache(afni.TShift)
