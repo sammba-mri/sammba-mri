@@ -98,10 +98,7 @@ create_new_conda_env() {
     echo "AFNI plugin path $AFNI_PLUGINPATH."
     echo "AFNI binaries installed in $(which afni)"
     travis_retry sudo apt-get install -y -qq  ants
-    echo "FIND ANTS"
-    echo $(find /usr/ -name "ants.sh")
-    echo "FIND ANTS"
-    source /usr/local/antsbin/bin/ants.sh
+    source /usr/lib/ants/ants.sh
     echo "ANTS plugin path $ANTSPATH."
     echo "ANTS binaries installed in $(which ANTS)"
 }
@@ -118,7 +115,7 @@ if [[ "$DISTRIB" == "neurodebian" ]]; then
     echo "AFNI plugin path $AFNI_PLUGINPATH."
     echo "AFNI binaries installed in $(which afni)"
     travis_retry sudo apt-get install -y -qq  ants
-    source /usr/local/antsbin/bin/ants.sh
+    source /usr/lib/ants/ants.sh
     echo "ANTS plugin path $ANTSPATH."
     echo "ANTS binaries installed in $(which ANTS)"
 elif [[ "$DISTRIB" == "conda" ]]; then
