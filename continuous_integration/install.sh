@@ -98,10 +98,9 @@ create_new_conda_env() {
     echo "AFNI plugin path $AFNI_PLUGINPATH."
     echo "AFNI binaries installed in $(which afni)"
     travis_retry sudo apt-get install -y -qq  ants
-    echo "GREP"
-    grep -r "ants.sh" /usr >where_is_ants.txt
-    vi where_is_ants.txt
-    echo "GREP"
+    echo "FIND ANTS"
+    echo $(find /usr/ -name "ants.sh")
+    echo "FIND ANTS"
     source /usr/local/antsbin/bin/ants.sh
     echo "ANTS plugin path $ANTSPATH."
     echo "ANTS binaries installed in $(which ANTS)"
