@@ -15,7 +15,7 @@ from functools import partial
 import tqdm
 
 
-def perf_fair_read_ptbl(nii_fname):
+def _perf_fair_read_ptbl(nii_fname):
     """
     Extract perfusion FAIR acquisition parameters (TIs, order of selective and
     non-selective inversions) from the *_ptbl.txt file of a *.nii.gz file. Note
@@ -35,12 +35,12 @@ def perf_fair_read_ptbl(nii_fname):
     Returns
     -------
     Dictionary of parameters needed for perfusion fitting:
-    ti:
+    ti_list:
         simple list of all TIs
-    long_ti:
+    long_ti_list:
         full list of TIs, the same length and in the same order as the
         acquisitions (the final dimension of the NIfTI-1 file)
-    fc:
+    fc_list:
         full list of inversion type descriptions ("Selective" or
         "Non-selective"), the same length and in the same order as the
         acquisitions (the final dimension of the NIfTI-1 file). fc is a DICOM
@@ -71,14 +71,14 @@ def perf_fair_read_ptbl(nii_fname):
     # their own formatted text file which this function would not be able to
     # process
     
-    bfx = nii_fname.split('_')[-1].split('.')[0]
+    bfx = nii_fname.split('_')[-1].split('.')[0] # bfx = bruker folder number
     ptbl = pd.read_table(nii_fname.replace(bfx + '.nii.gz', bfx + '_ptbl.txt'))
-    ti = ptbl.TI[ptbl.slice == 1][ptbl.FC == 'Selective Inversion'].tolist()
-    long_ti = ptbl.TI[ptbl.slice == 1].tolist()
-    fc = ptbl.FC[ptbl.slice == 1].tolist()
-    picker_sel = [n for n,x in enumerate(fc) if x == 'Selective Inversion']
-    picker_nonsel = [n for n,x in enumerate(fc) if x == 'Non-selective Inversion']
-    return {'TI':ti, 'long_TI':long_ti, 'FC':fc,
+    ti_list = ptbl.TI[ptbl.slice == 1][ptbl.FC == 'Selective Inversion'].tolist()
+    long_ti_list = ptbl.TI[ptbl.slice == 1].tolist()
+    fc_list = ptbl.FC[ptbl.slice == 1].tolist()
+    picker_sel = [n for n,x in enumerate(fc_list) if x == 'Selective Inversion']
+    picker_nonsel = [n for n,x in enumerate(fc_list) if x == 'Non-selective Inversion']
+    return {'TI':ti_list, 'long_TI':long_ti_list, 'FC':fc_list,
             'picker_sel':picker_sel, 'picker_nonsel':picker_nonsel}
 
 
@@ -89,7 +89,7 @@ def _fair_t1_func(pars, s0, ti):
     return pars[0] + np.absolute(pars[1] * (1 - 2 * np.exp(-ti / pars[2]))) - s0
 
 
-def fair_t1_fit(s0, ti, t1_guess):
+def _fair_t1_fit(s0, ti, t1_guess):
     """
     Fit the perfusion FAIR equation:
         
@@ -133,8 +133,8 @@ def fair_t1_fit(s0, ti, t1_guess):
               bounds=([0, 0, 0], np.inf), args=(s0, np.array(ti)))
 
 
-def perf_fair_fitter(s0, t1_blood, ti, t1_guess, picker_sel, picker_nonsel,
-                     lambda_blood=0.9, multiplier=6000000, outtype='simple'):
+def _perf_fair_fit(s0, t1_blood, ti, t1_guess, picker_sel, picker_nonsel,
+                   lambda_blood=0.9, multiplier=6000000, outtype='simple'):
     """
     Wrapper to execute fair_t1_fit on a real signal vector containing both
     selective and non-selective inversions. Also calculates rCBF and absolute
@@ -204,8 +204,8 @@ def perf_fair_fitter(s0, t1_blood, ti, t1_guess, picker_sel, picker_nonsel,
     s0_sel = np.array(s0)[np.array(picker_sel)]
     s0_nonsel = np.array(s0)[np.array(picker_nonsel)]
 
-    r_sel = fair_t1_fit(s0_sel, ti, t1_guess)
-    r_nonsel = fair_t1_fit(s0_nonsel, ti, t1_guess)
+    r_sel = _fair_t1_fit(s0_sel, ti, t1_guess)
+    r_nonsel = _fair_t1_fit(s0_nonsel, ti, t1_guess)
     
     if r_sel.success and r_nonsel.success:
         
@@ -230,8 +230,8 @@ def perf_fair_fitter(s0, t1_blood, ti, t1_guess, picker_sel, picker_nonsel,
                     'rCBF nan', 'CBF nan']
 
 
-def perf_fair_fitter_mp(all_s0, t1_blood, ti, t1_guess, picker_sel,
-                        picker_nonsel, ncpu=cpu_count() - 1, **kwargs):
+def _perf_fair_fit_mp(all_s0, t1_blood, ti, t1_guess, picker_sel,
+                      picker_nonsel, ncpu=cpu_count() - 1, **kwargs):
     """
     Wrapper to execute perf_fair_fitter (outtype='simple') in parallel on
     multiple signal vectors, tracking execution with a progress bar.
@@ -274,7 +274,7 @@ def perf_fair_fitter_mp(all_s0, t1_blood, ti, t1_guess, picker_sel,
 
     Returns
     -------
-    List of all_s0.shape[0] lists, each of 8 floats (see perf_fair_fitter).
+    List of all_s0.shape[0] lists, each of 8 floats (see _perf_fair_fit).
     """
     
     # inspiration provided by:
@@ -283,10 +283,8 @@ def perf_fair_fitter_mp(all_s0, t1_blood, ti, t1_guess, picker_sel,
     
     # cannot use a with statement in python 2.7; may cause problems
     pool = Pool(processes=ncpu)
-    return list(tqdm.tqdm(pool.imap(partial(perf_fair_fitter,
-                                            t1_blood=t1_blood,
-                                            ti=ti,
-                                            t1_guess=t1_guess,
+    return list(tqdm.tqdm(pool.imap(partial(_perf_fair_fit, t1_blood=t1_blood,
+                                            ti=ti, t1_guess=t1_guess,
                                             picker_sel=picker_sel,
                                             picker_nonsel=picker_nonsel,
                                             **kwargs),
@@ -330,18 +328,22 @@ def perf_fair_nii_proc(nii_in_fname, t1_blood, ti, t1_guess, picker_sel,
         but suffixed with _proc.
 
     kwargs : dict, optional
-        Additional keyword arguments passed to perf_fair_fitter_mp.
+        Additional keyword arguments passed to _perf_fair_fit_mp.
 
     Returns
     -------
-    NIfTI-1 file saved to nii_out_fname.
+    NIfTI-1 file saved to nii_out_fname. There are eight images in the time
+    dimension, for:
+        selective inversion bias, M0 and T1, non-selective inversion bias, M0
+        and T1, rCBF (relative cerebral blood flow) and CBF (absolute).
+    Failed fits produce zero-valued voxels.
     """
 
     nii_in = nib.load(nii_in_fname)
     in_mat = nii_in.get_data()
     all_s0 = in_mat.reshape((np.product(in_mat.shape[:-1]), in_mat.shape[-1]))
-    r = perf_fair_fitter_mp(all_s0, t1_blood, ti, t1_guess, picker_sel,
-                            picker_nonsel, **kwargs)
+    r = _perf_fair_fit_mp(all_s0, t1_blood, ti, t1_guess, picker_sel,
+                          picker_nonsel, **kwargs)
     r = np.array(r)
     img = nib.Nifti1Image(np.reshape(r, in_mat.shape[:-1] + (r.shape[1],)),
                           nii_in.get_affine())
@@ -375,13 +377,17 @@ def perf_fair_niiptbl_proc(nii_in_fname, t1_blood, **kwargs):
     
     Returns
     -------
-    NIfTI-1 file saved to nii_out_fname.
+    NIfTI-1 file saved to nii_out_fname. There are eight images in the time
+    dimension, for:
+        selective inversion bias, M0 and T1, non-selective inversion bias, M0
+        and T1, rCBF (relative cerebral blood flow) and CBF (absolute).
+    Failed fits produce zero-valued voxels.
     """
 
-    ptbl_dict = perf_fair_read_ptbl(nii_in_fname)
-    ti=ptbl_dict['TI']
-    t1_guess=np.mean(ptbl_dict['TI'])
-    picker_sel=ptbl_dict['picker_sel']
-    picker_nonsel=ptbl_dict['picker_nonsel']
+    ptbl_dict = _perf_fair_read_ptbl(nii_in_fname)
+    ti = ptbl_dict['TI']
+    t1_guess = np.mean(ptbl_dict['TI'])
+    picker_sel = ptbl_dict['picker_sel']
+    picker_nonsel = ptbl_dict['picker_nonsel']
     perf_fair_nii_proc(nii_in_fname, t1_blood, ti, t1_guess, picker_sel,
                        picker_nonsel, **kwargs)
