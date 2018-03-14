@@ -2,10 +2,10 @@ import os
 import numpy as np
 import nibabel
 from sammba.externals.nipype.caching import Memory
-from sammba.externals.nipype.interfaces import afni, ants
+from sammba.externals.nipype.interfaces import afni, ants, fsl
 from sammba.externals.nipype.utils.filemanip import fname_presuffix
 from sammba.interfaces import segmentation
-from .utils import fix_obliquity, copy_geometry
+from .utils import fix_obliquity
 from .fmri_session import FMRISession
 from .struct import anats_to_template
 
@@ -126,6 +126,7 @@ def coregister_fmri_session(session_data, t_r, write_dir, brain_volume,
         warp_apply = memory.cache(afni.NwarpApply)
         qwarp = memory.cache(afni.Qwarp)
         merge = memory.cache(afni.Zcat)
+        copy_geom = memory.cache(fsl.CopyGeom)
         overwrite = False
         for step in [tshift, volreg, allineate, allineate2,
                      tstat, compute_mask, calc, unifize, resample,
@@ -149,6 +150,7 @@ def coregister_fmri_session(session_data, t_r, write_dir, brain_volume,
         warp_apply = afni.NwarpApply(terminal_output=terminal_output).run
         qwarp = afni.Qwarp(terminal_output=terminal_output).run
         merge = afni.Zcat(terminal_output=terminal_output).run
+        copy_geom = fsl.CopyGeom(terminal_output=terminal_output).run
         overwrite = True
 
     session_data._check_inputs()
@@ -203,9 +205,10 @@ def coregister_fmri_session(session_data, t_r, write_dir, brain_volume,
     # 3dAllineate removes the obliquity. This is not a good way to readd it as
     # removes motion correction info in the header if it were an AFNI file...as
     # it happens it's NIfTI which does not store that so irrelevant!
-    allineated_filename = copy_geometry(
-        filename_to_copy=out_volreg.outputs.out_file,
-        filename_to_change=out_allineate.outputs.out_file)
+    out_copy_geom = copy_geom(dest_file=out_allineate.outputs.out_file,
+                              in_file=out_volreg.outputs.out_file)
+
+    allineated_filename = out_copy_geom.outputs.out_file
 
     # Create a (hopefully) nice mean image for use in the registration
     out_tstat = tstat(in_file=allineated_filename, args='-mean',
