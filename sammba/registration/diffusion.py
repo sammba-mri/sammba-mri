@@ -167,6 +167,7 @@ def _correct_head_motion(dwi_file, bvecs_file, bvals_file, brain_mask_file,
 def _correct_eddy_currents(dwi_file, bvals_file, brain_mask_file,
                            initialization_matrices):
     """
+    Adapted from nipype dMRI workflows to use it as a function.
     Corrects for artifacts induced by Eddy currents in dMRI sequences.
     It takes a series of diffusion weighted images and linearly co-registers
     them to one reference image (the average of all b0s in the dataset).
