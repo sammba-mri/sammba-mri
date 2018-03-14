@@ -8,7 +8,7 @@ from .base import (BaseSession, _delete_orientation, _rigid_body_register,
                    _warp, _per_slice_qwarp)
 from ..externalsnipype.workflows.dmri.fsl.utils import (b0_average,
                                                         hmc_split, dwi_flirt,
-                                                        eddy_rotate_bvecs,
+                                                        extract_bval,
                                                         rotate_bvecs,
                                                         insert_mat,
                                                         recompose_dwi,
@@ -226,7 +226,7 @@ def _correct_eddy_currents(dwi_file, bvals_file, brain_mask_file,
     params = dict(dof=12, no_search=True, interp='spline', bgvalue=0,
                   schedule=get_flirt_schedule('ecc'))
     reference_file = b0_average(dwi_file, bvals_file)
-    extracted_dwis_file = extract_bval(dwi_file, bvals_file, 'b'='diff')
+    extracted_dwis_file = extract_bval(dwi_file, bvals_file, b='diff')
 
     ecc_corrected_file, out_matrices = _dwi_flirt(reference_file,
                                                   extracted_dwis_file,
@@ -246,8 +246,9 @@ def _correct_eddy_currents(dwi_file, bvals_file, brain_mask_file,
     corrected_files = []
     for splitted_file, matrix in zip(out_split.outputs.out_files,
                                      out_matrices):
-        out_multiply = multiply('operand_value'=(matrix, _xfm_jacobian),
-                                in_file=splitted_file)
+        for operand_value in _xfm_jacobian(matrix):
+            out_multiply = multiply(operand_value=operand_value,
+                                    in_file=splitted_file)
         out_threshold = threshold(out_multiply.outputs.out_file)
         corrected_files.append(out_threshold.outputs.out_file)
 
