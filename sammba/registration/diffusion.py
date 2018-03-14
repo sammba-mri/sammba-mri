@@ -6,13 +6,15 @@ from ..externals.nipype.interfaces import afni
 from ..externals.nipype.utils.filemanip import fname_presuffix
 from .base import (BaseSession, _delete_orientation, _rigid_body_register,
                    _warp, _per_slice_qwarp)
-from nipype.workflows.dmri.fsl.utils import (b0_average,
-                                             hmc_split, dwi_flirt,
-                                             eddy_rotate_bvecs, rotate_bvecs,
-                                             insert_mat, recompose_dwi,
-                                             recompose_xfm)
-from nipype.workflows.dmri.fsl.artifacts import _xfm_jacobian
-from nipype.interfaces import fsl, ants
+from ..externalsnipype.workflows.dmri.fsl.utils import (b0_average,
+                                                        hmc_split, dwi_flirt,
+                                                        eddy_rotate_bvecs,
+                                                        rotate_bvecs,
+                                                        insert_mat,
+                                                        recompose_dwi,
+                                                        recompose_xfm)
+from ..externalsnipype.workflows.dmri.fsl.artifacts import _xfm_jacobian
+from ..externals.nipype.interfaces import fsl, ants
 
 
 def _to_float(in_file, out_file=None):
