@@ -6,14 +6,14 @@ from ..externals.nipype.interfaces import afni
 from ..externals.nipype.utils.filemanip import fname_presuffix
 from .base import (BaseSession, _delete_orientation, _rigid_body_register,
                    _warp, _per_slice_qwarp)
-from nipype.workflows.dmri.fsl.utils import (b0_indices, time_avg, apply_all_corrections, b0_average,
-                    hmc_split, dwi_flirt, eddy_rotate_bvecs, rotate_bvecs,
-                    insert_mat, extract_bval, recompose_dwi, recompose_xfm,
-                    siemens2rads, rads2radsec, demean_image,
-                    cleanup_edge_pipeline, add_empty_vol, vsm2warp,
-                    compute_readout, _checkinitxfm)
-
+from nipype.workflows.dmri.fsl.utils import (b0_average,
+                                             hmc_split, dwi_flirt,
+                                             eddy_rotate_bvecs, rotate_bvecs,
+                                             insert_mat, recompose_dwi,
+                                             recompose_xfm)
+from nipype.workflows.dmri.fsl.artifacts import _xfm_jacobian
 from nipype.interfaces import fsl, ants
+
 
 def _to_float(in_file, out_file=None):
     import os
@@ -36,6 +36,9 @@ def _to_float(in_file, out_file=None):
 
 def _dwi_flirt(reference, in_file, ref_mask, in_bval, in_xfms=None,
                excl_nodiff=False, flirt_param={}):
+    """
+    Adapted from nipype dMRI workflows to use it as a function.
+    """
 
     bias_correct = ants.N4BiasFieldCorrection().run
     out_bias_correct = bias_correct(input_image=reference,
@@ -43,8 +46,8 @@ def _dwi_flirt(reference, in_file, ref_mask, in_bval, in_xfms=None,
                                     dimension=3)
 
     apply_mask = fsl.maths.ApplyMask().run
-    out_apply_mask_b0 = apply_mask(in_file=out_bias_correct.outputs.output_image,
-                                   mask_file=ref_mask)
+    out_apply_mask_b0 = apply_mask(
+        in_file=out_bias_correct.outputs.output_image, mask_file=ref_mask)
 
     dilate = fsl.maths.MathsCommand().run
     out_dilate = dilate(in_file=ref_mask,
@@ -52,7 +55,6 @@ def _dwi_flirt(reference, in_file, ref_mask, in_bval, in_xfms=None,
                         args='-kernel sphere 5 -dilM')
 
     init_xfms = _checkinitxfm(in_bval, excl_nodiff, in_xfms=in_xfms)
-
 
     split = fsl.Split().run
     out_split = split(in_file=in_file, dimension='t')
@@ -77,13 +79,13 @@ def _dwi_flirt(reference, in_file, ref_mask, in_bval, in_xfms=None,
 
     merge = fsl.Merge(dimension='t').run
     out_merge = merge(in_files=preproc_files)
-    out_merge.outputs.merged_files
-    return wf
+    return out_merge.outputs.merged_file
 
 
 def _correct_head_motion(dwi_file, bvecs_file, bvals_file, brain_mask_file,
                          reference_frame=0):
     """
+    Adapted from nipype dMRI workflows to use it as a function.
     Correct for head motion artifacts in dMRI sequences.
     It takes a series of diffusion weighted images and rigidly co-registers
     them to one reference image. Finally, the `b`-matrix is rotated accordingly
@@ -116,74 +118,140 @@ def _correct_head_motion(dwi_file, bvecs_file, bvals_file, brain_mask_file,
         <http://dx.doi.org/10.1016/j.neuroimage.2013.11.027>`_.
         Neuroimage. 21(88C):79-90. 2013. doi: 10.1016/j.neuroimage.2013.11.027
 
-    Inputs::
+    Parameters
+    ----------
+    dwi_file : str
+         Path to the dwi file
 
-        inputnode.in_file - input dwi file
-        inputnode.in_mask - weights mask of reference image (a file with data \
-range in [0.0, 1.0], indicating the weight of each voxel when computing the \
-metric.
-        inputnode.in_bval - b-values file
-        inputnode.in_bvec - gradients file (b-vectors)
-        inputnode.ref_num (optional, default=0) index of the b0 volume that \
-should be taken as reference
+    bvecs_file : str
+         Path to the gradients file (b-vectors)
 
-    Outputs::
+    bvals_file : str
+         Path to the b-values file
 
-        outputnode.out_file - corrected dwi file
-        outputnode.out_bvec - rotated gradient vectors table
-        outputnode.out_xfms - list of transformation matrices
+    brain_mask_file : str
+        Path to the weights mask of reference image (a file with data range
+        in [0.0, 1.0], indicating the weight of each voxel when computing
+        the metric.
+
+    reference_frame : int, optional
+        Index of the b0 volume that should be taken as reference.
+
+    Returns
+    -------
+    output : tuple of str, str and list of str
+        Path to the corrected DW image, Path to the rotated gradient vectors
+        table and list of paths to the transformation matrices.
 
     """
-
-    params = dict(dof=6, 
-#                  bgvalue=0,  # commented by salma, doesn't work for fsl<5 
-                  save_log=True, no_search=True,
-                  # cost='mutualinfo', cost_func='mutualinfo', bins=64,
+    params = dict(dof=6, save_log=True, no_search=True,
                   schedule=get_flirt_schedule('hmc'))
 
-    [out_ref, out_mov, out_bval, volid] = hmc_split(in_file=dwi_file, in_bval=bvals_file, ref_num=reference_frame)
+    [out_ref, out_mov, out_bval, volid] = hmc_split(
+        in_file=dwi_file, in_bval=bvals_file, ref_num=reference_frame)
 
-    out_files, out_matrices =  _dwi_flirt(out_ref, out_mov, brain_mask_file, in_bval, in_xfms=None,
-               excl_nodiff=False, flirt_param=params)
+    motion_corrected_file, out_matrices = _dwi_flirt(out_ref, out_mov,
+                                                     brain_mask_file,
+                                                     out_bval, in_xfms=None,
+                                                     excl_nodiff=False,
+                                                     flirt_param=params)
 
     all_matrices = insert_mat(inlist=out_matrices, volid=volid)
-    rotated_bvecs = rotate_bvecs()
-    inputnode = pe.Node(niu.IdentityInterface(
-        fields=['in_file', 'ref_num', 'in_bvec', 'in_bval', 'in_mask']),
-        name='inputnode')
-    split = pe.Node(niu.Function(
-        output_names=['out_ref', 'out_mov', 'out_bval', 'volid'],
-        input_names=['in_file', 'in_bval', 'ref_num'], function=hmc_split),
-        name='SplitDWI')
-    flirt = dwi_flirt(flirt_param=params)
-    insmat = pe.Node(niu.Function(input_names=['inlist', 'volid'],
-                                  output_names=['out'], function=insert_mat),
-                     name='InsertRefmat')
-    rot_bvec = pe.Node(niu.Function(
-        function=rotate_bvecs, input_names=['in_bvec', 'in_matrix'],
-        output_names=['out_file']), name='Rotate_Bvec')
-    outputnode = pe.Node(niu.IdentityInterface(
-        fields=['out_file', 'out_bvec', 'out_xfms']), name='outputnode')
+    rotated_bvecs = rotate_bvecs(in_bvec=bvecs_file, in_matrix=all_matrices)
 
-    wf = pe.Workflow(name=name)
-    wf.connect([
-        (inputnode, split, [('in_file', 'in_file'),
-                            ('in_bval', 'in_bval'),
-                            ('ref_num', 'ref_num')]),
-        (inputnode, flirt, [('in_mask', 'inputnode.ref_mask')]),
-        (split, flirt, [('out_ref', 'inputnode.reference'),
-                        ('out_mov', 'inputnode.in_file'),
-                        ('out_bval', 'inputnode.in_bval')]),
-        (flirt, insmat, [('outputnode.out_xfms', 'inlist')]),
-        (split, insmat, [('volid', 'volid')]),
-        (inputnode, rot_bvec, [('in_bvec', 'in_bvec')]),
-        (insmat, rot_bvec, [('out', 'in_matrix')]),
-        (rot_bvec, outputnode, [('out_file', 'out_bvec')]),
-        (flirt, outputnode, [('outputnode.out_file', 'out_file')]),
-        (insmat, outputnode, [('out', 'out_xfms')])
-    ])
-    return wf
+    return motion_corrected_file, rotated_bvecs, all_matrices
 
+
+def _correct_eddy_currents(dwi_file, bvals_file, brain_mask_file,
+                           initialization_matrices):
+    """
+    Corrects for artifacts induced by Eddy currents in dMRI sequences.
+    It takes a series of diffusion weighted images and linearly co-registers
+    them to one reference image (the average of all b0s in the dataset).
+
+    DWIs are also modulated by the determinant of the Jacobian as indicated by
+    [Jones10]_ and [Rohde04]_.
+
+    A list of rigid transformation matrices can be provided, sourcing from a
+    :func:`.hmc_pipeline` workflow, to initialize registrations in a *motion
+    free* framework.
+
+    A list of affine transformation matrices is available as output, so that
+    transforms can be chained (discussion
+    `here <https://github.com/nipy/nipype/pull/530#issuecomment-14505042>`_).
+
+    Parameters
+    ----------
+    dwi_file : str
+         Path to the dwi file
+
+    bvecs_file : str
+         Path to the gradients file (b-vectors)
+
+    bvals_file : str
+         Path to the b-values file
+
+    brain_mask_file : str
+        Path to the weights mask of reference image (a file with data range
+        in [0.0, 1.0], indicating the weight of each voxel when computing
+        the metric.
+
+    initialization_matrices : list of str
+        List of Paths to matrices to initialize registration (typically
+        from head-motion correction).
+
+
+    Returns
+    -------
+    output : tuple of str and list of str
+        Path to the corrected DW image and list of paths to the transformation
+        matrices.
+
+    .. admonition:: References
+
+      .. [Jones10] Jones DK, `The signal intensity must be modulated by the
+        determinant of the Jacobian when correcting for eddy currents in
+        diffusion MRI
+        <http://cds.ismrm.org/protected/10MProceedings/files/1644_129.pdf>`_,
+        Proc. ISMRM 18th Annual Meeting, (2010).
+
+      .. [Rohde04] Rohde et al., `Comprehensive Approach for Correction of
+        Motion and Distortion in Diffusion-Weighted MRI
+        <http://stbb.nichd.nih.gov/pdf/com_app_cor_mri04.pdf>`_, MRM
+        51:103-114 (2004).
+    """
+    params = dict(dof=12, no_search=True, interp='spline', bgvalue=0,
+                  schedule=get_flirt_schedule('ecc'))
+    reference_file = b0_average(dwi_file, bvals_file)
+    extracted_dwis_file = extract_bval(dwi_file, bvals_file, 'b'='diff')
+
+    ecc_corrected_file, out_matrices = _dwi_flirt(reference_file,
+                                                  extracted_dwis_file,
+                                                  brain_mask_file,
+                                                  bvals_file,
+                                                  in_xfms=initialization_matrices,
+                                                  excl_nodiff=False,
+                                                  flirt_param=params)
+
+    recomposed_matrices = recompose_xfm(in_bval=bvals_file,
+                                        in_xfms=out_matrices)
+ 
+    split = fsl.Split(dimension='t').run
+    out_split = split(ecc_corrected_file)
+    multiply = fsl.BinaryMaths(operation='mul').run
+    threshold = fsl.Threshold(thresh=0.0).run
+    corrected_files = []
+    for splitted_file, matrix in zip(out_split.outputs.out_files,
+                                     out_matrices):
+        out_multiply = multiply('operand_value'=(matrix, _xfm_jacobian),
+                                in_file=splitted_file)
+        out_threshold = threshold(out_multiply.outputs.out_file)
+        corrected_files.append(out_threshold.outputs.out_file)
+
+    ecc_file = recompose_dwi(in_dwi=dwi_file, in_bval=bvals_file,
+                             in_corrected=corrected_files)
+
+    return ecc_file, recomposed_matrices
 
 
 class DWISession(BaseSession):
