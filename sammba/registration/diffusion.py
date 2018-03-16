@@ -6,14 +6,15 @@ from ..externals.nipype.interfaces import afni
 from ..externals.nipype.utils.filemanip import fname_presuffix
 from .base import (BaseSession, _delete_orientation, _rigid_body_register,
                    _warp, _per_slice_qwarp)
-from ..externalsnipype.workflows.dmri.fsl.utils import (b0_average,
-                                                        hmc_split, dwi_flirt,
+from nipype.workflows.dmri.fsl.utils import (b0_average,
+                                                        hmc_split,
+                                                        _checkinitxfm,
                                                         extract_bval,
                                                         rotate_bvecs,
                                                         insert_mat,
                                                         recompose_dwi,
                                                         recompose_xfm)
-from ..externalsnipype.workflows.dmri.fsl.artifacts import _xfm_jacobian
+from nipype.workflows.dmri.fsl.artifacts import _xfm_jacobian
 from ..externals.nipype.interfaces import fsl, ants
 
 
