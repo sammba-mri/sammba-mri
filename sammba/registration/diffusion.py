@@ -82,7 +82,7 @@ def _dwi_flirt(reference, in_file, ref_mask, in_bval, in_xfms=None,
 
     merge = fsl.Merge(dimension='t').run
     out_merge = merge(in_files=preproc_files)
-    return out_merge.outputs.merged_file
+    return out_merge.outputs.merged_file, matrix_files
 
 
 def _correct_head_motion(dwi_file, bvecs_file, bvals_file, brain_mask_file,
