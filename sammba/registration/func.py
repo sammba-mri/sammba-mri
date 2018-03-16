@@ -550,6 +550,7 @@ def _func_to_template(func_coreg_filename, template_filename, write_dir,
         If True, all steps are verbose. Note that caching implies some
         verbosity in any case.
     """
+    environ = {}
     if verbose:
         terminal_output = 'allatonce'
     else:
@@ -564,6 +565,7 @@ def _func_to_template(func_coreg_filename, template_filename, write_dir,
     else:
         warp_apply = afni.NwarpApply(terminal_output=terminal_output).run
         resample = afni.Resample(terminal_output=terminal_output).run
+        environ['AFNI_DECONFLICT'] = 'OVERWRITE'
 
     current_dir = os.getcwd()
     os.chdir(write_dir)  # XXX to remove
@@ -574,7 +576,8 @@ def _func_to_template(func_coreg_filename, template_filename, write_dir,
     else:
         out_resample = resample(in_file=template_filename,
                                 voxel_size=voxel_size,
-                                outputtype='NIFTI_GZ')
+                                outputtype='NIFTI_GZ',
+                                environ=environ)
         func_template_filename = out_resample.outputs.out_file
 
     warp = "'{0} {1} {2}'".format(anat_to_template_warp_filename,
@@ -584,7 +587,8 @@ def _func_to_template(func_coreg_filename, template_filename, write_dir,
     _ = warp_apply(in_file=func_coreg_filename,
                    master=func_template_filename,
                    warp=warp,
-                   out_file=normalized_filename)
+                   out_file=normalized_filename,
+                   environ=environ)
     os.chdir(current_dir)
     return normalized_filename
 
