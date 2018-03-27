@@ -93,10 +93,18 @@ create_new_conda_env() {
     fi
 
     bash <(wget -q -O- http://neuro.debian.net/_files/neurodebian-travis.sh)
-    travis_retry sudo apt-get install -y -qq graphviz afni
+    travis_retry sudo apt-get install -y -qq graphviz afni fsl
     source /etc/afni/afni.sh
     echo "AFNI plugin path $AFNI_PLUGINPATH."
     echo "AFNI binaries installed in $(which afni)"
+    source /etc/fsl/fsl.sh
+    export FSLOUTPUTTYPE=NIFTI_GZ
+    travis_retry sudo apt-get install -y -qq  ants
+    export ANTSPATH=${ANTSPATH:="/usr/lib/ants"}
+    export PATH=${PATH}:/usr/bin/ANTS
+    export PATH=${PATH}:/usr/lib/ants
+    echo "ANTS path $ANTSPATH."
+    echo "ANTS binaries installed in $(which ANTS)"
 }
 
 if [[ "$DISTRIB" == "neurodebian" ]]; then
@@ -106,11 +114,17 @@ if [[ "$DISTRIB" == "neurodebian" ]]; then
          python-sklearn python-pandas python-nilearn python-patsy\
          python-networkx python-configparser python-future python-traits\
          python-simplejson python-funcsigs python-click graphviz
-    travis_retry sudo apt-get install -y -qq  afni
+    travis_retry sudo apt-get install -y -qq  afni fsl
     source /etc/afni/afni.sh
     echo "AFNI plugin path $AFNI_PLUGINPATH."
     echo "AFNI binaries installed in $(which afni)"
-
+    source /etc/fsl/fsl.sh
+    travis_retry sudo apt-get install -y -qq  ants
+    export ANTSPATH=${ANTSPATH:="/usr/lib/ants"}
+    export PATH=${PATH}:/usr/bin/ANTS
+    export PATH=${PATH}:/usr/lib/ants
+    echo "ANTS path $ANTSPATH."
+    echo "ANTS binaries installed in $(which ANTS)"
 elif [[ "$DISTRIB" == "conda" ]]; then
     create_new_conda_env
     # Note: nibabel is in setup.py install_requires so nibabel will
