@@ -54,7 +54,7 @@ REQUIRED_MODULE_METADATA = (
         'required_at_installation': True,
         'install_info': _SAMMBA_INSTALL_MSG}),
 	('tqdm', {
-        'min_version': '4.19.5',
+        'min_version': '4.11.2',
         'required_at_installation': True,
         'install_info': _SAMMBA_INSTALL_MSG}),
     )
