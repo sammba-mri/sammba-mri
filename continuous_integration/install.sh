@@ -27,6 +27,7 @@ create_new_venv() {
     pip install prov
     pip install nose
     pip install doctest-ignore-unicode
+	pip install tqdm 
 }
 
 print_conda_requirements() {
@@ -105,7 +106,7 @@ if [[ "$DISTRIB" == "neurodebian" ]]; then
     sudo apt-get install -y -qq python-scipy python-nose python-nibabel\
          python-sklearn python-pandas python-nilearn python-patsy\
          python-networkx python-configparser python-future python-traits\
-         python-simplejson python-funcsigs python-click python-tqdm graphviz
+         python-simplejson python-funcsigs python-click graphviz
     travis_retry sudo apt-get install -y -qq  afni
     source /etc/afni/afni.sh
     echo "AFNI plugin path $AFNI_PLUGINPATH."
