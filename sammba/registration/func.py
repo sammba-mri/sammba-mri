@@ -2,10 +2,10 @@ import os
 import numpy as np
 import nibabel
 from sammba.externals.nipype.caching import Memory
-from sammba.externals.nipype.interfaces import afni
+from sammba.externals.nipype.interfaces import afni, ants, fsl
 from sammba.externals.nipype.utils.filemanip import fname_presuffix
 from sammba.interfaces import segmentation
-from .utils import fix_obliquity, copy_geometry
+from .utils import fix_obliquity
 from .fmri_session import FMRISession
 from .struct import anats_to_template
 
@@ -103,6 +103,9 @@ def coregister_fmri_session(session_data, t_r, write_dir, brain_volume,
     else:
         ComputeMask = segmentation.HistogramMask
 
+    if ants.base.Info().version is None:
+        raise ValueError('Can not locate ANTS')
+
     if caching:
         memory = Memory(write_dir)
         tshift = memory.cache(afni.TShift)
@@ -115,6 +118,7 @@ def coregister_fmri_session(session_data, t_r, write_dir, brain_volume,
         allineate = memory.cache(afni.Allineate)
         allineate2 = memory.cache(afni.Allineate)
         unifize = memory.cache(afni.Unifize)
+        bias_correct = memory.cache(ants.N4BiasFieldCorrection)
         catmatvec = memory.cache(afni.CatMatvec)
         warp = memory.cache(afni.Warp)
         resample = memory.cache(afni.Resample)
@@ -122,6 +126,7 @@ def coregister_fmri_session(session_data, t_r, write_dir, brain_volume,
         warp_apply = memory.cache(afni.NwarpApply)
         qwarp = memory.cache(afni.Qwarp)
         merge = memory.cache(afni.Zcat)
+        copy_geom = memory.cache(fsl.CopyGeom)
         overwrite = False
         for step in [tshift, volreg, allineate, allineate2,
                      tstat, compute_mask, calc, unifize, resample,
@@ -137,6 +142,7 @@ def coregister_fmri_session(session_data, t_r, write_dir, brain_volume,
         compute_mask = ComputeMask(terminal_output=terminal_output).run
         calc = afni.Calc(terminal_output=terminal_output).run
         unifize = afni.Unifize(terminal_output=terminal_output).run
+        bias_correct = ants.N4BiasFieldCorrection(terminal_output=terminal_output).run
         catmatvec = afni.CatMatvec().run
         warp = afni.Warp().run
         resample = afni.Resample(terminal_output=terminal_output).run
@@ -144,6 +150,7 @@ def coregister_fmri_session(session_data, t_r, write_dir, brain_volume,
         warp_apply = afni.NwarpApply(terminal_output=terminal_output).run
         qwarp = afni.Qwarp(terminal_output=terminal_output).run
         merge = afni.Zcat(terminal_output=terminal_output).run
+        copy_geom = fsl.CopyGeom(terminal_output=terminal_output).run
         overwrite = True
 
     session_data._check_inputs()
@@ -198,9 +205,10 @@ def coregister_fmri_session(session_data, t_r, write_dir, brain_volume,
     # 3dAllineate removes the obliquity. This is not a good way to readd it as
     # removes motion correction info in the header if it were an AFNI file...as
     # it happens it's NIfTI which does not store that so irrelevant!
-    allineated_filename = copy_geometry(
-        filename_to_copy=out_volreg.outputs.out_file,
-        filename_to_change=out_allineate.outputs.out_file)
+    out_copy_geom = copy_geom(dest_file=out_allineate.outputs.out_file,
+                              in_file=out_volreg.outputs.out_file)
+
+    allineated_filename = out_copy_geom.outputs.out_file
 
     # Create a (hopefully) nice mean image for use in the registration
     out_tstat = tstat(in_file=allineated_filename, args='-mean',
@@ -218,9 +226,8 @@ def coregister_fmri_session(session_data, t_r, write_dir, brain_volume,
     # Corret anat and func for intensity bias #
     ###########################################
     # Correct the functional average for intensities bias
-    out_bias_correct = unifize(in_file=out_tstat.outputs.out_file,
-                               outputtype='NIFTI_GZ', environ=environ)
-    unbiased_func_filename = out_bias_correct.outputs.out_file
+    out_bias_correct = bias_correct(input_image=out_tstat.outputs.out_file)
+    unbiased_func_filename = out_bias_correct.outputs.output_image
 
     # Bias correct the antomical image
     out_unifize = unifize(in_file=anat_filename, outputtype='NIFTI_GZ',
@@ -543,6 +550,7 @@ def _func_to_template(func_coreg_filename, template_filename, write_dir,
         If True, all steps are verbose. Note that caching implies some
         verbosity in any case.
     """
+    environ = {}
     if verbose:
         terminal_output = 'allatonce'
     else:
@@ -557,6 +565,7 @@ def _func_to_template(func_coreg_filename, template_filename, write_dir,
     else:
         warp_apply = afni.NwarpApply(terminal_output=terminal_output).run
         resample = afni.Resample(terminal_output=terminal_output).run
+        environ['AFNI_DECONFLICT'] = 'OVERWRITE'
 
     current_dir = os.getcwd()
     os.chdir(write_dir)  # XXX to remove
@@ -567,7 +576,8 @@ def _func_to_template(func_coreg_filename, template_filename, write_dir,
     else:
         out_resample = resample(in_file=template_filename,
                                 voxel_size=voxel_size,
-                                outputtype='NIFTI_GZ')
+                                outputtype='NIFTI_GZ',
+                                environ=environ)
         func_template_filename = out_resample.outputs.out_file
 
     warp = "'{0} {1} {2}'".format(anat_to_template_warp_filename,
@@ -577,7 +587,8 @@ def _func_to_template(func_coreg_filename, template_filename, write_dir,
     _ = warp_apply(in_file=func_coreg_filename,
                    master=func_template_filename,
                    warp=warp,
-                   out_file=normalized_filename)
+                   out_file=normalized_filename,
+                   environ=environ)
     os.chdir(current_dir)
     return normalized_filename
 
