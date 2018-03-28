@@ -112,8 +112,9 @@ if [[ "$DISTRIB" == "neurodebian" ]]; then
     sudo apt-get install -y -qq python-scipy python-nose python-nibabel\
          python-sklearn python-pandas python-nilearn python-patsy\
          python-networkx python-configparser python-future python-traits\
-         python-simplejson python-funcsigs python-click python-tqdm python-lmfit
+         python-simplejson python-funcsigs python-click python-tqdm
          graphviz
+	sudo pip install lmfit
     travis_retry sudo apt-get install -y -qq  afni fsl
     source /etc/afni/afni.sh
     echo "AFNI plugin path $AFNI_PLUGINPATH."
@@ -141,6 +142,8 @@ elif [[ "$DISTRIB" == "conda" ]]; then
     pip install prov
     # Allow nose to ignore unicode in doctest
     pip install doctest-ignore-unicode
+	
+	sudo pip install lmfit
 
 else
     echo "Unrecognized distribution ($DISTRIB); cannot setup travis environment."
