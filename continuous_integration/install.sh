@@ -143,7 +143,7 @@ elif [[ "$DISTRIB" == "conda" ]]; then
     # Allow nose to ignore unicode in doctest
     pip install doctest-ignore-unicode
     
-    sudo pip install lmfit
+    conda install -c conda-forge lmfit=0.9.4
 
 else
     echo "Unrecognized distribution ($DISTRIB); cannot setup travis environment."
