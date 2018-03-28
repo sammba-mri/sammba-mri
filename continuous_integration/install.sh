@@ -38,7 +38,7 @@ print_conda_requirements() {
     #   - for scikit-learn, SCIKIT_LEARN_VERSION is used
     TO_INSTALL_ALWAYS="pip nose libgfortran=1.0=0 nomkl"
     REQUIREMENTS="$TO_INSTALL_ALWAYS"
-    TO_INSTALL_MAYBE="python numpy scipy matplotlib scikit-learn pandas configparser future traits simplejson networkx packaging funcsigs click tqdm"
+    TO_INSTALL_MAYBE="python numpy scipy matplotlib scikit-learn pandas configparser future traits simplejson networkx packaging funcsigs click tqdm lmfit"
     for PACKAGE in $TO_INSTALL_MAYBE; do
         # Capitalize package name and add _VERSION
         PACKAGE_VERSION_VARNAME="${PACKAGE^^}_VERSION"
@@ -112,7 +112,8 @@ if [[ "$DISTRIB" == "neurodebian" ]]; then
     sudo apt-get install -y -qq python-scipy python-nose python-nibabel\
          python-sklearn python-pandas python-nilearn python-patsy\
          python-networkx python-configparser python-future python-traits\
-         python-simplejson python-funcsigs python-click python-tqdm graphviz
+         python-simplejson python-funcsigs python-click python-tqdm python-lmfit
+         graphviz
     travis_retry sudo apt-get install -y -qq  afni fsl
     source /etc/afni/afni.sh
     echo "AFNI plugin path $AFNI_PLUGINPATH."

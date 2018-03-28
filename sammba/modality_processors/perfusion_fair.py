@@ -9,7 +9,8 @@ Created on Sunday 4th March 2018
 import pandas as pd
 import nibabel as nib
 import numpy as np
-from scipy.optimize import least_squares as ls
+# from scipy.optimize import least_squares as ls
+import lmfit
 from multiprocessing import cpu_count, Pool
 from functools import partial
 import tqdm
@@ -86,8 +87,11 @@ def _perf_fair_read_ptbl(nii_fname):
 # the jacobian should be callable but I do not know enough maths to create it
 # pars = parameters
 def _fair_t1_func(pars, s0, ti):
-    return pars[0] + np.absolute(pars[1] * (1 - 2 * np.exp(-ti / pars[2]))) - s0
-
+    
+    # return pars[0] + np.absolute(pars[1] * (1 - 2 * np.exp(-ti / pars[2]))) - s0
+    bias, m0, t1 = pars['bias'], pars['M0'], pars['T1']
+    m = bias + np.absolute(m0 * (1.0 - 2.0 * np.exp(-ti / t1)))
+    return m - s0
 
 def _fair_t1_fit(s0, ti, t1_guess):
     """
@@ -128,9 +132,17 @@ def _fair_t1_fit(s0, ti, t1_guess):
     minpack.lm nlsLM (to confirm), and are of course identical to
     scipy.optimize.least_squares with method='trf' (default).
     """
-    
-    return ls(_fair_t1_func, np.array([0, np.mean(s0), t1_guess]),
-              bounds=([0, 0, 0], np.inf), args=(s0, np.array(ti)))
+
+    # return ls(_fair_t1_func, np.array([0, np.mean(s0), t1_guess]),
+    #           bounds=([0, 0, 0], np.inf), args=(s0, np.array(ti)))
+    p = lmfit.Parameters()
+    p.add('bias', value=0, min=0.0)
+    p.add('M0', value=np.mean(s0), min=0.0)
+    p.add('T1', value=t1_guess, min=0.0)
+    minner = lmfit.Minimizer(_fair_t1_func, params=p,
+                             fcn_args=(s0, np.asarray(ti)),
+                             nan_policy='propagate')
+    return minner.minimize()
 
 
 def _perf_fair_fit(s0, t1_blood, ti, t1_guess, picker_sel, picker_nonsel,
@@ -184,8 +196,9 @@ def _perf_fair_fit(s0, t1_blood, ti, t1_guess, picker_sel, picker_nonsel,
     Returns
     -------
     If outtype='simple':
-        List of 8 floats- selective inversion bias, M0 and T1, non-selective
-        inversion bias, M0 and T1, rCBF and CBF. Failed fits produce zeroes.
+        List of 14 floats- selective inversion bias, M0 and T1, non-selective
+        inversion bias, M0 and T1, all paired with their standard errors,
+        plus rCBF and CBF. Failed fits produce zeroes.
     If outtype='complicated':
         List of 4- two scipy.optimize.OptimizeResult classes (selective fit
         then non-selective) plus floats for rCBF then CBF.
@@ -209,21 +222,33 @@ def _perf_fair_fit(s0, t1_blood, ti, t1_guess, picker_sel, picker_nonsel,
     
     if r_sel.success and r_nonsel.success:
         
-        t1_sel = r_sel.x[2]
-        t1_nonsel = r_nonsel.x[2]
+        # t1_sel = r_sel.x[2]
+        # t1_nonsel = r_nonsel.x[2]
+        t1_sel = r_sel.params['T1'].value
+        t1_nonsel = r_nonsel.params['T1'].value
         
         rCBF = 100 * (t1_nonsel - t1_sel) / t1_nonsel
         CBF = multiplier * lambda_blood * (
               (t1_nonsel / t1_blood) * ((1 / t1_sel) - (1 / t1_nonsel)))
      
         if outtype == 'simple':
-            r = [x for x in r_sel.x] + [x for x in r_nonsel.x] + [rCBF, CBF]
+            # r = [x for x in r_sel.x] + [x for x in r_nonsel.x] + [rCBF, CBF]
+            r = [r_sel.params['bias'].value, r_sel.params['bias'].stderr,
+                 r_sel.params['M0'].value, r_sel.params['M0'].stderr,
+                 r_sel.params['T1'].value, r_sel.params['T1'].stderr,
+                 r_nonsel.params['bias'].value, r_nonsel.params['bias'].stderr,
+                 r_nonsel.params['M0'].value, r_nonsel.params['M0'].stderr,
+                 r_nonsel.params['T1'].value, r_nonsel.params['T1'].stderr,
+                 rCBF, CBF]
             return [x if x is not None else 0 for x in r]
-        else: return [r_sel, r_nonsel, rCBF, CBF]
+        else:
+            return [r_sel, r_nonsel, rCBF, CBF]
     
     else:
         
-        if outtype == 'simple': return np.repeat(0, 8)
+        if outtype == 'simple':
+            # return np.repeat(0, 8)
+            return np.repeat(0, 14)
         else:
             return ['r_sel fit ' + r_sel.success,
                     'r_nonsel fit ' + r_nonsel.success,
@@ -274,7 +299,7 @@ def _perf_fair_fit_mp(all_s0, t1_blood, ti, t1_guess, picker_sel,
 
     Returns
     -------
-    List of all_s0.shape[0] lists, each of 8 floats (see _perf_fair_fit).
+    List of all_s0.shape[0] lists, each of 14 floats (see _perf_fair_fit).
     """
     
     # inspiration provided by:
