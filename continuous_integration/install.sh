@@ -112,7 +112,7 @@ if [[ "$DISTRIB" == "neurodebian" ]]; then
     sudo apt-get install -y -qq python-scipy python-nose python-nibabel\
          python-sklearn python-pandas python-nilearn python-patsy\
          python-networkx python-configparser python-future python-traits\
-         python-simplejson python-funcsigs python-click python-tqdm
+         python-simplejson python-funcsigs python-click python-tqdm\
          graphviz
 	sudo pip install lmfit
     travis_retry sudo apt-get install -y -qq  afni fsl
