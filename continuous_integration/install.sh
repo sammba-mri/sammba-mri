@@ -114,7 +114,7 @@ if [[ "$DISTRIB" == "neurodebian" ]]; then
          python-networkx python-configparser python-future python-traits\
          python-simplejson python-funcsigs python-click python-tqdm\
          graphviz
-    sudo pip install lmfit-0.9.4
+    sudo pip install lmfit==0.9.4
     travis_retry sudo apt-get install -y -qq  afni fsl
     source /etc/afni/afni.sh
     echo "AFNI plugin path $AFNI_PLUGINPATH."
