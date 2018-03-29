@@ -206,9 +206,6 @@ def fetch_masks_dorr_2008(image_format='nifti', downsample='30',
 
     corpus_callosum_labels = labels[
         np.in1d(names.astype(str), ['R corpus callosum', 'L corpus callosum'])]
-    print(np.in1d(names.astype(str), ['R corpus callosum', 'L corpus callosum']))
-    print(corpus_callosum_labels)
-    print(np.unique(atlas_data))
     corpus_callosum_mask = np.max(
         [atlas_data == value for value in corpus_callosum_labels], axis=0)
     eroded_corpus_callosum_mask = ndimage.binary_erosion(corpus_callosum_mask,
@@ -377,6 +374,133 @@ def fetch_atlas_waxholm_rat_2014(data_dir=None, url=None, resume=True,
             maps_img.to_filename(maps)
 
     params = dict(t2star=t2star, maps=maps, labels=labels,
+                  description=fdescr)
+
+    return Bunch(**params)
+
+
+def fetch_atlas_lemur_mircen_2017(data_dir=None, url=None, resume=True,
+                                  verbose=1):
+    """Download and load the MIRCen mouse lemur atlas and average (dated 2017)
+
+    Parameters
+    ----------
+    data_dir : str, optional
+        Path of the data directory. Use to forec data storage in a non-
+        standard location. Default: None (meaning: default)
+
+    url: string, optional
+        Download URL of the dataset. Overwrite the default URL.
+
+    resume : bool
+        whether to resumed download of a partly-downloaded file.
+
+    verbose : int
+        verbosity level (0 means no message).
+
+    Returns
+    -------
+    data: sklearn.datasets.base.Bunch
+        dictionary-like object, contains:
+
+        - 't2' : str, path to nifti file containing the T2 weighted average.
+
+        - 'maps' : str, path to nifti file containing regions definition.
+
+        - 'names' : str list containing the names of the regions.
+
+        - 'labels' : int list containing the label value of each region.
+
+        - 'description' : description about the atlas and the template.
+
+    References
+    ----------
+
+    A.E. Dorr, J.P. Lerch, S. Spring, N. Kabani and R.M. Henkelman. "High
+    resolution three dimensional brain atlas using an average magnetic
+    resonance image of 40 adult C57Bl/6j mice", NeuroImage 42(1):60-69, 2008.
+
+    See http://www.mouseimaging.ca/research/mouse_atlas.html for more
+    information on this parcellation.
+
+    Licence: Cecill2B
+    """
+    if url is None:
+        url = 'https://www.nitrc.org/frs/download.php/10273/'
+              'MIRCen_mouselemur_templateatlas.tar.gz'
+
+    if image_format == 'minc':
+        files = ['male-female-mouse-atlas.mnc', 'c57_fixed_labels_resized.mnc',
+                 'c57_brain_atlas_labels.csv']
+    else:
+        files = ['Dorr_2008_average.nii.gz', 'Dorr_2008_labels.nii.gz',
+                 'c57_brain_atlas_labels.csv']
+
+    files = [(f, u + f, {}) for f, u in zip(files, url)]
+
+    basenames = (atlas_dir + ".nii", atlas_dir + ".idx", "README",
+
+                 "COPYING")
+
+    opts = {'uncompress': True}
+
+    filenames = [(os.path.join(atlas_dir + '-nii', f), url,
+
+                  opts) for f in basenames]
+
+    data_dir = _get_dataset_dir(dataset_name, data_dir=data_dir,
+
+                                verbose=verbose)
+
+    files_ = _fetch_files(data_dir, filenames, resume=resume,
+
+                          verbose=verbose)
+
+
+    dataset_name = 'dorr_2008'
+    data_dir = _get_dataset_dir(dataset_name, data_dir=data_dir,
+                                verbose=verbose)
+    files_ = _fetch_files(data_dir, files, resume=resume,
+                          verbose=verbose)
+
+    fdescr = _get_dataset_descr(dataset_name)
+    csv_data = np.recfromcsv(
+        files_[2], skip_header=True,
+        names=('roi_id', 'roi_label', 'right_index', 'left_index'))
+
+    #TODO try dictionary with their region id as key and name as value
+    left_rois = []
+    right_rois = []
+    lateral_rois = []
+    for (idx, label, right_index, left_index) in csv_data:
+        label = label.decode('UTF-8')  # for python3
+        if right_index == left_index:
+            lateral_rois.append((label, right_index))
+        else:
+            left_rois.append(('L {}'.format(label), left_index))
+            right_rois.append(('R {}'.format(label), right_index))
+
+    rois = lateral_rois + right_rois + left_rois
+    labels, indices = map(list, zip(*rois))
+    t2 = files_[0]
+    maps = files_[1]
+    if downsample == '100':
+        t2_img = nibabel.load(t2)
+        maps_img = check_niimg(maps, dtype=int)
+        t2 = fname_presuffix(t2, suffix='_100um')
+        maps = fname_presuffix(maps, suffix='_100um')
+        if not os.path.isfile(t2):
+            target_affine = np.eye(3) * .1
+            t2_img = image.resample_img(t2_img, target_affine)
+            t2_img.to_filename(t2)
+        if not os.path.isfile(maps):
+            maps_img = image.resample_img(maps_img, target_affine,
+                                          interpolation='nearest')
+            maps_img.to_filename(maps)
+
+    params = dict(t2=t2, maps=maps,
+                  names=np.array(labels)[np.argsort(indices)],
+                  labels=np.sort(indices),
                   description=fdescr)
 
     return Bunch(**params)
