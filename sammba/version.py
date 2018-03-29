@@ -53,8 +53,16 @@ REQUIRED_MODULE_METADATA = (
         'min_version': '0.15.0',
         'required_at_installation': True,
         'install_info': _SAMMBA_INSTALL_MSG}),
+    ('tqdm', {
+        'min_version': '4.11.2',
+        'required_at_installation': True,
+        'install_info': _SAMMBA_INSTALL_MSG}),
+    ('lmfit', {
+        'min_version': '0.9.4',
+        'required_at_installation': True,
+        'install_info': _SAMMBA_INSTALL_MSG}),
     )
-
+    
 OPTIONAL_MATPLOTLIB_MIN_VERSION = '1.3.1'
 
 

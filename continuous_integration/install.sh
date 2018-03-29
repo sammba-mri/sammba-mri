@@ -1,4 +1,3 @@
-
 #!/bin/bash
 # This script is meant to be called by the "install" step defined in
 # .travis.yml. See http://docs.travis-ci.com/ for more details.
@@ -39,7 +38,7 @@ print_conda_requirements() {
     #   - for scikit-learn, SCIKIT_LEARN_VERSION is used
     TO_INSTALL_ALWAYS="pip nose libgfortran=1.0=0 nomkl"
     REQUIREMENTS="$TO_INSTALL_ALWAYS"
-    TO_INSTALL_MAYBE="python numpy scipy matplotlib scikit-learn pandas configparser future traits simplejson networkx packaging funcsigs click"
+    TO_INSTALL_MAYBE="python numpy scipy matplotlib scikit-learn pandas configparser future traits simplejson networkx packaging funcsigs click tqdm lmfit"
     for PACKAGE in $TO_INSTALL_MAYBE; do
         # Capitalize package name and add _VERSION
         PACKAGE_VERSION_VARNAME="${PACKAGE^^}_VERSION"
@@ -93,10 +92,18 @@ create_new_conda_env() {
     fi
 
     bash <(wget -q -O- http://neuro.debian.net/_files/neurodebian-travis.sh)
-    travis_retry sudo apt-get install -y -qq graphviz afni
+    travis_retry sudo apt-get install -y -qq graphviz afni fsl
     source /etc/afni/afni.sh
     echo "AFNI plugin path $AFNI_PLUGINPATH."
     echo "AFNI binaries installed in $(which afni)"
+    source /etc/fsl/fsl.sh
+    export FSLOUTPUTTYPE=NIFTI_GZ
+    travis_retry sudo apt-get install -y -qq  ants
+    export ANTSPATH=${ANTSPATH:="/usr/lib/ants"}
+    export PATH=${PATH}:/usr/bin/ANTS
+    export PATH=${PATH}:/usr/lib/ants
+    echo "ANTS path $ANTSPATH."
+    echo "ANTS binaries installed in $(which ANTS)"
 }
 
 if [[ "$DISTRIB" == "neurodebian" ]]; then
@@ -105,12 +112,20 @@ if [[ "$DISTRIB" == "neurodebian" ]]; then
     sudo apt-get install -y -qq python-scipy python-nose python-nibabel\
          python-sklearn python-pandas python-nilearn python-patsy\
          python-networkx python-configparser python-future python-traits\
-         python-simplejson python-funcsigs python-click graphviz
-    travis_retry sudo apt-get install -y -qq  afni
+         python-simplejson python-funcsigs python-click python-tqdm\
+         graphviz
+    sudo pip install lmfit==0.9.4
+    travis_retry sudo apt-get install -y -qq  afni fsl
     source /etc/afni/afni.sh
     echo "AFNI plugin path $AFNI_PLUGINPATH."
     echo "AFNI binaries installed in $(which afni)"
-
+    source /etc/fsl/fsl.sh
+    travis_retry sudo apt-get install -y -qq  ants
+    export ANTSPATH=${ANTSPATH:="/usr/lib/ants"}
+    export PATH=${PATH}:/usr/bin/ANTS
+    export PATH=${PATH}:/usr/lib/ants
+    echo "ANTS path $ANTSPATH."
+    echo "ANTS binaries installed in $(which ANTS)"
 elif [[ "$DISTRIB" == "conda" ]]; then
     create_new_conda_env
     # Note: nibabel is in setup.py install_requires so nibabel will
@@ -127,6 +142,9 @@ elif [[ "$DISTRIB" == "conda" ]]; then
     pip install prov
     # Allow nose to ignore unicode in doctest
     pip install doctest-ignore-unicode
+    
+    conda install -c conda-forge lmfit=0.9.4 --yes
+    conda install -c conda-forge tqdm --yes
 
 else
     echo "Unrecognized distribution ($DISTRIB); cannot setup travis environment."

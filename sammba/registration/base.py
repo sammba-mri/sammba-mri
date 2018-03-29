@@ -474,6 +474,7 @@ def _transform_to_template(to_register_filename, template_filename, write_dir,
         If True, all steps are verbose. Note that caching implies some
         verbosity in any case.
     """
+    environ = {}
     if verbose:
         terminal_output = 'allatonce'
     else:
@@ -488,12 +489,12 @@ def _transform_to_template(to_register_filename, template_filename, write_dir,
     else:
         resample = afni.Resample(terminal_output=terminal_output).run
         warp_apply = afni.NwarpApply(terminal_output=terminal_output).run
+        environ['AFNI_DECONFLICT'] = 'OVERWRITE'
 
     current_dir = os.getcwd()
     os.chdir(write_dir)
     normalized_filename = fname_presuffix(to_register_filename,
-                                          suffix='_normalized',
-                                          newpath=write_dir)
+                                          suffix='_normalized')
 
     if voxel_size is None:
         resampled_template_filename = template_filename

@@ -20,6 +20,7 @@ The required dependencies to use the package are
 the softwares:
 
 * AFNI
+* ANTS
 * `RATS <http://www.iibi.uiowa.edu/content/rats-overview/>`_ for brain
   extraction
 
@@ -81,3 +82,8 @@ Interfaces configuration
 
     # AFNI
     export PATH=/usr/lib/afni/bin:$PATH
+
+**Configuring AFNI**: To be able to run ANTS make sure to add the following lines of code to your .bashrc file::
+
+    #ANTs
+    export PATH=/usr/local/antsbin/bin:$PATH
