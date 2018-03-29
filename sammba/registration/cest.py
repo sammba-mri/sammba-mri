@@ -4,6 +4,7 @@ from ..externals.nipype.caching import Memory
 from ..externals.nipype.interfaces import afni
 from ..externals.nipype.utils.filemanip import fname_presuffix
 from .struct import anats_to_template
+from .utils import _get_output_type
 from .base import (BaseSession, extract_brain, _rigid_body_register,
                    _warp, _transform_to_template)
 
@@ -20,12 +21,9 @@ class CESTSession(BaseSession):
     anat : str
         Path to anatomical image
 
-    animal_id : str
-        Animal id
-
-    brain_volume : int
+    brain_volume : int, optional
         Volume of the brain used for brain extraction.
-        Typically 400 for mouse and 1800 for rat.
+        Typically 400 for mouse and 1650 for rat.
 
     output_dir : str, optional
         Path to the output directory. If not specified, current directory is
@@ -34,11 +32,10 @@ class CESTSession(BaseSession):
     """
 
     def __init__(self, cest=None, anat=None, brain_volume=None,
-                 animal_id=None, output_dir=None):
+                 output_dir=None):
         self.cest = cest
         self.anat = anat
         self.brain_volume = brain_volume
-        self.animal_id = animal_id
         self.output_dir = output_dir
 
     def _check_inputs(self):
@@ -49,13 +46,6 @@ class CESTSession(BaseSession):
         if not os.path.isfile(self.anat):
             raise IOError('anat must be an existing image file,'
                           'you gave {0}'.format(self.anat))
-
-        if self.brain_volume is None:
-            raise ValueError('you must provide the expected brain volume.')
-
-        if not isinstance(self.animal_id, _basestring):
-            raise ValueError('animal_id must be a string, you provided '
-                             '{0}'.format(self.animal_id))
 
     def coregister(self, use_rats_tool=True,
                    prior_rigid_body_registration=False,
@@ -120,21 +110,32 @@ class CESTSession(BaseSession):
 
         if caching:
             memory = Memory(self.output_dir)
+            copy = memory.cache(afni.Copy)
             unifize = memory.cache(afni.Unifize)
             catmatvec = memory.cache(afni.CatMatvec)
-            unifize.interface().set_default_terminal_output(terminal_output)
+            for step in [copy, unifize]:
+                step.interface().set_default_terminal_output(terminal_output)
             overwrite = False
         else:
+            copy = afni.Copy(terminal_output=terminal_output).run
             unifize = afni.Unifize(terminal_output=terminal_output).run
             catmatvec = afni.CatMatvec().run
             overwrite = True
 
         self._check_inputs()
         self._set_output_dir()
-        images_dir = os.path.join(os.path.abspath(self.output_dir),
-                                  self.animal_id)
-        current_dir = os.getcwd()
-        os.chdir(images_dir)
+        out_copy_cest = copy(
+            in_file=self.func,
+            out_file=fname_presuffix(self.cest, newpath=self.output_dir),
+            environ=environ)
+        out_copy_anat = copy(
+            in_file=self.anat,
+            out_file=fname_presuffix(self.anat, newpath=self.output_dir),
+            environ=environ)
+        cest_filename = out_copy_cest.outputs.out_file
+        anat_filename = out_copy_anat.outputs.out_file
+        output_files = [cest_filename, anat_filename]
+        outputtype = _get_output_type(cest_filename)  # XXX check if anat and func are of different types
         output_files = []
 
         ###########################################
@@ -142,11 +143,11 @@ class CESTSession(BaseSession):
         ###########################################
         # Correct the CEST for intensities bias
         out_bias_correct = unifize(in_file=cest_filename,
-                                   outputtype='NIFTI_GZ', environ=environ)
+                                   outputtype=outputtype, environ=environ)
         unbiased_cest_filename = out_bias_correct.outputs.out_file
 
         # Bias correct the antomical image
-        out_unifize = unifize(in_file=anat_filename, outputtype='NIFTI_GZ',
+        out_unifize = unifize(in_file=anat_filename, outputtype=outputtype,
                               environ=environ)
         unbiased_anat_filename = out_unifize.outputs.out_file
 
@@ -158,25 +159,15 @@ class CESTSession(BaseSession):
         # Rigid-body registration anat -> cest #
         ########################################
         if prior_rigid_body_registration:
-            anat_brain_filename = extract_brain(
-                unbiased_anat_filename, self.output_dir, self.brain_volume,
-                caching=caching, use_rats_tool=use_rats_tool,
-                terminal_output=terminal_output, environ=environ)
-            cest_brain_filename = extract_brain(
-                unbiased_cest_filename, self.output_dir,
-                self.brain_volume, caching=caching, use_rats_tool=use_rats_tool,
-                terminal_output=terminal_output, environ=environ)
             allineated_anat_filename, rigid_transform_file = \
                 _rigid_body_register(unbiased_anat_filename,
-                                     anat_brain_filename,
                                      unbiased_cest_filename,
-                                     cest_brain_filename, self.output_dir,
+                                     self.output_dir, self.brain_volume,
+                                     use_rats_tool=use_rats_tool,
                                      caching=caching,
                                      terminal_output=terminal_output,
                                      environ=environ)
-            output_files.extend([anat_brain_filename,
-                                 cest_brain_filename,
-                                 rigid_transform_file,
+            output_files.extend([rigid_transform_file,
                                  allineated_anat_filename])
         else:
             allineated_anat_filename = unbiased_anat_filename
@@ -206,7 +197,6 @@ class CESTSession(BaseSession):
         # Update the CEST data
         setattr(self, "coreg_anat_", registered_anat_oblique_filename)
         setattr(self, "coreg_transform_", transform_filename)
-        os.chdir(current_dir)
 
     def register_to_template(self, head_template_filename,
                              brain_template_filename=None,
@@ -262,9 +252,6 @@ class CESTSession(BaseSession):
         sammba.registration.anats_to_template
         """
         self._check_inputs()
-        images_dir = os.path.join(os.path.abspath(self.output_dir),
-                                  self.animal_id)
-
         if not hasattr(self, 'coreg_transform_'):
             raise ValueError('Anatomical image has not been registered '
                              'to CEAT. Please use `coreg` function first')
@@ -274,7 +261,7 @@ class CESTSession(BaseSession):
         anats_registration = anats_to_template(
             [self.anat],
             head_template_filename,
-            images_dir,
+            self.output_dir,
             self.brain_volume,
             brain_template_filename=brain_template_filename,
             dilated_head_mask_filename=dilated_head_mask_filename,
@@ -285,7 +272,7 @@ class CESTSession(BaseSession):
         normalized_cest_filename = _transform_to_template(
             self.cest,
             head_template_filename,
-            images_dir,
+            self.output_dir,
             [self.coreg_transform_, anats_registration.pre_transforms[0],
              anats_registration.transforms[0]],
             voxel_size=cest_voxel_size, caching=caching, verbose=verbose)

@@ -11,6 +11,21 @@ from sammba.externals.nipype.interfaces import afni
 from sammba.interfaces import segmentation
 
 
+def _get_output_type(in_file):
+    fname, ext = os.path.splitext(in_file)
+    if '.gz' in ext:
+        _, ext2 = os.path.splitext(fname)
+        ext = ext2 + ext
+    if ext == '.nii':
+        output_type = 'NIFTI'
+    elif ext == '.nii.gz':
+        output_type = 'NIFTI_GZ'
+    else:
+        raise ValueError('Unknown extension for {}'.format(in_file))
+
+    return output_type
+
+
 def _reset_affines(in_file, out_file, overwrite=False, axes_to_permute=None,
                    axes_to_flip=None, xyzscale=None, center_mass=None,
                    verbose=1):
