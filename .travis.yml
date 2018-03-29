@@ -27,7 +27,6 @@ matrix:
            FUTURE_VERSION="0.16.0" TRAITS_VERSION="4.6"
            SIMPLEJSON_VERSION="3.8.0" PROV_VERSION="1.5.0"
            FUNCSIGS_VERSION="*" CLICK_VERSION="6.6.0" TQDM_VERSION="4.19.5"
-           LMFIT_VERSION="0.9.4"
     # Neurodebian on Ubuntu 14.04
     - dist: trusty
       env: DISTRIB="neurodebian" PYTHON_VERSION="2.7"
@@ -42,7 +41,6 @@ matrix:
            FUTURE_VERSION="0.16.0" TRAITS_VERSION="4.6"
            SIMPLEJSON_VERSION="3.8.0" PROV_VERSION="1.5.0"
            FUNCSIGS_VERSION="*" CLICK_VERSION="6.6.0" TQDM_VERSION="4.19.5"
-           LMFIT_VERSION="0.9.4"
     # Python 3.4 with intermediary versions
     - env: DISTRIB="conda" PYTHON_VERSION="3.4"
            NUMPY_VERSION="1.8.2" SCIPY_VERSION="0.14.0"
@@ -51,7 +49,7 @@ matrix:
            FUTURE_VERSION="0.16.0" PACKAGING_VERSION="*"
            TRAITS_VERSION="4.6" SIMPLEJSON_VERSION="3.8.0"
            PROV_VERSION=="1.5.0" FUNCSIGS_VERSION="*"
-           CLICK_VERSION="6.6.0" TQDM_VERSION="4.11.1" LMFIT_VERSION="0.9.4"
+           CLICK_VERSION="6.6.0" TQDM_VERSION="4.11.1"
     # Most recent versions (Python 3)
     - env: DISTRIB="conda" PYTHON_VERSION="3.5"
            NUMPY_VERSION="*" SCIPY_VERSION="*"
@@ -60,7 +58,7 @@ matrix:
            FUTURE_VERSION="0.16.0" PACKAGING_VERSION="*"
            TRAITS_VERSION="4.6" SIMPLEJSON_VERSION="3.8.0"
            PROV_VERSION="1.5.0" FUNCSIGS_VERSION="*"
-           CLICK_VERSION="6.6.0" TQDM_VERSION="4.19.5" LMFIT_VERSION="0.9.4"
+           CLICK_VERSION="6.6.0" TQDM_VERSION="4.19.5"
 
 install:
     - source continuous_integration/install.sh
