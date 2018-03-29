@@ -144,7 +144,7 @@ elif [[ "$DISTRIB" == "conda" ]]; then
     pip install doctest-ignore-unicode
     
     conda install -c conda-forge lmfit=0.9.4 --yes
-	conda install -c conda-forge tqdm --yes
+    conda install -c conda-forge tqdm --yes
 
 else
     echo "Unrecognized distribution ($DISTRIB); cannot setup travis environment."
