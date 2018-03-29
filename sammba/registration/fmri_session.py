@@ -1,7 +1,10 @@
 import os
+from sklearn.utils import deprecated
 from nilearn._utils.compat import _basestring
 
 
+@deprecated("Class 'FMRISession' has been refactored and renamed to "
+            "'FuncSession'. It will be removed in future release. ")
 class FMRISession(object):
     """
     Encapsulation for fMRI data, relative to preprocessing.

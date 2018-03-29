@@ -23,11 +23,11 @@ print(func_filename)
 
 ##############################################################################
 # We encapsulate them in an object called `FMRISession`
-from sammba.registration import fmri
+from sammba.registration import FuncSession
 
-animal_session = fmri.FMRISession(anat=anat_filename, func=func_filename,
-                                  animal_id='1366', brain_volume=400, t_r=1.,
-                                  output_dir='zurich_fmri')
+animal_session = FuncSession(anat=anat_filename, func=func_filename,
+                             animal_id='1366', brain_volume=400, t_r=1.,
+                             output_dir='zurich_fmri')
 
 ##############################################################################
 # Functional to anatomical registration

@@ -22,15 +22,15 @@ output_dir = os.path.abspath('zurich_ica')
 ##############################################################################
 # Link data per animal
 # --------------------
-# We encapsulate data for each mouse through an object called `FMRISession`
-from sammba.registration import fmri
+# We encapsulate data for each mouse through an object called `FuncSession`
+from sammba.registration import FuncSession
 
 sessions = []
 for (animal_id, anat_file, func_file) in zip(['0', '1', '2', '3', '4'],
                                              retest.anat, retest.func):
-    session = fmri.FMRISession(anat=anat_file, func=func_file,
-                               animal_id=animal_id, t_r=1., brain_volume=400,
-                               output_dir=output_dir)
+    session = FuncSession(anat=anat_file, func=func_file,
+                          animal_id=animal_id, t_r=1., brain_volume=400,
+                          output_dir=output_dir)
     sessions.append(session)
 
 ##############################################################################
