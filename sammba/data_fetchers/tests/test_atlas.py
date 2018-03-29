@@ -162,3 +162,29 @@ def test_fetch_atlas_waxholm_rat_2014():
                               (.2, .2, .2))
     assert_array_almost_equal(nibabel.load(bunch['maps']).header.get_zooms(),
                               (.2, .2, .2))
+
+
+@with_setup(setup_mock, teardown_mock)
+@with_setup(tst.setup_tmpdata, tst.teardown_tmpdata)
+def test_fetch_atlas_lemur_mircen_2017():
+    datadir = os.path.join(tst.tmpdir, 'mircen_2017')
+    os.mkdir(datadir)
+    dummy = open(os.path.join(
+        datadir, 'MIRCen_mouselemur_atlas_labels.txt'), 'w')
+    dummy.write('#\n#\n#\n#\n#\n#\n#\n#\n#\n#\n#\n#\n#\n#\n#\n'
+                '    0     0    0    0        0  0  0    "Clear Label"\n'
+                '    1   248  164  138        1  1  0    "hippocampus R"\n'
+                '    2    96  238  253        1  1  0    "hippocampus L"\n')
+    dummy.close()
+
+    # Default resolution
+    bunch = atlas.fetch_atlas_lemur_mircen_2017(data_dir=tst.tmpdir, verbose=0)
+    assert_equal(len(tst.mock_url_request.urls), 2)
+    assert_equal(bunch['t2'],
+                 os.path.join(datadir, 'MIRCen_mouselemur_template.nii.gz'))
+    assert_equal(bunch['maps'],
+                 os.path.join(datadir, 'MIRCen_mouselemur_atlas.nii.gz'))
+    assert_equal(nibabel.load(bunch['maps']).get_data().dtype, np.dtype(int))
+    assert_equal(len(tst.mock_url_request.urls), 2)
+    assert_equal(len(bunch['labels']), 3)
+    assert_not_equal(bunch.description, '')

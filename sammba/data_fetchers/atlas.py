@@ -407,100 +407,37 @@ def fetch_atlas_lemur_mircen_2017(data_dir=None, url=None, resume=True,
 
         - 'maps' : str, path to nifti file containing regions definition.
 
-        - 'names' : str list containing the names of the regions.
-
-        - 'labels' : int list containing the label value of each region.
+        - 'labels' : numpy.recarray of region ids and names
 
         - 'description' : description about the atlas and the template.
 
-    References
-    ----------
-
-    A.E. Dorr, J.P. Lerch, S. Spring, N. Kabani and R.M. Henkelman. "High
-    resolution three dimensional brain atlas using an average magnetic
-    resonance image of 40 adult C57Bl/6j mice", NeuroImage 42(1):60-69, 2008.
-
-    See http://www.mouseimaging.ca/research/mouse_atlas.html for more
-    information on this parcellation.
-
-    Licence: Cecill2B
+    Licence: CeCill v2
     """
     if url is None:
-        url = 'https://www.nitrc.org/frs/download.php/10273/'
+        url = 'https://www.nitrc.org/frs/download.php/10273/' \
               'MIRCen_mouselemur_templateatlas.tar.gz'
 
-    if image_format == 'minc':
-        files = ['male-female-mouse-atlas.mnc', 'c57_fixed_labels_resized.mnc',
-                 'c57_brain_atlas_labels.csv']
-    else:
-        files = ['Dorr_2008_average.nii.gz', 'Dorr_2008_labels.nii.gz',
-                 'c57_brain_atlas_labels.csv']
-
-    files = [(f, u + f, {}) for f, u in zip(files, url)]
-
-    basenames = (atlas_dir + ".nii", atlas_dir + ".idx", "README",
-
-                 "COPYING")
-
+    basenames = ('MIRCen_mouselemur_atlas.nii.gz',
+                 'MIRCen_mouselemur_atlas_labels.txt',
+                 'MIRCen_mouselemur_template.nii.gz')
     opts = {'uncompress': True}
-
-    filenames = [(os.path.join(atlas_dir + '-nii', f), url,
-
-                  opts) for f in basenames]
-
+    filenames = [(f, url, opts) for f in basenames]
+    dataset_name = 'mircen_2017'
     data_dir = _get_dataset_dir(dataset_name, data_dir=data_dir,
-
                                 verbose=verbose)
-
     files_ = _fetch_files(data_dir, filenames, resume=resume,
-
-                          verbose=verbose)
-
-
-    dataset_name = 'dorr_2008'
-    data_dir = _get_dataset_dir(dataset_name, data_dir=data_dir,
-                                verbose=verbose)
-    files_ = _fetch_files(data_dir, files, resume=resume,
                           verbose=verbose)
 
     fdescr = _get_dataset_descr(dataset_name)
-    csv_data = np.recfromcsv(
-        files_[2], skip_header=True,
-        names=('roi_id', 'roi_label', 'right_index', 'left_index'))
 
-    #TODO try dictionary with their region id as key and name as value
-    left_rois = []
-    right_rois = []
-    lateral_rois = []
-    for (idx, label, right_index, left_index) in csv_data:
-        label = label.decode('UTF-8')  # for python3
-        if right_index == left_index:
-            lateral_rois.append((label, right_index))
-        else:
-            left_rois.append(('L {}'.format(label), left_index))
-            right_rois.append(('R {}'.format(label), right_index))
+    names = ('ids', 'red', 'green', 'blue', 'transparency', 'visibility',
+             'mesh', 'names')
+    labels = np.recfromcsv(files_[1], skip_header=15, names=names,
+                           delimiter=(6, 6, 5, 5, 15, 3, 3, 32),
+                           autostrip=True, usecols=(0, 7))
 
-    rois = lateral_rois + right_rois + left_rois
-    labels, indices = map(list, zip(*rois))
-    t2 = files_[0]
-    maps = files_[1]
-    if downsample == '100':
-        t2_img = nibabel.load(t2)
-        maps_img = check_niimg(maps, dtype=int)
-        t2 = fname_presuffix(t2, suffix='_100um')
-        maps = fname_presuffix(maps, suffix='_100um')
-        if not os.path.isfile(t2):
-            target_affine = np.eye(3) * .1
-            t2_img = image.resample_img(t2_img, target_affine)
-            t2_img.to_filename(t2)
-        if not os.path.isfile(maps):
-            maps_img = image.resample_img(maps_img, target_affine,
-                                          interpolation='nearest')
-            maps_img.to_filename(maps)
-
-    params = dict(t2=t2, maps=maps,
-                  names=np.array(labels)[np.argsort(indices)],
-                  labels=np.sort(indices),
+    params = dict(t2=files_[2], maps=files_[0],
+                  labels=labels,
                   description=fdescr)
 
     return Bunch(**params)
