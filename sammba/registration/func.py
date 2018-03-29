@@ -961,8 +961,7 @@ def _func_to_template(func_coreg_filename, template_filename, write_dir,
     current_dir = os.getcwd()
     os.chdir(write_dir)  # XXX to remove
     normalized_filename = fname_presuffix(func_coreg_filename,
-                                          suffix='_normalized',
-                                          newpath=write_dir)
+                                          suffix='_normalized')
     if voxel_size is None:
         func_template_filename = template_filename
     else:
