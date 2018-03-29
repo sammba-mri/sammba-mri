@@ -241,6 +241,7 @@ def _per_slice_qwarp(to_qwarp_file, reference_file,
     # Slice anatomical image
     reference_img = nibabel.load(reference_file)
     reference_n_slices = reference_img.header.get_data_shape()[2]
+    print(write_dir)
     per_slice_dir = os.path.join(write_dir, 'per_slice')
     if not os.path.isdir(per_slice_dir):
         os.makedirs(per_slice_dir)

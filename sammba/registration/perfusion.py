@@ -103,7 +103,7 @@ class PerfSession(BaseSession):
 
     def __init__(self, perf=None, anat=None, brain_volume=None,
                  t_r=None, output_dir=None):
-        self.func = perf
+        self.perf = perf
         self.anat = anat
         self.brain_volume = brain_volume
         self.output_dir = output_dir
@@ -246,7 +246,7 @@ class PerfSession(BaseSession):
         ############################################
         registered_anat_oblique_filename, mat_filename, warp_output_files =\
             _warp(allineated_anat_filename, unbiased_perf_filename,
-                  self.output_dir, caching=caching,
+                  caching=caching,
                   terminal_output=terminal_output, overwrite=overwrite,
                   environ=environ)
         # Concatenate all the anat to func tranforms
