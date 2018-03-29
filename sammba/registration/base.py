@@ -492,8 +492,7 @@ def _transform_to_template(to_register_filename, template_filename, write_dir,
     current_dir = os.getcwd()
     os.chdir(write_dir)
     normalized_filename = fname_presuffix(to_register_filename,
-                                          suffix='_normalized',
-                                          newpath=write_dir)
+                                          suffix='_normalized')
 
     if voxel_size is None:
         resampled_template_filename = template_filename
