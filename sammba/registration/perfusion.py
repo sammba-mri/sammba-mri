@@ -14,72 +14,6 @@ from .base import (BaseSession, extract_brain, _rigid_body_register, _warp,
                    _per_slice_qwarp, _transform_to_template)
 
 
-def _realign(func_filename, write_dir, caching=False,
-             terminal_output='allatonce', environ={}):
-    if caching:
-        memory = Memory(write_dir)
-        clip_level = memory.cache(afni.ClipLevel)
-        calc = memory.cache(afni.Calc)
-        volreg = memory.cache(afni.Volreg)
-        allineate = memory.cache(afni.Allineate)
-        tstat = memory.cache(afni.TStat)
-        for step in [volreg, allineate, tstat, calc]:
-            step.interface().set_default_terminal_output(terminal_output)
-    else:
-        clip_level = afni.ClipLevel().run
-        calc = afni.Calc(terminal_output=terminal_output).run
-        volreg = afni.Volreg(terminal_output=terminal_output).run
-        allineate = afni.Allineate(terminal_output=terminal_output).run
-        tstat = afni.TStat(terminal_output=terminal_output).run
-
-    out_clip_level = clip_level(in_file=func_filename)
-    out_calc_threshold = calc(
-        in_file_a=func_filename,
-        expr='ispositive(a-{0}) * a'.format(out_clip_level.outputs.clip_val),
-        outputtype='NIFTI_GZ')
-    thresholded_filename = out_calc_threshold.outputs.out_file
-
-    out_volreg = volreg(  # XXX dfile not saved
-        in_file=thresholded_filename,
-        outputtype='NIFTI_GZ',
-        environ=environ,
-        oned_file=fname_presuffix(thresholded_filename,
-                                  suffix='Vr.1Dfile.1D', use_ext=False),
-        oned_matrix_save=fname_presuffix(thresholded_filename,
-                                         suffix='Vr.aff12.1D',
-                                         use_ext=False))
-
-    # Apply the registration to the whole head
-    out_allineate = allineate(in_file=func_filename,
-                              master=func_filename,
-                              in_matrix=out_volreg.outputs.oned_matrix_save,
-                              out_file=fname_presuffix(func_filename,
-                                                       suffix='Av',
-                                                       newpath=write_dir),
-                              environ=environ)
-
-    # 3dAllineate removes the obliquity. This is not a good way to readd it as
-    # removes motion correction info in the header if it were an AFNI file...as
-    # it happens it's NIfTI which does not store that so irrelevant!
-    allineated_filename = copy_geometry(
-        filename_to_copy=out_volreg.outputs.out_file,
-        filename_to_change=out_allineate.outputs.out_file)
-
-    # Create a (hopefully) nice mean image for use in the registration
-    out_tstat = tstat(in_file=allineated_filename, args='-mean',
-                      outputtype='NIFTI_GZ', environ=environ)
-
-    # Remove intermediate outputs
-    if not caching:
-        for output_file in [thresholded_filename,
-                            out_volreg.outputs.oned_matrix_save,
-                            out_volreg.outputs.out_file,
-                            out_volreg.outputs.md1d_file]:
-            os.remove(output_file)
-    return (allineated_filename, out_tstat.outputs.out_file,
-            out_volreg.outputs.oned_file)
-
-
 class PerfSession(BaseSession):
     """
     Encapsulation for perfusion data, relative to preprocessing.
@@ -197,7 +131,6 @@ class PerfSession(BaseSession):
 
         self._check_inputs()
         self._set_output_dir()
-
         perf_outputtype = _get_output_type(self.perf)
         anat_outputtype = _get_output_type(self.anat)
         output_files = []
@@ -246,7 +179,7 @@ class PerfSession(BaseSession):
         ############################################
         registered_anat_oblique_filename, mat_filename, warp_output_files =\
             _warp(allineated_anat_filename, unbiased_perf_filename,
-                  caching=caching,
+                  caching=caching, verbose=verbose,
                   terminal_output=terminal_output, overwrite=overwrite,
                   environ=environ)
         # Concatenate all the anat to func tranforms
@@ -264,8 +197,8 @@ class PerfSession(BaseSession):
         warped_mean_func_filename, warp_filenames, warped_func_filename =\
             _per_slice_qwarp(unbiased_perf_filename,
                              registered_anat_oblique_filename,
-                             self.output_dir, voxel_size_x, voxel_size_y,
-                             overwrite=overwrite,
+                             voxel_size_x, voxel_size_y, verbose=verbose,
+                             write_dir=self.output_dir, overwrite=overwrite,
                              caching=caching, terminal_output=terminal_output,
                              environ=environ)
         # Update the outputs
