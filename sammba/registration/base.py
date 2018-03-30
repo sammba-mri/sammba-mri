@@ -182,11 +182,15 @@ def _rigid_body_register(moving_head_file, reference_head_file,
     return out_allineate_apply.outputs.out_file, rigid_transform_file
 
 
-def _warp(to_warp_file, reference_file, caching=False,
+def _warp(to_warp_file, reference_file, write_dir=None, caching=False,
           terminal_output='allatonce', environ={}, verbose=True,
           overwrite=True):
+    # XXX: add verbosity
+    if write_dir is None:
+        write_dir = os.path.dirname(to_warp_file)
+
     if caching:
-        memory = Memory(os.path.dirname(to_warp_file))
+        memory = Memory(write_dir)
         warp = memory.cache(afni.Warp)
     else:
         warp = afni.Warp().run
@@ -198,7 +202,8 @@ def _warp(to_warp_file, reference_file, caching=False,
                     oblique_parent=reference_file,
                     interp='quintic',
                     gridset=reference_file,
-                    out_file=fname_presuffix(to_warp_file, suffix='_warped'),
+                    out_file=fname_presuffix(to_warp_file, suffix='_warped',
+                                             newpath=write_dir),
                     verbose=True,
                     environ=environ)
     warped_file = out_warp.outputs.out_file
@@ -207,12 +212,11 @@ def _warp(to_warp_file, reference_file, caching=False,
         overwrite=overwrite, verbose=verbose)
 
     # Concatenate all the anat to func tranforms
-    mat_file = fname_presuffix(warped_file, suffix='_warp.mat', use_ext=False)
-    output_files = []
+    mat_file = fname_presuffix(warped_file, suffix='_warp.mat', use_ext=False,
+                               newpath=write_dir)
     if not os.path.isfile(mat_file):
         np.savetxt(mat_file, [out_warp.runtime.stdout], fmt='%s')
-        output_files.append(mat_file)
-    return warped_oblique_file, mat_file, output_files
+    return warped_oblique_file, mat_file
 
 
 def _per_slice_qwarp(to_qwarp_file, reference_file,
@@ -362,7 +366,8 @@ def _per_slice_qwarp(to_qwarp_file, reference_file,
 
     out_merge_func = merge(
         in_files=resampled_warped_slices,
-        out_file=fname_presuffix(to_qwarp_file, suffix='_perslice'),
+        out_file=fname_presuffix(to_qwarp_file, suffix='_perslice',
+                                 newpath=write_dir),
         environ=environ)
 
     # Fix the obliquity
@@ -402,8 +407,8 @@ def _per_slice_qwarp(to_qwarp_file, reference_file,
                                             master=sliced_apply_to_file,
                                             warp=warp_file,
                                             out_file=fname_presuffix(
-                                                    sliced_apply_to_file,
-                                                    suffix='_qwarped'),
+                                                sliced_apply_to_file,
+                                                suffix='_qwarped'),
                                             environ=environ)
                 warped_apply_to_slices.append(out_warp_apply.outputs.out_file)
 
@@ -432,7 +437,7 @@ def _per_slice_qwarp(to_qwarp_file, reference_file,
         merged_apply_to_file = None
 
     if not caching:
-        for out_file in np.unique(output_files):
+        for out_file in output_files:
             os.remove(out_file)
 
     return (out_merge_func.outputs.out_file, warp_files,

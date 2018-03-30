@@ -1,14 +1,7 @@
 import os
-import numpy as np
-import nibabel
-from sklearn.utils import deprecated
-from nilearn._utils.compat import _basestring
 from sammba.externals.nipype.caching import Memory
-from sammba.externals.nipype.interfaces import afni, ants, fsl
+from sammba.externals.nipype.interfaces import afni, ants
 from sammba.externals.nipype.utils.filemanip import fname_presuffix
-from sammba.interfaces import segmentation
-from .fmri_session import FMRISession
-from .utils import fix_obliquity, copy_geometry, _get_output_type
 from .struct import anats_to_template
 from .base import (BaseSession, extract_brain, _rigid_body_register, _warp,
                    _per_slice_qwarp, _transform_to_template)
@@ -119,6 +112,7 @@ class PerfSession(BaseSession):
             memory = Memory(self.output_dir)
             tshift = memory.cache(afni.TShift)
             unifize = memory.cache(afni.Unifize)
+            bias_correct = memory.cache(ants.N4BiasFieldCorrection)
             catmatvec = memory.cache(afni.CatMatvec)
             for step in [tshift, unifize]:
                 step.interface().set_default_terminal_output(terminal_output)
@@ -126,27 +120,34 @@ class PerfSession(BaseSession):
         else:
             tshift = afni.TShift(terminal_output=terminal_output).run
             unifize = afni.Unifize(terminal_output=terminal_output).run
+            bias_correct = ants.N4BiasFieldCorrection(
+                terminal_output=terminal_output).run
             catmatvec = afni.CatMatvec().run
             overwrite = True
 
         self._check_inputs()
         self._set_output_dir()
-        perf_outputtype = _get_output_type(self.perf)
-        anat_outputtype = _get_output_type(self.anat)
         output_files = []
 
         ###########################################
         # Corret anat and perf for intensity bias #
         ###########################################
         # Correct the functional average for intensities bias
-        out_bias_correct = unifize(
-            in_file=self.perf,
-            out_file=fname_presuffix(self.perf, suffix='_unifized'),
-            environ=environ)
-        unbiased_perf_filename = out_bias_correct.outputs.out_file
+        out_bias_correct = bias_correct(input_image=self.perf,
+                                        output_image=fname_presuffix(self.perf, suffix='_unbiased',
+                                     newpath=self.output_dir))
+
+        unbiased_perf_filename = out_bias_correct.outputs.output_image
+        import nibabel
+        print(nibabel.load(self.perf).shape)
+        print(nibabel.load(unbiased_perf_filename).shape)
+        stop
 
         # Bias correct the antomical image
-        out_unifize = unifize(in_file=self.anat, outputtype=anat_outputtype,
+        out_unifize = unifize(in_file=self.anat,
+                              out_file=fname_presuffix(self.anat,
+                                                       suffix='_unifized',
+                                                       newpath=self.output_dir),
                               environ=environ)
         unbiased_anat_filename = out_unifize.outputs.out_file
 
@@ -177,13 +178,14 @@ class PerfSession(BaseSession):
         ############################################
         # Nonlinear registration anat -> mean func #
         ############################################
-        registered_anat_oblique_filename, mat_filename, warp_output_files =\
+        registered_anat_oblique_filename, mat_filename =\
             _warp(allineated_anat_filename, unbiased_perf_filename,
                   caching=caching, verbose=verbose,
                   terminal_output=terminal_output, overwrite=overwrite,
                   environ=environ)
+
         # Concatenate all the anat to func tranforms
-        output_files.extend(warp_output_files)
+        output_files.append(mat_filename)
         transform_filename = fname_presuffix(registered_anat_oblique_filename,
                                              suffix='_anat_to_func.aff12.1D',
                                              use_ext=False)
@@ -194,21 +196,22 @@ class PerfSession(BaseSession):
         ##################################################
         # Per-slice non-linear registration func -> anat #
         ##################################################
-        warped_mean_func_filename, warp_filenames, warped_func_filename =\
+        warped_perf_filename, warp_filenames, _ =\
             _per_slice_qwarp(unbiased_perf_filename,
                              registered_anat_oblique_filename,
                              voxel_size_x, voxel_size_y, verbose=verbose,
                              write_dir=self.output_dir, overwrite=overwrite,
                              caching=caching, terminal_output=terminal_output,
                              environ=environ)
-        # Update the outputs
-        output_files.append(warped_mean_func_filename)
+        print(output_files)
+
+        # Remove the intermediate outputs
         if not caching:
             for out_file in output_files:
                 os.remove(out_file)
 
         # Update the fmri data
-        setattr(self, "coreg_perf_", warped_func_filename)
+        setattr(self, "coreg_perf_", warped_perf_filename)
         setattr(self, "coreg_anat_", registered_anat_oblique_filename)
         setattr(self, "coreg_transform_", transform_filename)
         setattr(self, "coreg_warps_", warp_filenames)
