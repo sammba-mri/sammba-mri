@@ -1,4 +1,6 @@
 import os
+from sklearn.base import _pprint
+from sklearn.utils.fixes import signature
 from ..externals.nipype.caching import Memory
 from ..externals.nipype.interfaces import afni
 from ..interfaces import segmentation
