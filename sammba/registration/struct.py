@@ -421,8 +421,11 @@ def anats_to_common(anat_filenames, write_dir, brain_volume,
 
     if registration_kind == 'rigid':
         os.chdir(current_dir)
+
         return Bunch(registered=shift_rotated_head_files,
-                     transforms=rigid_transform_files)
+                     transforms=rigid_transform_files,
+                     brain_masks=brain_mask_files,
+                     unifized=unifized_files)
 
     ###########################################################################
     # Affine transform
@@ -519,7 +522,9 @@ def anats_to_common(anat_filenames, write_dir, brain_volume,
     if registration_kind == 'affine':
         os.chdir(current_dir)
         return Bunch(registered=allineated_head_files,
-                     transforms=affine_transform_files)
+                     transforms=affine_transform_files,
+                     brain_masks=brain_mask_files,
+                     unifized=unifized_files)
 
     ###########################################################################
     # Non-linear registration
@@ -648,8 +653,11 @@ def anats_to_common(anat_filenames, write_dir, brain_volume,
         warped_files.append(out_warp_apply.outputs.out_file)
 
     os.chdir(current_dir)
+
     return Bunch(registered=warped_files,
-                 transforms=warp_files)
+                 transforms=warp_files,
+                 brain_masks=brain_mask_files,
+                 unifized=unifized_files)
 
 
 def anats_to_template(anat_filenames, head_template_filename, write_dir,
@@ -928,4 +936,6 @@ def anats_to_template(anat_filenames, head_template_filename, write_dir,
     # XXX can't we just catenate the affine to the warp?
     return Bunch(registered=registered,
                  transforms=warp_transforms,
-                 pre_transforms=affine_transforms)
+                 pre_transforms=affine_transforms,
+                 brain_masks=brain_mask_files,
+                 unifized=unbiased_anat_filenames)

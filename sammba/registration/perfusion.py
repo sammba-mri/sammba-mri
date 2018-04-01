@@ -3,6 +3,7 @@ from sammba.externals.nipype.caching import Memory
 from sammba.externals.nipype.interfaces import afni, ants
 from sammba.externals.nipype.utils.filemanip import fname_presuffix
 from .struct import anats_to_template
+from .utils import compute_n4_max_shrink
 from .base import (BaseSession, extract_brain, _rigid_body_register, _warp,
                    _per_slice_qwarp, _transform_to_template)
 
@@ -28,9 +29,10 @@ class PerfSession(BaseSession):
         used.
     """
 
-    def __init__(self, perf=None, anat=None, brain_volume=None,
+    def __init__(self, perf=None, m0=None, anat=None, brain_volume=None,
                  t_r=None, output_dir=None):
         self.perf = perf
+        self.m0 = m0
         self.anat = anat
         self.brain_volume = brain_volume
         self.output_dir = output_dir
@@ -39,6 +41,10 @@ class PerfSession(BaseSession):
         if not os.path.isfile(self.perf):
             raise IOError('perf must be an existing image file,'
                           'you gave {0}'.format(self.perf))
+
+        if not os.path.isfile(self.m0):
+            raise IOError('m0 must be an existing image file,'
+                          'you gave {0}'.format(self.m0))
 
         if not os.path.isfile(self.anat):
             raise IOError('anat must be an existing image file,'
@@ -98,6 +104,8 @@ class PerfSession(BaseSession):
         and has to be cited. For more information, see
         `RATS <http://www.iibi.uiowa.edu/content/rats-overview/>`_
         """
+        self._check_inputs()
+        self._set_output_dir()
 
         environ = {'AFNI_DECONFLICT': 'OVERWRITE'}
         for (key, value) in environ_kwargs.items():
@@ -110,39 +118,23 @@ class PerfSession(BaseSession):
 
         if caching:
             memory = Memory(self.output_dir)
-            tshift = memory.cache(afni.TShift)
             unifize = memory.cache(afni.Unifize)
             bias_correct = memory.cache(ants.N4BiasFieldCorrection)
             catmatvec = memory.cache(afni.CatMatvec)
-            for step in [tshift, unifize]:
-                step.interface().set_default_terminal_output(terminal_output)
+            unifize.interface().set_default_terminal_output(terminal_output)
             overwrite = False
         else:
-            tshift = afni.TShift(terminal_output=terminal_output).run
             unifize = afni.Unifize(terminal_output=terminal_output).run
             bias_correct = ants.N4BiasFieldCorrection(
                 terminal_output=terminal_output).run
             catmatvec = afni.CatMatvec().run
             overwrite = True
 
-        self._check_inputs()
-        self._set_output_dir()
         output_files = []
 
         ###########################################
-        # Corret anat and perf for intensity bias #
+        # Corret anat and M0 for intensity bias #
         ###########################################
-        # Correct the functional average for intensities bias
-        out_bias_correct = bias_correct(input_image=self.perf,
-                                        output_image=fname_presuffix(self.perf, suffix='_unbiased',
-                                     newpath=self.output_dir))
-
-        unbiased_perf_filename = out_bias_correct.outputs.output_image
-        import nibabel
-        print(nibabel.load(self.perf).shape)
-        print(nibabel.load(unbiased_perf_filename).shape)
-        stop
-
         # Bias correct the antomical image
         out_unifize = unifize(in_file=self.anat,
                               out_file=fname_presuffix(self.anat,
@@ -151,8 +143,17 @@ class PerfSession(BaseSession):
                               environ=environ)
         unbiased_anat_filename = out_unifize.outputs.out_file
 
+        # Correct the functional average for intensities bias
+        out_bias_correct = bias_correct(
+            input_image=self.m0,
+            shrink_factor=compute_n4_max_shrink(self.m0),
+            output_image=fname_presuffix(self.m0, suffix='_unbiased',
+                                         newpath=self.output_dir))
+
+        unbiased_m0_filename = out_bias_correct.outputs.output_image
+
         # Update outputs
-        output_files.extend([unbiased_perf_filename,
+        output_files.extend([unbiased_m0_filename,
                              unbiased_anat_filename])
 
         #############################################
@@ -164,7 +165,7 @@ class PerfSession(BaseSession):
                                  "rigid-body registration")
             allineated_anat_filename, rigid_transform_file = \
                 _rigid_body_register(unbiased_anat_filename,
-                                     unbiased_perf_filename,
+                                     unbiased_m0_filename,
                                      self.output_dir, self.brain_volume,
                                      use_rats_tool=use_rats_tool,
                                      caching=caching,
@@ -179,7 +180,7 @@ class PerfSession(BaseSession):
         # Nonlinear registration anat -> mean func #
         ############################################
         registered_anat_oblique_filename, mat_filename =\
-            _warp(allineated_anat_filename, unbiased_perf_filename,
+            _warp(allineated_anat_filename, unbiased_m0_filename,
                   caching=caching, verbose=verbose,
                   terminal_output=terminal_output, overwrite=overwrite,
                   environ=environ)
@@ -196,10 +197,12 @@ class PerfSession(BaseSession):
         ##################################################
         # Per-slice non-linear registration func -> anat #
         ##################################################
-        warped_perf_filename, warp_filenames, _ =\
-            _per_slice_qwarp(unbiased_perf_filename,
+        warped_m0_filename, warp_filenames, warped_perf_filename =\
+            _per_slice_qwarp(unbiased_m0_filename,
                              registered_anat_oblique_filename,
-                             voxel_size_x, voxel_size_y, verbose=verbose,
+                             voxel_size_x, voxel_size_y,
+                             apply_to_file=self.perf,
+                             verbose=verbose,
                              write_dir=self.output_dir, overwrite=overwrite,
                              caching=caching, terminal_output=terminal_output,
                              environ=environ)
@@ -212,6 +215,7 @@ class PerfSession(BaseSession):
 
         # Update the fmri data
         setattr(self, "coreg_perf_", warped_perf_filename)
+        setattr(self, "coreg_m0_", warped_m0_filename)
         setattr(self, "coreg_anat_", registered_anat_oblique_filename)
         setattr(self, "coreg_transform_", transform_filename)
         setattr(self, "coreg_warps_", warp_filenames)
@@ -270,9 +274,9 @@ class PerfSession(BaseSession):
         sammba.registration.anats_to_template
         """
         self._check_inputs()
-        if not hasattr(self, 'coreg_func_') or not hasattr(self,
-                                                           'coreg_transform_'):
-            raise ValueError('Anatomical and functional have not been '
+        if not hasattr(self, 'coreg_m0_') or not hasattr(self,
+                                                         'coreg_transform_'):
+            raise ValueError('Anatomical and M0 have not been '
                              'coregistered. Please use `coreg` function first')
 
         # XXX do a function for creating new attributes ?
@@ -288,12 +292,21 @@ class PerfSession(BaseSession):
             caching=caching, verbose=verbose)
         setattr(self, "registered_anat_", anats_registration.registered[0])
 
-        normalized_func_filename = _transform_to_template(
-            self.coreg_func_,
+        normalized_m0_filename = _transform_to_template(
+            self.coreg_m0_,
             head_template_filename,
             self.output_dir,
             [self.coreg_transform_, anats_registration.pre_transforms[0],
              anats_registration.transforms[0]],
             voxel_size=func_voxel_size, caching=caching, verbose=verbose)
 
-        setattr(self, "registered_func_", normalized_func_filename)
+        setattr(self, "registered_m0_", normalized_m0_filename)
+        normalized_perf_filename = _transform_to_template(
+            self.coreg_perf_,
+            head_template_filename,
+            self.output_dir,
+            [self.coreg_transform_, anats_registration.pre_transforms[0],
+             anats_registration.transforms[0]],
+            voxel_size=func_voxel_size, caching=caching, verbose=verbose)
+
+        setattr(self, "registered_perf_", normalized_perf_filename)

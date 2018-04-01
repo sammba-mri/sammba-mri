@@ -4,7 +4,7 @@ from ..externals.nipype.caching import Memory
 from ..externals.nipype.interfaces import afni
 from ..externals.nipype.utils.filemanip import fname_presuffix
 from .struct import anats_to_template
-from .utils import _get_output_type
+from .utils import _get_afni_outputtype
 from .base import (BaseSession, extract_brain, _rigid_body_register,
                    _warp, _transform_to_template)
 

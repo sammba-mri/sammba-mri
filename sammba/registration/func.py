@@ -8,7 +8,7 @@ from sammba.externals.nipype.interfaces import afni, ants, fsl
 from sammba.externals.nipype.utils.filemanip import fname_presuffix
 from sammba.interfaces import segmentation
 from .fmri_session import FMRISession
-from .utils import fix_obliquity, copy_geometry, _get_output_type
+from .utils import fix_obliquity, copy_geometry, _get_afni_outputtype
 from .struct import anats_to_template
 from .base import (BaseSession, extract_brain, _rigid_body_register, _warp,
                    _per_slice_qwarp, _transform_to_template)

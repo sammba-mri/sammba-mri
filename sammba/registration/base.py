@@ -337,7 +337,9 @@ def _per_slice_qwarp(to_qwarp_file, reference_file,
                                '-parfix 10 0 -parfix 12 0',
                 out_file=warped_slice,
                 environ=environ)
-            warped_slices.append(out_qwarp.outputs.warped_source)
+            # XXX fix qwarp bug : out_qwarp.outputs.warped_source extension is
+            # +tlrc.HEAD if base_file and in_file are of different extensions
+            warped_slices.append(warped_slice)
             warp_files.append(out_qwarp.outputs.source_warp)
             # There are files geenrated by the allineate option
             output_files.extend([
@@ -346,8 +348,10 @@ def _per_slice_qwarp(to_qwarp_file, reference_file,
                 fname_presuffix(out_qwarp.outputs.warped_source,
                                 suffix='_Allin.aff12.1D', use_ext=False)])
 
+    print(nibabel.load(warped_slices[0]).shape)
+
     # Resample the mean volume back to the initial resolution,
-    voxel_size = nibabel.load(to_qwarp_file).header.get_zooms()
+    voxel_size = nibabel.load(to_qwarp_file).header.get_zooms()[:3]
     resampled_warped_slices = []
     for warped_slice in warped_slices:
         out_resample = resample(in_file=warped_slice,
@@ -357,6 +361,8 @@ def _per_slice_qwarp(to_qwarp_file, reference_file,
                                 environ=environ)
         resampled_warped_slices.append(out_resample.outputs.out_file)
 
+    print(nibabel.load(resampled_warped_slices[0]).shape)
+
     # fix the obliquity
     for (sliced_reference_file, resampled_warped_slice) in zip(
             sliced_reference_files, resampled_warped_slices):
@@ -364,16 +370,19 @@ def _per_slice_qwarp(to_qwarp_file, reference_file,
                           sliced_reference_file,
                           overwrite=overwrite, verbose=verbose)
 
+    print(nibabel.load(resampled_warped_slices[0]).shape)
     out_merge_func = merge(
         in_files=resampled_warped_slices,
         out_file=fname_presuffix(to_qwarp_file, suffix='_perslice',
                                  newpath=write_dir),
         environ=environ)
+    print(nibabel.load(out_merge_func.outputs.out_file).shape)
 
     # Fix the obliquity
     _ = fix_obliquity(out_merge_func.outputs.out_file, reference_file,
                       overwrite=overwrite, verbose=verbose)
 
+    print(nibabel.load(out_merge_func.outputs.out_file).shape)
     # Collect the outputs
     output_files.extend(sliced_reference_files +
                         sliced_to_qwarp_files +
