@@ -3,7 +3,8 @@ from sammba.externals.nipype.interfaces import afni
 from sammba.externals.nipype.utils.filemanip import fname_presuffix
 from sammba.externals.nipype.caching import Memory
 from sklearn.datasets.base import Bunch
-from sammba.interfaces import segmentation
+from .base import BaseRegistrator, compute_brain_mask, _bias_correct, unifize
+from .perfusion import coregister as coregister_perf
 
 
 def anats_to_common(anat_filenames, brain_mask_files,
@@ -835,3 +836,274 @@ def anats_to_template(anat_filenames, brain_mask_files, head_template_filename,
     return Bunch(registered=registered,
                  transforms=warp_transforms,
                  pre_transforms=affine_transforms)
+
+
+class TemplateRegistrator(BaseRegistrator):
+    """
+    Encapsulation for anatomical data, relative to registration to a template.
+
+    Parameters
+    ----------
+    anat : str
+        Path to the anatomical image.
+
+    head_template : str
+        Path to the template image.
+
+    brain_volume : int
+        Volume of the brain used for brain extraction.
+        Typically 400 for mouse and 1650 for rat.
+
+    brain_template_mask : str, optional
+        Path to the template brain mask image.
+
+    dilated_template_mask : str, optional
+        Path to a dilated head mask. Note that this must be compliant with the
+        the given head template. If None, the mask is set to the non-background
+        voxels of the head template after one dilation.
+
+    output_dir : str, optional
+        Path to the output directory. If not specified, current directory is
+        used.
+
+    caching : bool, optional
+        If True, caching is used for all the registration steps.
+
+    verbose : int, optional
+        Verbosity level. Note that caching implies some
+        verbosity in any case.
+
+    clip_level_fraction : float, optional
+        Clip level fraction passed to
+        sammba.externals.nipype.interfaces.afni.Unifize, to tune
+        the bias correction step done prior to brain mask segementation.
+        Smaller fractions tend to make the mask larger.
+    """
+
+    def __init__(self, anat=None, template=None,
+                 brain_template_mask=None, brain_volume=None,
+                 dilated_template_mask=None, output_dir=None, caching=False,
+                 verbose=True, use_rats_tools=True,
+                 clip_level_fraction=.1):
+        self.anat = anat
+        self.template = template
+        self.brain_template_mask = brain_template_mask
+        self.dilated_template_mask = dilated_template_mask
+        self.brain_volume = brain_volume
+        self.output_dir = output_dir
+        self.use_rats_tools = use_rats_tools
+        self.caching = caching
+        self.verbose = verbose
+        self.clip_level_fraction = self.clip_level_fraction
+
+    def _check_inputs(self):
+        if not os.path.isfile(self.anat):
+            raise IOError('`anat` must be an existing '
+                          'image file, you gave {0}'.format(self.anat))
+
+        if not os.path.isfile(self.template):
+            raise IOError('`template` must be an existing '
+                          'image file, you gave {0}'.format(self.template))
+
+        if self.brain_volume is None:
+            raise IOError('`brain_volume` must be provided')
+
+        self._output_type = _get_afni_output_type(self.anat)
+        if self.verbose:
+            self.terminal_output = 'stream'
+        else:
+            self.terminal_output = 'none'
+
+        if self.caching:
+            self._memory = Memory(self.output_dir)
+
+    def segment(self):
+        brain_mask_file = compute_brain_mask(
+            self.anat, self.brain_volume, write_dir=self.output_dir,
+            caching=self.caching,
+            terminal_output=self.terminal_output,
+            use_rats_tool=self.use_rats_tool,
+            unifize_kwargs={'cl_frac': self.clip_level_fraction})
+        setattr(self, 'brain_mask_', brain_mask_file)
+        return self
+
+    def _unifize(self):
+        unifized_anat_file = unifize(self.anat, write_dir=self.output_dir,
+                                     terminal_output=self.terminal_output,
+                                     caching=self.caching)
+        setattr(self, '_unifized_anat', unifized_anat_file)
+        return self
+
+    def normalize(self):
+        """ Estimates noramlization from anatomical to template space.
+        """
+        self._unifize()
+        normalization = anats_to_template(
+            [self._unifized_anat], [self.brain_mask_], self.template,
+            self.brain_template_mask, write_dir=self.output_dir,
+            dilated_head_mask_filename=self.dilated_template_mask,
+            caching=self.caching, verbose=self.verbose)
+        setattr(self, 'normalized_anat', normalization.registered_files[0])
+        setattr(self, '_normalization_transform',
+                normalization.transform_files[0])
+        return self
+
+    def coregister_modality(self, in_file, modality, in_brain_mask_file=None,
+                            apply_to_files=None,
+                            prior_rigid_body_registration=False):
+        """ Coregisters the anatomical and the given modality to the same space
+        """
+        unbiased_file = _bias_correct(in_file, write_dir=self.output_dir,
+                                      terminal_output=self.terminal_output,
+                                      caching=self.caching)
+        if modality == 'func':
+            coregistration = coregister_func(
+                self._unifized, unbiased_file,
+                anat_brain_mask_file=self.brain_mask_,
+                func_brain_mask_file=in_brain_mask_file,
+                apply_to_file=apply_to_files,
+                prior_rigid_body_registration=prior_rigid_body_registration)
+            coreg_modality_file = coregistration.coreg_func
+            setattr(self, 'coreg_anat_', coregistration.coreg_anat)
+            setattr(self, '_coreg_transform', coregistration.coreg_transform)
+        elif modality == 'perf':
+            coregistration = coregister_perf(
+                self._unifized, unbiased_file,
+                anat_brain_mask_file=self.brain_mask_,
+                m0_brain_mask_file=in_brain_mask_file,
+                apply_to_file=apply_to_files,
+                prior_rigid_body_registration=prior_rigid_body_registration)
+            coreg_modality_file = coregistration.coreg_perf
+            setattr(self, 'coreg_anat_', coregistration.coreg_anat)
+            setattr(self, '_coreg_transform', coregistration.coreg_transform)
+        else:
+            raise ValueError("Only 'func' and 'perf' modalities are"
+                             "implemented")
+        return coreg_modality_file
+
+    def normalize_modality(self, in_file, voxel_size=None):
+        """ Applies normalization from coregistration space to template space
+        """
+        if not hasattr(self, '_coref_transform'):
+            raise ValueError('anatomical image has not been coregistered to'
+                             'the {} space'.format(in_file))
+        if not _check_coregistration(in_file, self.coreg_anat):
+            raise ValueError('{0} and {1} are not coregistered'.format(
+                in_file, self.coreg_anat_))
+
+        normalized_file = _transform_to_template(
+            in_file, self.template, self.output_dir
+            [self._coreg_transform, self._normalization_transform],
+            voxel_size=voxel_size)
+        return normalized_file
+
+    def inverse_normalize_modality(self, in_file):
+        """ Applies inverse normalization from template space to modality space
+        """
+        if not hasattr(self, '_coref_transform'):
+            raise ValueError('anatomical image has not been coregistered to'
+                             'the {} space'.format(in_file))
+        if not _check_coregistration(in_file, self.coreg_anat):
+            raise ValueError('{0} and {1} are not coregistered'.format(
+                in_file, self.coreg_anat_))
+
+        inverse_normalized_file = _inverse_transform_to_template(
+            in_file, self.template, self.output_dir
+            [self._coreg_transform, self._normalization_transform])
+        return inverse_normalized_file
+
+
+class GroupAnatSession(BaseSession):
+    """
+    Encapsulation for anatomical data from a given cohort, relative to
+    preprocessing.
+
+    Parameters
+    ----------
+    anats : list of str
+        Path to anatomical images
+
+    brain_volume : int
+        Volume of the brain used for brain extraction.
+        Typically 400 for mouse and 1650 for rat.
+
+    output_dir : str, optional
+        Path to the output directory. If not specified, current directory is
+        used.
+    """
+
+    def __init__(self, anats=None, brain_volume=None, output_dir=None,
+                 caching=False, verbose=True):
+        self.anats = anats
+        self.brain_volume = brain_volume
+        self.output_dir = output_dir
+        self.caching = caching
+        self.verbose = verbose
+
+    def _check_inputs(self):
+        if not hasattr(self.anats, '__iter__'):
+            raise ValueError('anats must be an iterable,'
+                             'you gave {0}'.format(self.anats))
+        for anat in self.anats:
+            if not os.path.isfile(anat):
+                raise IOError('Each element of `anats` must be an existing '
+                              'image file, you gave {0}'.format(anat))
+
+    def fit(self):
+        self._output_types = [_get_afni_output_type(a) for a in self.anat]
+
+    def segment(self, unifize=True, use_rats_tool=True, **unifize_kwargs):
+        brain_mask_files = []
+        for anat_file in self.anats:
+            brain_mask_file = compute_brain_mask(
+                anat_file, self.brain_volume, unifize=unifize, caching=caching,
+                terminal_output='allatonce', use_rats_tool=True,
+                unifize_kwargs=unifize_kwargs)
+            brain_mask_files.append(brain_mask_file)
+        setattr(self, '_brain_masks', brain_mask_files)
+
+    def _bias_correct(self, **unifize_kwargs):
+        if self.verbose:
+            terminal_output = 'stream'
+            quietness_kwargs = {}
+        else:
+            terminal_output = 'none'
+            quietness_kwargs = {'quiet': True}
+
+        if self.caching:
+            memory = Memory(self.output_dir)
+            unifize = memory.cache(afni.Unifize)
+            calc = memory.cache(afni.Calc)
+            for step in [unifize, calc]:
+                step.interface().set_default_terminal_output(terminal_output)
+        else:
+            unifize = afni.Unifize(terminal_output=terminal_output).run
+            calc = afni.Calc(terminal_output=terminal_output).run
+
+            if unifize_kwargs is None:
+                unifize_kwargs = {}
+
+        unifize_kwargs.update(quietness_kwargs)
+
+        unifized_files = []
+        brain_files = []
+        for anat_file, brain_mask_file, output_type in zip(self.anats,
+                                                           self.brain_masks,
+                                                           self._output_types):
+            out_unifize = unifize(in_file=anat_file,
+                                  out_file='%s_unifized',
+                                  outputtype=output_type,
+                                  **unifize_kwargs)
+            out_calc_mask = calc(in_file_a=out_unifize.outputs.out_file,
+                                 in_file_b=brain_mask_file,
+                                 expr='a*b',
+                                 outputtype=output_type)
+            unifized_files.append(out_unifize.outputs.out_file)
+            brain_files.append(out_calc_mask.outputs.out_file)
+        setattr(self, 'unifized', unifized_files)
+        setattr(self, 'brains', brain_files)
+
+    def normalize(self, head_template_file=None, brain_template_file=None,
+                  registration_kind='nonlinear', **unifize_kwargs):
+        if head_template_file is None:
+            normalization = anats_to_common(self.unifized, self.brains)
