@@ -335,7 +335,7 @@ def coregister_fmri_session(session_data, t_r, write_dir, brain_volume,
     transform_filename = fname_presuffix(registered_anat_filename,
                                          suffix='_anat_to_func.aff12.1D',
                                          use_ext=False)
-    if False:#prior_rigid_body_registration:
+    if prior_rigid_body_registration:
         _ = catmatvec(in_file=[(mat_filename, 'ONELINE'),
                                (rigid_transform_file, 'ONELINE')],
                       oneline=True,
