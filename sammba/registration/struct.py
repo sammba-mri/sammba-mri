@@ -785,7 +785,11 @@ def anats_to_template(anat_filenames, head_template_filename, write_dir,
             in_file=head_template_filename,
             volume_threshold=brain_volume,
             intensity_threshold=int(out_clip_level.outputs.clip_val))
-        brain_template_filename = out_rats.outputs.out_file
+        out_calc_mask = calc(in_file_a=head_template_filename,
+                             in_file_b=out_rats.outputs.out_file,
+                             expr='a*b',
+                             outputtype='NIFTI_GZ')
+        brain_template_filename = out_calc_mask.outputs.out_file
 
     if dilated_head_mask_filename is None:
         out_clip_level = clip_level(in_file=head_template_filename)
