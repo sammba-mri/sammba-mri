@@ -289,16 +289,14 @@ def coregister_fmri_session(session_data, t_r, write_dir, brain_volume,
         # apply the inverse transform to register the anatomical to the func
         catmatvec_out_file = fname_presuffix(rigid_transform_file,
                                              suffix='INV')
-        if not os.path.isfile(catmatvec_out_file):
-            _ = catmatvec(in_file=[(rigid_transform_file, 'I')],
-                          oneline=True,
-                          out_file=catmatvec_out_file)
-            # XXX not cached I don't understand why
-            output_files.append(catmatvec_out_file)
+        out_catmatvec = catmatvec(in_file=[(rigid_transform_file, 'I')],
+                                           oneline=True,
+                                  out_file=catmatvec_out_file)
+        output_files.append(out_catmatvec.outputs.out_file)
         out_allineate = allineate(
             in_file=unbiased_anat_filename,
             master=unbiased_func_filename,
-            in_matrix=catmatvec_out_file,
+            in_matrix=out_catmatvec.outputs.out_file,
             out_file=fname_presuffix(unbiased_anat_filename,
                                      suffix='_shr_in_func_space'),
             environ=environ)

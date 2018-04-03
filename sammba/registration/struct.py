@@ -472,7 +472,7 @@ def anats_to_common(anat_filenames, write_dir, brain_volume,
                                            (out_allineate.outputs.out_matrix,
                                             'ONELINE')],
                                   out_file=catmatvec_out_file)
-        affine_transform_files.append(catmatvec_out_file)
+        affine_transform_files.append(out_catmatvec.outputs.out_file)
 
     # application to brains
     allineated_brain_files = []
