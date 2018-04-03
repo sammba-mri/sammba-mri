@@ -124,7 +124,7 @@ def _apply_mask(head_file, brain_mask_file, write_dir, bias_correct=True,
     environ = {}
     if caching:
         memory = Memory(write_dir)
-        calc = memory.cache(afni.Cacl)
+        calc = memory.cache(afni.Calc)
         calc.interface().set_default_terminal_output(terminal_output)
     else:
         calc = afni.Calc(terminal_output=terminal_output).run
