@@ -645,13 +645,6 @@ class CatMatvec(AFNICommand):
             return spec.argstr%(' '.join([i[0]+' -'+i[1] for i in value]))
         return super(CatMatvec, self)._format_arg(name, spec, value)
 
-    def _list_outputs(self):
-        outputs = self.output_spec().get()
-
-        if self.inputs.out_file:
-            outputs['out_file'] = op.abspath(self.inputs.out_file)
-        return outputs
-
 
 class CenterMassInputSpec(CommandLineInputSpec):
     in_file = File(
