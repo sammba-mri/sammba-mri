@@ -3,7 +3,8 @@ from sammba.externals.nipype.interfaces import afni
 from sammba.externals.nipype.utils.filemanip import fname_presuffix
 from sammba.externals.nipype.caching import Memory
 from sklearn.datasets.base import Bunch
-from .base import BaseRegistrator, compute_brain_mask, _bias_correct, unifize
+from .base import (BaseRegistrator, compute_brain_mask, _bias_correct,
+                   _afni_bias_correct, _apply_mask)
 from .perfusion import coregister as coregister_perf
 
 
@@ -610,8 +611,9 @@ def anats_to_common(anat_filenames, brain_mask_files,
                  transforms=warp_files)
 
 
-def anats_to_template(anat_filenames, brain_mask_files, head_template_filename,
-                      brain_template_filename, write_dir=None,
+def anats_to_template(unbiased_anat_filenames, unbiased_brain_files,
+                      head_template_filename,
+                      brain_extracted_template_filename, write_dir=None,
                       dilated_head_mask_filename=None, convergence=.005,
                       maxlev=None,
                       caching=False, verbose=1, unifize_kwargs=None,
@@ -629,9 +631,8 @@ def anats_to_template(anat_filenames, brain_mask_files, head_template_filename,
     head_template_filename : str
         Path to the head template.
 
-    brain_template_filename : str
-        Path to a brain template. Note that this must coincide with the brain
-        from the given head template.
+    brain_template_mask_filename : str
+        Path to a brain mask for the template.
 
     write_dir : str, optional
         Path to an existant directory to save output files to. If None, the
@@ -698,13 +699,11 @@ def anats_to_template(anat_filenames, brain_mask_files, head_template_filename,
         mask_tool = memory.cache(afni.MaskTool)
         allineate = memory.cache(afni.Allineate)
         allineate2 = memory.cache(afni.Allineate)
-        unifize = memory.cache(afni.Unifize)
         qwarp = memory.cache(afni.Qwarp)
         for step in [allineate, allineate2, calc,
-                     mask_tool, unifize, qwarp]:
+                     mask_tool, qwarp]:
             step.interface().set_default_terminal_output(terminal_output)
     else:
-        unifize = afni.Unifize(terminal_output=terminal_output).run
         clip_level = afni.ClipLevel().run
         calc = afni.Calc(terminal_output=terminal_output).run
         mask_tool = afni.MaskTool(terminal_output=terminal_output).run
@@ -729,27 +728,11 @@ def anats_to_template(anat_filenames, brain_mask_files, head_template_filename,
         dilated_head_mask_filename = out_mask_tool.outputs.out_file
         intermediate_files.append(out_calc_threshold.outputs.out_file)
 
-    if unifize_kwargs is None:
-        unifize_kwargs = {}
-    unifize_kwargs.update(quietness_kwargs)
-
-    unbiased_anat_filenames = []
-    for anat_filename in anat_filenames:
-        out_unifize = unifize(in_file=anat_filename, environ=environ,
-                              urad=18.3, outputtype='NIFTI_GZ',
-                              **unifize_kwargs)
-        unbiased_anat_filenames.append(out_unifize.outputs.out_file)
-
     affine_transforms = []
     allineated_filenames = []
     for (unbiased_anat_filename,
-         brain_mask_file) in zip(unbiased_anat_filenames,
-                                 brain_mask_files):
-        out_calc_mask = calc(in_file_a=unbiased_anat_filename,
-                             in_file_b=brain_mask_file,
-                             expr='a*b',
-                             outputtype='NIFTI_GZ')
-        masked_anat_filename = out_calc_mask.outputs.out_file
+         masked_anat_filename) in zip(unbiased_anat_filenames,
+                                      unbiased_brain_files):
 
         # the actual T1anat to template registration using the brain extracted
         # image could do in one 3dQwarp step using allineate flags but will
@@ -760,10 +743,10 @@ def anats_to_template(anat_filenames, brain_mask_files, head_template_filename,
                                                     use_ext=False)
         out_allineate = allineate(
             in_file=masked_anat_filename,
-            reference=brain_template_filename,
-            master=brain_template_filename,
+            reference=brain_extracted_template_filename,
+            master=brain_extracted_template_filename,
             out_matrix=affine_transform_filename,
-            two_blur=1,
+            two_blur=convergence * 11. / .05,
             cost='nmi',
             convergence=convergence,
             two_pass=True,
@@ -874,27 +857,28 @@ class TemplateRegistrator(BaseRegistrator):
         verbosity in any case.
 
     clip_level_fraction : float, optional
-        Clip level fraction passed to
+        Clip level fraction is passed to
         sammba.externals.nipype.interfaces.afni.Unifize, to tune
         the bias correction step done prior to brain mask segementation.
-        Smaller fractions tend to make the mask larger.
+        Only values between 0.1 and 0.9 are accepted. Smaller fractions tend to
+        make the mask larger.
     """
 
     def __init__(self, anat=None, template=None,
-                 brain_template_mask=None, brain_volume=None,
+                 brain_extracted_template=None, brain_volume=None,
                  dilated_template_mask=None, output_dir=None, caching=False,
-                 verbose=True, use_rats_tools=True,
+                 verbose=True, use_rats_tool=True,
                  clip_level_fraction=.1):
         self.anat = anat
         self.template = template
-        self.brain_template_mask = brain_template_mask
+        self.brain_extracted_template = brain_extracted_template
         self.dilated_template_mask = dilated_template_mask
         self.brain_volume = brain_volume
         self.output_dir = output_dir
-        self.use_rats_tools = use_rats_tools
+        self.use_rats_tool = use_rats_tool
         self.caching = caching
         self.verbose = verbose
-        self.clip_level_fraction = self.clip_level_fraction
+        self.clip_level_fraction = clip_level_fraction
 
     def _check_inputs(self):
         if not os.path.isfile(self.anat):
@@ -908,39 +892,60 @@ class TemplateRegistrator(BaseRegistrator):
         if self.brain_volume is None:
             raise IOError('`brain_volume` must be provided')
 
-        self._output_type = _get_afni_output_type(self.anat)
+        if self.clip_level_fraction is not None:
+            if self.clip_level_fraction < .1 or self.clip_level_fraction > .9:
+                raise ValueError("'clip_level_fraction' must be between 0.1"
+                                 "and 0.9, you provided {}".format(
+                                 self.clip_level_fraction))
+
+    def fit(self):
+        self._check_inputs()
+#        self._output_type = _get_afni_output_type(self.anat)
         if self.verbose:
             self.terminal_output = 'stream'
         else:
             self.terminal_output = 'none'
-
-        if self.caching:
-            self._memory = Memory(self.output_dir)
+        self._set_output_dir()
 
     def segment(self):
-        brain_mask_file = compute_brain_mask(
-            self.anat, self.brain_volume, write_dir=self.output_dir,
-            caching=self.caching,
-            terminal_output=self.terminal_output,
-            use_rats_tool=self.use_rats_tool,
-            unifize_kwargs={'cl_frac': self.clip_level_fraction})
-        setattr(self, 'brain_mask_', brain_mask_file)
-        return self
+        self.fit()
+        if self.clip_level_fraction:
+            brain_mask_file = compute_brain_mask(
+                self.anat, self.brain_volume, write_dir=self.output_dir,
+                caching=self.caching,
+                terminal_output=self.terminal_output,
+                use_rats_tool=self.use_rats_tool,
+                cl_frac=self.clip_level_fraction)
+        else:
+            brain_mask_file = compute_brain_mask(
+                self.anat, self.brain_volume, write_dir=self.output_dir,
+                caching=self.caching,
+                terminal_output=self.terminal_output,
+                use_rats_tool=self.use_rats_tool,
+                bias_correct=False)
+
+        self._unifize()
+        brain_file = _apply_mask(self._unifized_anat, brain_mask_file,
+                                 write_dir=self.output_dir,
+                                 caching=self.caching,
+                                 terminal_output=self.terminal_output)
+        setattr(self, 'brain_', brain_file)
 
     def _unifize(self):
-        unifized_anat_file = unifize(self.anat, write_dir=self.output_dir,
-                                     terminal_output=self.terminal_output,
-                                     caching=self.caching)
+        unifized_anat_file = _afni_bias_correct(
+            self.anat, write_dir=self.output_dir,
+            terminal_output=self.terminal_output, caching=self.caching)
         setattr(self, '_unifized_anat', unifized_anat_file)
-        return self
 
     def normalize(self):
         """ Estimates noramlization from anatomical to template space.
         """
-        self._unifize()
+        if not hasattr(self, 'brain_'):
+            raise ValueError('anatomical image has not been segmented')
+
         normalization = anats_to_template(
-            [self._unifized_anat], [self.brain_mask_], self.template,
-            self.brain_template_mask, write_dir=self.output_dir,
+            [self._unifized_anat], [self.brain_], self.template,
+            self.brain_extracted_template, write_dir=self.output_dir,
             dilated_head_mask_filename=self.dilated_template_mask,
             caching=self.caching, verbose=self.verbose)
         setattr(self, 'normalized_anat', normalization.registered_files[0])
