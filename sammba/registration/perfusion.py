@@ -137,12 +137,8 @@ def coregister(unifized_anat_file,
         for out_file in output_files:
             os.remove(out_file)
 
-    print(warped_m0_file)
-    print(warp_files)
-    print(warped_apply_to_file)
-    return Bunch({#"coreg_apply_to_": warped_apply_to_file,
-                  "coreg_m0_": warped_m0_file,
-                  "coreg_anat_": registered_anat_oblique_file,
-                  "coreg_transform_": transform_file,
-                  #"coreg_warps_": warp_files
-                  })
+    return Bunch(coreg_apply_to_=warped_apply_to_file,
+                  coreg_m0_=warped_m0_file,
+                  coreg_anat_=registered_anat_oblique_file,
+                  coreg_transform_=transform_file,
+                  coreg_warps_=warp_files)

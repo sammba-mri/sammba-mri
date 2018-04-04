@@ -4,7 +4,8 @@ from sammba.externals.nipype.utils.filemanip import fname_presuffix
 from sammba.externals.nipype.caching import Memory
 from sklearn.datasets.base import Bunch
 from .base import (BaseRegistrator, compute_brain_mask, _bias_correct,
-                   _afni_bias_correct, _apply_mask)
+                   _afni_bias_correct, _apply_mask, _transform_to_template,
+                   _apply_perslice_warp)
 from .perfusion import coregister as coregister_perf
 
 
@@ -818,7 +819,7 @@ def anats_to_template(unbiased_anat_filenames, unbiased_brain_files,
     # XXX can't we just catenate the affine to the warp?
     return Bunch(registered=registered,
                  transforms=warp_transforms,
-                 pre_transforms=affine_transforms)
+                 pretransforms=affine_transforms)
 
 
 class TemplateRegistrator(BaseRegistrator):
@@ -952,14 +953,17 @@ class TemplateRegistrator(BaseRegistrator):
         setattr(self, '_normalization_transform',
                 normalization.transforms[0])
         setattr(self, '_normalization_pretransform',
-                normalization.pre_transforms[0])
+                normalization.pretransforms[0])
         return self
 
-    def coregister_modality(self, in_file, modality, in_brain_mask_file=None,
-                            apply_to_files=None,
-                            prior_rigid_body_registration=False):
+    def normalize_modality(self, in_file, modality, in_brain_mask_file=None,
+                           voxel_size=None,
+                           prior_rigid_body_registration=False):
         """ Coregisters the anatomical and the given modality to the same space
         """
+        if not hasattr(self, 'brain_'):
+            raise ValueError('anatomical image has not been segmented')
+
         unbiased_file = _bias_correct(in_file, write_dir=self.output_dir,
                                       terminal_output=self.terminal_output,
                                       caching=self.caching)
@@ -968,7 +972,6 @@ class TemplateRegistrator(BaseRegistrator):
                 self._unifized_anat, unbiased_file,
                 anat_brain_mask_file=self.brain_,
                 func_brain_mask_file=in_brain_mask_file,
-                apply_to_file=apply_to_files,
                 prior_rigid_body_registration=prior_rigid_body_registration)
             coreg_modality_file = coregistration.coreg_func
             setattr(self, 'coreg_anat_', coregistration.coreg_anat)
@@ -979,31 +982,48 @@ class TemplateRegistrator(BaseRegistrator):
                 self.output_dir,
                 anat_brain_mask_file=self.brain_,
                 m0_brain_mask_file=in_brain_mask_file,
-                apply_to_file=apply_to_files,
                 prior_rigid_body_registration=prior_rigid_body_registration,
                 caching=self.caching)
-            coreg_modality_file = coregistration.coreg_perf
-            setattr(self, 'coreg_anat_', coregistration.coreg_anat)
-            setattr(self, '_coreg_transform', coregistration.coreg_transform)
+            coreg_modality_file = coregistration.coreg_m0_
+            setattr(self, 'coreg_anat_', coregistration.coreg_anat_)
+            setattr(self, 'coreg_modality_', coreg_modality_file)
+            setattr(self, '_coreg_transform', coregistration.coreg_transform_)
+            setattr(self, '_coreg_warps', coregistration.coreg_warps_)
         else:
             raise ValueError("Only 'func' and 'perf' modalities are"
                              "implemented")
-        return coreg_modality_file
-
-    def normalize_modality(self, in_file, voxel_size=None):
-        """ Applies normalization from coregistration space to template space
-        """
-        if not hasattr(self, '_coref_transform'):
-            raise ValueError('anatomical image has not been coregistered to'
-                             'the {} space'.format(in_file))
-        if not _check_coregistration(in_file, self.coreg_anat):
-            raise ValueError('{0} and {1} are not coregistered'.format(
-                in_file, self.coreg_anat_))
 
         normalized_file = _transform_to_template(
-            in_file, self.template, self.output_dir
-            [self._coreg_transform, self._normalization_transform],
-            voxel_size=voxel_size)
+            coreg_modality_file, self.template, self.output_dir,
+            self._coreg_transform, self._normalization_pretransform,
+            self._normalization_transform,
+            voxel_size=voxel_size, caching=self.caching)
+        return normalized_file
+
+    def apply_normalize_modality(self, apply_to_file, voxel_size=None):
+        """ Applies modality normalization to a file in the modality space.
+        """
+        if not hasattr(self, 'brain_'):
+            raise ValueError('anatomical image has not been segmented')
+
+        if not hasattr(self, '_coreg_warps'):
+            raise ValueError('modality has not been coregistrated')
+
+        if voxel_size is None:
+            voxel_size_x, voxel_size_y = None, None
+        else:
+            voxel_size_x, voxel_size_y = voxel_size[0], voxel_size[1]
+        coreg_modality_file = _apply_perslice_warp(apply_to_file,
+                                                   self._coreg_warps,
+                                                   voxel_size_x,
+                                                   voxel_size_y,
+                                                   write_dir=self.output_dir,
+                                                   caching=self.caching)
+        normalized_file = _transform_to_template(
+            coreg_modality_file, self.template, self.output_dir,
+            self._coreg_transform, self._normalization_pretransform,
+            self._normalization_transform,
+            voxel_size=voxel_size, caching=self.caching)
         return normalized_file
 
     def inverse_normalize_modality(self, in_file):
