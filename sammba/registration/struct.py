@@ -947,10 +947,12 @@ class TemplateRegistrator(BaseRegistrator):
             [self._unifized_anat], [self.brain_], self.template,
             self.brain_extracted_template, write_dir=self.output_dir,
             dilated_head_mask_filename=self.dilated_template_mask,
-            caching=self.caching, verbose=self.verbose)
-        setattr(self, 'normalized_anat', normalization.registered_files[0])
+            caching=self.caching, verbose=self.verbose, maxlev=0)
+        setattr(self, 'normalized_anat', normalization.registered[0])
         setattr(self, '_normalization_transform',
-                normalization.transform_files[0])
+                normalization.transforms[0])
+        setattr(self, '_normalization_pretransform',
+                normalization.pre_transforms[0])
         return self
 
     def coregister_modality(self, in_file, modality, in_brain_mask_file=None,
@@ -963,8 +965,8 @@ class TemplateRegistrator(BaseRegistrator):
                                       caching=self.caching)
         if modality == 'func':
             coregistration = coregister_func(
-                self._unifized, unbiased_file,
-                anat_brain_mask_file=self.brain_mask_,
+                self._unifized_anat, unbiased_file,
+                anat_brain_mask_file=self.brain_,
                 func_brain_mask_file=in_brain_mask_file,
                 apply_to_file=apply_to_files,
                 prior_rigid_body_registration=prior_rigid_body_registration)
@@ -973,11 +975,13 @@ class TemplateRegistrator(BaseRegistrator):
             setattr(self, '_coreg_transform', coregistration.coreg_transform)
         elif modality == 'perf':
             coregistration = coregister_perf(
-                self._unifized, unbiased_file,
-                anat_brain_mask_file=self.brain_mask_,
+                self._unifized_anat, unbiased_file,
+                self.output_dir,
+                anat_brain_mask_file=self.brain_,
                 m0_brain_mask_file=in_brain_mask_file,
                 apply_to_file=apply_to_files,
-                prior_rigid_body_registration=prior_rigid_body_registration)
+                prior_rigid_body_registration=prior_rigid_body_registration,
+                caching=self.caching)
             coreg_modality_file = coregistration.coreg_perf
             setattr(self, 'coreg_anat_', coregistration.coreg_anat)
             setattr(self, '_coreg_transform', coregistration.coreg_transform)
