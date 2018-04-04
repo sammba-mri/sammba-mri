@@ -220,8 +220,7 @@ def _afni_bias_correct(in_file, write_dir, caching=False,
 def _rigid_body_register(moving_head_file, reference_head_file,
                          moving_brain_mask, reference_brain_mask,
                          write_dir=None,
-                         caching=False, terminal_output='allatonce',
-                         environ={}):
+                         caching=False, terminal_output='allatonce'):
     # XXX: add verbosity
     if write_dir is None:
         write_dir = os.path.dirname(moving_head_file)
@@ -299,9 +298,10 @@ def _rigid_body_register(moving_head_file, reference_head_file,
 
 
 def _warp(to_warp_file, reference_file, write_dir=None, caching=False,
-          terminal_output='allatonce', environ={}, verbose=True,
-          overwrite=True):
-    # XXX: add verbosity
+          terminal_output='allatonce', verbose=True,
+          overwrite=True, environ={}):
+    # XXX: add verbosity and handle environ correctly
+    environ = {}
     if write_dir is None:
         write_dir = os.path.dirname(to_warp_file)
 
@@ -310,6 +310,7 @@ def _warp(to_warp_file, reference_file, write_dir=None, caching=False,
         warp = memory.cache(afni.Warp)
     else:
         warp = afni.Warp().run
+        environ['AFNI_DECONFLICT'] = 'OVERWRITE'
 
     # 3dWarp doesn't put the obliquity in the header, so do it manually
     # This step generates one file per slice and per time point, so we are
@@ -340,6 +341,7 @@ def _per_slice_qwarp(to_qwarp_file, reference_file,
                      write_dir=None,
                      caching=False, overwrite=True,
                      verbose=True, terminal_output='allatonce', environ={}):
+    environ = {}
     if write_dir is None:
         write_dir = os.path.dirname(to_qwarp_file),
 
@@ -358,6 +360,7 @@ def _per_slice_qwarp(to_qwarp_file, reference_file,
         warp_apply = afni.NwarpApply(terminal_output=terminal_output).run
         qwarp = afni.Qwarp(terminal_output=terminal_output).run
         merge = afni.Zcat(terminal_output=terminal_output).run
+        environ['AFNI_DECONFLICT'] = 'OVERWRITE'
 
     # Slice anatomical image
     reference_img = nibabel.load(reference_file)

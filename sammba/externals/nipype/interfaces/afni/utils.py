@@ -591,12 +591,6 @@ class CatMatvecInputSpec(AFNICommandInputSpec):
         mandatory=True,
         argstr="%s",
         position=-2)
-# removec by salma to fix the hashing issue
-#    out_file = File(
-#        descr="File to write concattenated matvecs to",
-#        argstr=" > %s",
-#        position=-1,
-#        mandatory=True)
     out_file = File(
         argstr=" > %s",
         name_template='%s_cat.aff12.1D',
@@ -650,14 +644,6 @@ class CatMatvec(AFNICommand):
         if name == 'in_file':
             return spec.argstr%(' '.join([i[0]+' -'+i[1] for i in value]))
         return super(CatMatvec, self)._format_arg(name, spec, value)
-
-    # added by salma to fix undefined output
-    def _list_outputs(self):
-        outputs = self.output_spec().get()
-
-        if self.inputs.out_file:
-            outputs['out_file'] = op.abspath(self.inputs.out_file)
-        return outputs
 
 
 class CenterMassInputSpec(CommandLineInputSpec):

@@ -218,11 +218,6 @@ class AllineateInputSpec(AFNICommandInputSpec):
         argstr='-base %s',
         desc='file to be used as reference, the first volume will be used if '
              'not given the reference will be the first volume of in_file.')
-#    out_file = File(
-#        desc='output file from 3dAllineate',
-#        argstr='-prefix %s',
-#        genfile=True,
-#        xor=['allcostx'])
     out_file = File(
         name_template='%s_allineated',
         desc='output file from 3dAllineate',
