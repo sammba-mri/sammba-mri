@@ -69,7 +69,7 @@ def compute_brain_mask(head_file, brain_volume, write_dir, bias_correct=True,
         out_unifize = unifize(
             in_file=head_file,
             out_file=fname_presuffix(head_file,
-                                     suffix='_unifized_for_brain_mask',
+                                     suffix='_unifized_for_extraction',
                                      newpath=write_dir),
             environ=environ,
             **unifize_kwargs)
@@ -136,9 +136,6 @@ def _apply_mask(head_file, brain_mask_file, write_dir, bias_correct=True,
                          out_file=fname_presuffix(head_file,
                                                   suffix='_brain',
                                                   newpath=write_dir))
-
-    if not caching:
-        os.remove(brain_mask_file)
 
     return out_calc_mask.outputs.out_file
 
@@ -264,7 +261,7 @@ def _rigid_body_register(moving_head_file, reference_head_file,
         out_matrix=fname_presuffix(reference_brain_file,
                                    suffix='_shr.aff12.1D',
                                    use_ext=False,
-                                   new_path=write_dir),
+                                   newpath=write_dir),
         center_of_mass='',
         warp_type='shift_rotate',
         out_file=fname_presuffix(reference_brain_file, suffix='_shr'),
@@ -274,7 +271,7 @@ def _rigid_body_register(moving_head_file, reference_head_file,
 
     # apply the inverse transform to register the anatomical to the func
     catmatvec_out_file = fname_presuffix(rigid_transform_file, suffix='INV',
-                                         new_path=write_dir)
+                                         newpath=write_dir)
     if not os.path.isfile(catmatvec_out_file):
         _ = catmatvec(in_file=[(rigid_transform_file, 'I')],
                       oneline=True,
@@ -286,7 +283,7 @@ def _rigid_body_register(moving_head_file, reference_head_file,
         master=reference_head_file,
         in_matrix=catmatvec_out_file,
         out_file=fname_presuffix(moving_head_file, suffix='_shr',
-                                 new_path=write_dir),
+                                 newpath=write_dir),
         environ=environ)
 
     # Remove intermediate output
