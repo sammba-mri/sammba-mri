@@ -321,8 +321,8 @@ class Node(EngineBase):
         if op.exists(outdir):
             logger.debug('Output dir: %s', to_str(os.listdir(outdir)))
         hash_info = self.hash_exists(updatehash=updatehash)
+        print(hash_info)
         hash_exists, hashvalue, hashfile, hashed_inputs = hash_info
-	print(hash_info)
         logger.debug(
             'updatehash=%s, overwrite=%s, always_run=%s, hash_exists=%s',
             updatehash, self.overwrite, self._interface.always_run, hash_exists)
