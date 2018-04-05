@@ -18,6 +18,7 @@ retest = data_fetchers.fetch_zurich_test_retest(subjects=range(5),
 import os
 
 write_dir = os.path.join(os.getcwd(), 'zurich_ica')
+write_dir = os.path.join('/tmp', 'zurich_ica')
 if not os.path.exists(write_dir):
     os.makedirs(write_dir)
 
@@ -35,12 +36,12 @@ from sammba.registration.base import _apply_mask
 
 # XXX apply_mask_to
 dorr_masks = data_fetchers.fetch_masks_dorr_2008(downsample='100')
-if not os.path.isfile('/tmp/brain_mask_100u.nii.gz'):
+brain_extracted_template = '/home/bougacha/zurich_ica/Dorr_2008_average_100um_brain.nii.gz'
+if not os.path.isfile(brain_extracted_template):
     dorr_masks.brain.to_filename('/tmp/brain_mask_100u.nii.gz')
     brain_extracted_template = _apply_mask(template_filename,
                                  '/tmp/brain_mask_100u.nii.gz',
                                  write_dir)
-brain_extracted_template = '/home/bougacha/zurich_ica/Dorr_2008_average_100um_brain.nii.gz'
 
 ##############################################################################
 # Register to the template
@@ -55,16 +56,14 @@ for anat, func in zip(retest.anat, retest.func):
         anat=anat,
         template=template_filename,
         brain_extracted_template=brain_extracted_template,
-        caching=True, output_dir=output_dir,
+        caching=False, output_dir=output_dir,
         brain_volume=400)
     registrator.segment()
     registrator.normalize()
     normalized_func = registrator.normalize_modality(func, 'func', t_r=1.,
                                                      voxel_size=(.3, .3, .3),
                                                  prior_rigid_body_registration=True)
-    stop
     registered_funcs.append(normalized_func)
-stop
 ##############################################################################
 # Run ICA
 # -------

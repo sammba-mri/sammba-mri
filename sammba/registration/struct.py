@@ -764,9 +764,7 @@ def anats_to_template(unbiased_anat_filenames, unbiased_brain_files,
             environ=environ,
             **verbosity_quietness_kwargs)
         allineated_filenames.append(out_allineate2.outputs.out_file)
-        intermediate_files.extend([unbiased_anat_filename,
-                                   masked_anat_filename,
-                                   out_allineate.outputs.out_file])
+        intermediate_files.append(out_allineate.outputs.out_file)
 
     intermediate_files.extend(allineated_filenames)
     warp_transforms = []
