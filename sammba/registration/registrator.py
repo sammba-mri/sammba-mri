@@ -151,7 +151,7 @@ class AnatCoregistrator(BaseEstimator, TransformerMixin):
             Path to the modality image after coregistration.
         """
         self._check_fitted()
-        for attribute in ['modality_brain_', '_unbiased_modality', 'modality']:
+        for attribute in [modality + '_brain_', '_unbiased_' + modality]:
             if hasattr(self, attribute):
                 delattr(self, attribute)
 
@@ -178,7 +178,6 @@ class AnatCoregistrator(BaseEstimator, TransformerMixin):
             raise ValueError("Only 'func' and 'perf' modalities are "
                              "implemented")
 
-        setattr(self, 'modality', modality)
         unbiased_file = _bias_correct(to_coregister_file,
                                       write_dir=self.output_dir,
                                       terminal_output=self.terminal_output,
@@ -206,35 +205,37 @@ class AnatCoregistrator(BaseEstimator, TransformerMixin):
                                      write_dir=self.output_dir,
                                      caching=self.caching,
                                      terminal_output=self.terminal_output)
-            setattr(self, 'modality_brain_', brain_file)
+            setattr(self, modality + '_brain_', brain_file)
         else:
-            setattr(self, 'modality_brain_', None)
+            brain_file = None
 
         if modality == 'func':
             coregistration = coregister_func(
                 self._unifized_anat, unbiased_file,
                 self.output_dir,
                 anat_brain_file=self.brain_,
-                func_brain_file=self.modality_brain_,
+                func_brain_file=brain_file,
                 prior_rigid_body_registration=prior_rigid_body_registration,
                 caching=self.caching)
-            setattr(self, '_coreg_warps', coregistration.coreg_warps_)
+            setattr(self, '_coreg_func_warps', coregistration.coreg_warps_)
             coreg_modality_file = _apply_perslice_warp(
-                allineated_file, self._coreg_warps, .1, .1,
+                allineated_file, self._coreg_func_warps, .1, .1,
                 write_dir=self.output_dir, caching=self.caching)
         elif modality == 'perf':
             coregistration = coregister_perf(
                 self._unifized_anat, unbiased_file,
                 self.output_dir,
                 anat_brain_file=self.brain_,
-                m0_brain_file=self.modality_brain_,
+                m0_brain_file=brain_file,
                 prior_rigid_body_registration=prior_rigid_body_registration,
                 caching=self.caching)
-            setattr(self, '_coreg_warps', coregistration.coreg_warps_)
+            setattr(self, '_coreg_perf_warps', coregistration.coreg_warps_)
             coreg_modality_file = coregistration.coreg_m0_
 
-        setattr(self, 'coreg_anat_', coregistration.coreg_anat_)
-        setattr(self, '_coreg_transform', coregistration.coreg_transform_)
+        setattr(self, 'anat_in_{}_space'.format(modality),
+                coregistration.coreg_anat_)
+        setattr(self, '_coreg_{0}_transform'.format(modality),
+                coregistration.coreg_transform_)
 
         return coreg_modality_file
 
@@ -438,6 +439,9 @@ class TemplateRegistrator(BaseEstimator, TransformerMixin):
                 normalization.transforms[0])
         return normalization.registered[0]
 
+    def fit_transform(self, anat_file, **fit_params):
+        return self.fit(**fit_params).transform(anat_file)
+
     def inverse_transform(self, in_file, interpolation='wsinc5'):
         """Use provided loadings to compute corresponding linear component
         combination in whole-brain voxel space
@@ -470,7 +474,7 @@ class TemplateRegistrator(BaseEstimator, TransformerMixin):
         self._check_fitted()
         self._check_transformed()
 
-        for attribute in ['modality_brain_', '_unbiased_modality', 'modality']:
+        for attribute in [modality + '_brain_', '_unbiased_' + modality]:
             if hasattr(self, attribute):
                 delattr(self, attribute)
 
@@ -497,7 +501,6 @@ class TemplateRegistrator(BaseEstimator, TransformerMixin):
             raise ValueError("Only 'func' and 'perf' modalities are "
                              "implemented")
 
-        setattr(self, 'modality', modality)
         unbiased_file = _bias_correct(to_coregister_file,
                                       write_dir=self.output_dir,
                                       terminal_output=self.terminal_output,
@@ -525,53 +528,67 @@ class TemplateRegistrator(BaseEstimator, TransformerMixin):
                                      write_dir=self.output_dir,
                                      caching=self.caching,
                                      terminal_output=self.terminal_output)
-            setattr(self, 'modality_brain_', brain_file)
+            setattr(self, modality + '_brain_', brain_file)
         else:
-            setattr(self, 'modality_brain_', None)
+            brain_file = None
 
         if modality == 'func':
             coregistration = coregister_func(
                 self._unifized_anat_, unbiased_file,
                 self.output_dir,
                 anat_brain_file=self.anat_brain_,
-                func_brain_file=self.modality_brain_,
+                func_brain_file=brain_file,
                 prior_rigid_body_registration=prior_rigid_body_registration,
                 caching=self.caching)
-            setattr(self, '_coreg_warps', coregistration.coreg_warps_)
+            setattr(self, '_coreg_func_warps', coregistration.coreg_warps_)
             coreg_modality_file = _apply_perslice_warp(
-                allineated_file, self._coreg_warps, .1, .1,
+                allineated_file, self._coreg_func_warps, .1, .1,
                 write_dir=self.output_dir, caching=self.caching)
         elif modality == 'perf':
             coregistration = coregister_perf(
                 self._unifized_anat_, unbiased_file,
                 self.output_dir,
                 anat_brain_file=self.anat_brain_,
-                m0_brain_file=self.modality_brain_,
+                m0_brain_file=brain_file,
                 prior_rigid_body_registration=prior_rigid_body_registration,
                 caching=self.caching)
-            setattr(self, '_coreg_warps', coregistration.coreg_warps_)
+            setattr(self, '_coreg_perf_warps', coregistration.coreg_warps_)
             coreg_modality_file = coregistration.coreg_m0_
 
-        setattr(self, 'coreg_modality_', coreg_modality_file)
-        setattr(self, 'coreg_anat_', coregistration.coreg_anat_)
-        setattr(self, '_coreg_transform', coregistration.coreg_transform_)
+        setattr(self, 'coreg_{}_'.format(modality), coreg_modality_file)
+        setattr(self, 'anat_in_{}_space'.format(modality),
+                coregistration.coreg_anat_)
+        setattr(self, '_{}_coreg_transform'.format(modality),
+                coregistration.coreg_transform_)
 
         normalized_file = _transform_to_template(
             coreg_modality_file, self.template, self.output_dir,
-            self._coreg_transform, self._normalization_pretransform,
+            coregistration.coreg_transform_,
+            self._normalization_pretransform,
             self._normalization_transform,
             voxel_size=voxel_size, caching=self.caching)
 
         return normalized_file
 
+    def fit_transform_modality(self, anat_file, in_file, modality,
+                               slice_timing=True, t_r=None,
+                               prior_rigid_body_registration=False,
+                               voxel_size=None, **fit_transform_params):
+        self.fit_transform(anat_file, **fit_transform_params)
+        return self.transform_modality(
+            in_file, modality, slice_timing=slice_timing, t_r=t_r,
+            prior_rigid_body_registration=prior_rigid_body_registration,
+            voxel_size=voxel_size)
+
     def _check_transformed(self):
         if not hasattr(self, '_normalization_transform'):
             raise ValueError(
                 'It seems that %s has not been transformed. '
-                'You must call transform() before calling apply_to().'
+                'You must call transform() before calling transform_modality().'
                 % self.__class__.__name__)
 
-    def inverse_transform_modality(self, in_file, interpolation='wsinc5'):
+    def inverse_transform_modality(self, in_file, modality,
+                                   interpolation='wsinc5'):
         """Use provided loadings to compute corresponding linear component
         combination in whole-brain voxel space
         Parameters
@@ -585,15 +602,17 @@ class TemplateRegistrator(BaseEstimator, TransformerMixin):
         """
         self._check_fitted()
         self._check_transformed()
-        if not hasattr(self, '_coreg_transform'):
+        coreg_transform_key = '_{}_coreg_transform'.format(modality)
+        coreg_anat_key = 'anat_in_{}_space'.format(modality)
+        if not hasattr(self, coreg_transform_key):
             raise ValueError(
-                'It seems that %s has not been modality transformed. '
+                'It seems that {0} has not been {1} modality transformed. '
                 'You must call transform_modality() before calling '
-                'inverse_transform_modality().'
-                % self.__class__.__name__)
-        inverted_in_file = _apply_transforms(in_file, self.coreg_anat_,
+                'inverse_transform_modality().'.format(self.__class__.__name__,
+                                                       modality))
+        inverted_in_file = _apply_transforms(in_file, self[coreg_anat_key],
                                              self.output_dir,
-                                             [self._coreg_transform,
+                                             [self[coreg_transform_key],
                                               self._normalization_pretransform,
                                               self._normalization_transform],
                                              inverse=True,
