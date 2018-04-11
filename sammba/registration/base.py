@@ -10,6 +10,15 @@ from ..interfaces import segmentation
 from .utils import fix_obliquity, _get_afni_output_type, compute_n4_max_shrink
 
 
+def mask_report(mask_file, expected_volume):
+    # TODO: symmetry, length and width
+    mask_img = nibabel.load(mask_file)
+    volume = segmentation.compute_volume(mask_img)
+    volume_accuracy = volume / expected_volume * 100.
+    return "extracted volume is {0:0.1f}% of expected volume".format(
+        volume_accuracy)
+
+
 def compute_brain_mask(head_file, brain_volume, write_dir, bias_correct=True,
                        caching=False,
                        terminal_output='allatonce',
@@ -135,7 +144,8 @@ def _apply_mask(head_file, brain_mask_file, write_dir, bias_correct=True,
                          expr='a*b',
                          out_file=fname_presuffix(head_file,
                                                   suffix='_brain',
-                                                  newpath=write_dir))
+                                                  newpath=write_dir),
+                         environ=environ)
 
     return out_calc_mask.outputs.out_file
 
@@ -766,6 +776,101 @@ def _transform_to_template(to_register_filename, template_filename, write_dir,
                    out_file=normalized_filename)
     os.chdir(current_dir)
     return normalized_filename
+
+
+def _apply_transforms(to_register_filename, target_filename,
+                      write_dir,
+                      transforms,
+                      interpolation='wsinc5',
+                      transformed_filename=None,
+                      voxel_size=None,
+                      caching=False, verbose=True, inverse=False):
+    """ Applies successive transforms to a given image to put it in
+    template space.
+
+    Parameters
+    ----------
+    to_register_filename : str
+        Path to functional volume, coregistered to a common space with the
+        anatomical volume.
+
+    template_filename : str
+        Template to register the functional to.
+
+    transforms : list
+        List of transforms in order of 3dNWarpApply application: first must
+        one must be in the target space and last one must be in
+        the source space.
+
+    inverse : bool, optional
+        If True, after the transforms composition is computed, invert it.
+        If the input transforms would take a dataset from space A to B,
+        then the inverted transform will do the reverse.
+
+    interpolation : one of {'nearestneighbour', 'linear', 'cubic', 'quintic',
+                            'wsinc5'}, optional
+        Interpolation type.
+
+    voxel_size : 3-tuple of floats, optional
+        Voxel size of the registered functional, in mm.
+
+    caching : bool, optional
+        Wether or not to use caching.
+
+    verbose : bool, optional
+        If True, all steps are verbose. Note that caching implies some
+        verbosity in any case.
+    """
+    environ = {}
+    if verbose:
+        terminal_output = 'allatonce'
+    else:
+        terminal_output = 'none'
+
+    if caching:
+        memory = Memory(write_dir)
+        warp_apply = memory.cache(afni.NwarpApply)
+        resample = memory.cache(afni.Resample)
+        warp_apply.interface().set_default_terminal_output(terminal_output)
+        resample.interface().set_default_terminal_output(terminal_output)
+    else:
+        resample = afni.Resample(terminal_output=terminal_output).run
+        warp_apply = afni.NwarpApply(terminal_output=terminal_output).run
+        environ['AFNI_DECONFLICT'] = 'OVERWRITE'
+
+    current_dir = os.getcwd()
+    os.chdir(write_dir)
+    if transformed_filename is None:
+        target_basename = os.path.basename(target_filename)
+        target_basename = os.path.splitext(target_basename)[0]
+        target_basename = os.path.splitext(target_basename)[0]
+        transformed_filename = fname_presuffix(
+            to_register_filename, suffix='_to_' + target_basename,
+            newpath=write_dir)
+
+    if voxel_size is None:
+        resampled_template_filename = target_filename
+    else:
+        out_resample = resample(in_file=target_filename,
+                                voxel_size=voxel_size,
+                                outputtype=fname_presuffix(target_filename,
+                                                           suffix='_resampled',
+                                                           newpath=write_dir),
+                                environ=environ)
+        resampled_template_filename = out_resample.outputs.out_file
+
+    warp = "'"
+    warp += " ".join(transforms)
+    warp += "'"
+    _ = warp_apply(in_file=to_register_filename,
+                   master=resampled_template_filename,
+                   warp=warp,
+                   inv_warp=inverse,
+                   interp=interpolation,
+                   out_file=transformed_filename,
+                   environ=environ)
+    os.chdir(current_dir)
+    return transformed_filename
 
 
 class BaseRegistrator(object):
