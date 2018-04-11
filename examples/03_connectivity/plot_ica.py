@@ -64,6 +64,7 @@ for anat, func in zip(retest.anat, retest.func):
                                                      voxel_size=(.3, .3, .3),
                                                  prior_rigid_body_registration=True)
     registered_funcs.append(normalized_func)
+
 ##############################################################################
 # Run ICA
 # -------
@@ -83,5 +84,5 @@ components_img = canica.masker_.inverse_transform(canica.components_)
 from nilearn import plotting
 
 plotting.plot_prob_atlas(components_img,
-                         anat_img=dorr.t2,
+                         anat_img='/home/Promane/2014-ROMANE/5_Experimental-Plan-Experiments-Results/mouse/XNAT_CSD_MRI_MOUSE/20170925_goodposttemplate/Qw4_meanhead200.nii.gz',
                          title='All ICA components')
