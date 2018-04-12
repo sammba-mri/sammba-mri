@@ -11,6 +11,15 @@ from .utils import fix_obliquity, _get_afni_output_type, compute_n4_max_shrink
 
 
 def mask_report(mask_file, expected_volume):
+    """
+    Parameters
+    ----------
+    registrator : registrator object conatining brain_volume and
+        mask_clipping_fraction
+
+        The object to use to compute the brain mask.
+    """
+
     # TODO: symmetry, length and width
     mask_img = nibabel.load(mask_file)
     volume = segmentation.compute_volume(mask_img)

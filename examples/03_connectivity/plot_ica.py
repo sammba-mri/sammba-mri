@@ -13,16 +13,6 @@ retest = data_fetchers.fetch_zurich_test_retest(subjects=range(5),
                                                 correct_headers=True)
 
 ##############################################################################
-# Define the writing directory
-# ----------------------------
-import os
-
-write_dir = os.path.join(os.getcwd(), 'zurich_ica')
-write_dir = os.path.join('/tmp', 'zurich_ica')
-if not os.path.exists(write_dir):
-    os.makedirs(write_dir)
-
-##############################################################################
 # Load the template
 # -------------------
 dorr = data_fetchers.fetch_atlas_dorr_2008(downsample='100')
@@ -31,22 +21,13 @@ template_filename = dorr.t2
 ##############################################################################
 # Extract the brain template
 # --------------------------
-import os
-from sammba.registration.base import _apply_mask
-
-# XXX apply_mask_to
 dorr_masks = data_fetchers.fetch_masks_dorr_2008(downsample='100')
-brain_extracted_template = '/home/bougacha/zurich_ica/Dorr_2008_average_100um_brain.nii.gz'
-if not os.path.isfile(brain_extracted_template):
-    dorr_masks.brain.to_filename('/tmp/brain_mask_100u.nii.gz')
-    brain_extracted_template = _apply_mask(template_filename,
-                                 '/tmp/brain_mask_100u.nii.gz',
-                                 write_dir)
+template_brain_mask = dorr_masks.brain
 
 ##############################################################################
 # Register to the template
 # ------------------------
-from sammba.registration import template_registrator
+from sammba.registration import TemplateRegistrator
 
 registered_funcs = []
 for anat, func in zip(retest.anat, retest.func):

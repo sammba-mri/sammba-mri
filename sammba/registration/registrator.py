@@ -41,12 +41,13 @@ class AnatCoregistrator(BaseEstimator, TransformerMixin):
         Only values between 0.1 and 0.9 are accepted. Smaller fractions tend to
         make the mask larger.
     """
-    def __init__(self, anat=None, brain_volume=None,
+    def __init__(self, anat=None, brain_mask=None, brain_volume=None,
                  output_dir=None, caching=False,
                  verbose=True, use_rats_tool=True,
-                 mask_clipping_fraction=.1):
+                 mask_clipping_fraction=.2):
         self.anat = anat
         self.brain_volume = brain_volume
+        self.brain_mask = brain_mask
         self.output_dir = output_dir
         self.use_rats_tool = use_rats_tool
         self.caching = caching
@@ -83,47 +84,77 @@ class AnatCoregistrator(BaseEstimator, TransformerMixin):
         unifized_anat_file = _afni_bias_correct(
             self.anat, write_dir=self.output_dir,
             terminal_output=self.terminal_output, caching=self.caching)
-        setattr(self, '_unifized_anat', unifized_anat_file)
+        self._unifized_anat = unifized_anat_file
 
-        if self.mask_clipping_fraction:
-            brain_mask_file = compute_brain_mask(
-                self.anat, self.brain_volume, write_dir=self.output_dir,
-                caching=self.caching,
-                terminal_output=self.terminal_output,
-                use_rats_tool=self.use_rats_tool,
-                cl_frac=self.mask_clipping_fraction)
+        if self.brain_mask is None:
+            if self.mask_clipping_fraction:
+                brain_mask_file = compute_brain_mask(
+                    self.anat, self.brain_volume, write_dir=self.output_dir,
+                    caching=self.caching,
+                    terminal_output=self.terminal_output,
+                    use_rats_tool=self.use_rats_tool,
+                    cl_frac=self.mask_clipping_fraction)
+            else:
+                brain_mask_file = compute_brain_mask(
+                    self.anat, self.brain_volume, write_dir=self.output_dir,
+                    caching=self.caching,
+                    terminal_output=self.terminal_output,
+                    use_rats_tool=self.use_rats_tool,
+                    bias_correct=False)
         else:
-            brain_mask_file = compute_brain_mask(
-                self.anat, self.brain_volume, write_dir=self.output_dir,
-                caching=self.caching,
-                terminal_output=self.terminal_output,
-                use_rats_tool=self.use_rats_tool,
-                bias_correct=False)
+            brain_mask_file = self.brain_mask
 
         brain_file = _apply_mask(unifized_anat_file, brain_mask_file,
                                  write_dir=self.output_dir,
                                  caching=self.caching,
                                  terminal_output=self.terminal_output)
-        setattr(self, 'brain_', brain_file)
+        self.brain_ = brain_file
 
-    def fit(self, y=None):
+    def pre_check_mask(self):
+        self._fit()
+        if self.brain_mask is None:
+            if self.mask_clipping_fraction:
+                brain_mask_file = compute_brain_mask(
+                    self.anat, self.brain_volume, write_dir=self.output_dir,
+                    caching=self.caching,
+                    terminal_output=self.terminal_output,
+                    use_rats_tool=self.use_rats_tool,
+                    cl_frac=self.mask_clipping_fraction)
+            else:
+                brain_mask_file = compute_brain_mask(
+                    self.anat, self.brain_volume, write_dir=self.output_dir,
+                    caching=self.caching,
+                    terminal_output=self.terminal_output,
+                    use_rats_tool=self.use_rats_tool,
+                    bias_correct=False)
+        else:
+            brain_mask_file = self.brain_mask
+        print(mask_report(brain_mask_file, self.brain_volume))
+
+    def _fit(self, y=None):
         self._check_inputs()
         if self.verbose:
             self.terminal_output = 'stream'
         else:
             self.terminal_output = 'none'
         self._set_output_dir()
+        return self
+
+    def fit(self, y=None):
+        self._fit()
         self.segment()
         return self
 
     def _check_fitted(self):
         if not hasattr(self, 'brain_'):
-            raise ValueError('It seems that %s has not been fitted. '
-                             'You must call fit() before calling transform().'
-                             % self.__class__.__name__)
+            raise ValueError(
+                'It seems that %s has not been fitted. You must call '
+                'fit() before calling fit_modality().'
+                % self.__class__.__name__)
 
-    def transform(self, in_file, modality, slice_timing=True,
-                  t_r=None, prior_rigid_body_registration=False):
+    def fit_modality(self, in_file, modality, slice_timing=True,
+                     t_r=None, prior_rigid_body_registration=False,
+                     brain_mask_file=None):
         """ Prepare and perform coregistration.
 
         Parameters
@@ -151,9 +182,6 @@ class AnatCoregistrator(BaseEstimator, TransformerMixin):
             Path to the modality image after coregistration.
         """
         self._check_fitted()
-        for attribute in [modality + '_brain_', '_unbiased_' + modality]:
-            if hasattr(self, attribute):
-                delattr(self, attribute)
 
         if modality == 'perf':
             to_coregister_file = in_file
@@ -184,32 +212,33 @@ class AnatCoregistrator(BaseEstimator, TransformerMixin):
                                       caching=self.caching)
 
         if prior_rigid_body_registration:
-            if self.mask_clipping_fraction:
-                brain_mask_file = compute_brain_mask(
-                    to_coregister_file, self.brain_volume,
-                    write_dir=self.output_dir,
-                    caching=self.caching,
-                    terminal_output=self.terminal_output,
-                    use_rats_tool=self.use_rats_tool,
-                    cl_frac=self.mask_clipping_fraction)
-            else:
-                brain_mask_file = compute_brain_mask(
-                    to_coregister_file, self.brain_volume,
-                    write_dir=self.output_dir,
-                    caching=self.caching,
-                    terminal_output=self.terminal_output,
-                    use_rats_tool=self.use_rats_tool,
-                    bias_correct=False)
+            if brain_mask_file is None:
+                if self.mask_clipping_fraction:
+                    brain_mask_file = compute_brain_mask(
+                        to_coregister_file, self.brain_volume,
+                        write_dir=self.output_dir,
+                        caching=self.caching,
+                        terminal_output=self.terminal_output,
+                        use_rats_tool=self.use_rats_tool,
+                        cl_frac=self.mask_clipping_fraction)
+                else:
+                    brain_mask_file = compute_brain_mask(
+                        to_coregister_file, self.brain_volume,
+                        write_dir=self.output_dir,
+                        caching=self.caching,
+                        terminal_output=self.terminal_output,
+                        use_rats_tool=self.use_rats_tool,
+                        bias_correct=False)
 
             brain_file = _apply_mask(unbiased_file, brain_mask_file,
                                      write_dir=self.output_dir,
                                      caching=self.caching,
                                      terminal_output=self.terminal_output)
-            setattr(self, modality + '_brain_', brain_file)
         else:
             brain_file = None
 
         if modality == 'func':
+            self.func_brain_ = brain_file
             coregistration = coregister_func(
                 self._unifized_anat, unbiased_file,
                 self.output_dir,
@@ -217,11 +246,14 @@ class AnatCoregistrator(BaseEstimator, TransformerMixin):
                 func_brain_file=brain_file,
                 prior_rigid_body_registration=prior_rigid_body_registration,
                 caching=self.caching)
-            setattr(self, '_coreg_func_warps', coregistration.coreg_warps_)
-            coreg_modality_file = _apply_perslice_warp(
+            self._func_undistort_warps = coregistration.coreg_warps_
+            self.undistorted_func_ = _apply_perslice_warp(
                 allineated_file, self._coreg_func_warps, .1, .1,
                 write_dir=self.output_dir, caching=self.caching)
+            self.anat_in_func_space = coregistration.coreg_anat_
+            self._func_to_anat_transform = coregistration.coreg_transform_
         elif modality == 'perf':
+            self.perf_brain_ = brain_file
             coregistration = coregister_perf(
                 self._unifized_anat, unbiased_file,
                 self.output_dir,
@@ -229,21 +261,34 @@ class AnatCoregistrator(BaseEstimator, TransformerMixin):
                 m0_brain_file=brain_file,
                 prior_rigid_body_registration=prior_rigid_body_registration,
                 caching=self.caching)
-            setattr(self, '_coreg_perf_warps', coregistration.coreg_warps_)
-            coreg_modality_file = coregistration.coreg_m0_
+            self._perf_undistort_warps = coregistration.coreg_warps_
+            self.anat_in_perf_space = coregistration.coreg_anat_
+            self.undistorted_perf = coregistration.coreg_m0_
+            self._perf_to_anat_transform = coregistration.coreg_transform_
 
-        setattr(self, 'anat_in_{}_space'.format(modality),
-                coregistration.coreg_anat_)
-        setattr(self, '_coreg_{0}_transform'.format(modality),
-                coregistration.coreg_transform_)
+        return self
 
-        return coreg_modality_file
+    def transform_modality(self, apply_to_file, modality):
+        """ Applies modality coregristration to a file in the modality space.
+        """
+        self._check_fitted()
+        modality_coreg_warps = '_coreg_{}_warps'.format(modality)
+        if not hasattr(self, modality_coreg_warps):
+            raise ValueError('It seems that %s has not been transformed. '
+                             'You must call fit_modality() before calling '
+                             'transform_modality().' % self.__class__.__name__)
 
-    def fit_transform(self, in_file, modality, slice_timing=None,
-                      t_r=None, prior_rigid_body_registration=None,
-                      **fit_params):
-        """Fit to data, then transform it
-#        Prepare and perform coregistration.
+        coreg_apply_to_file = _apply_perslice_warp(
+            apply_to_file, self.__getattribute__(modality_coreg_warps), .1, .1,
+            write_dir=self.output_dir, caching=self.caching)
+        return coreg_apply_to_file
+
+    def fit_transform_modality(self, in_file, apply_to_file,
+                               modality, slice_timing=None,
+                               t_r=None, prior_rigid_body_registration=None,
+                               **fit_params):
+        """#Fit to data, then transform it
+        Prepare and perform coregistration.
 
         Parameters
         ----------
@@ -269,12 +314,13 @@ class AnatCoregistrator(BaseEstimator, TransformerMixin):
         out_file : str
             Path to the modality image after coregistration.
         """
-        return self.fit(**fit_params).transform(
-            in_file,
-            modality=modality,
-            slice_timing=slice_timing,
-            t_r=t_r,
-            prior_rigid_body_registration=prior_rigid_body_registration)
+        self._check_fitted()
+        return self.fit_modality(
+            in_file, modality, slice_timing=slice_timing, t_r=t_r,
+            prior_rigid_body_registration=
+            prior_rigid_body_registration).transform_modality(
+            apply_to_file,
+            modality=modality)
 
 
 class TemplateRegistrator(BaseEstimator, TransformerMixin):
@@ -321,12 +367,12 @@ class TemplateRegistrator(BaseEstimator, TransformerMixin):
     """
 
     def __init__(self, template=None,
-                 brain_extracted_template=None, brain_volume=None,
+                 template_brain_mask=None, brain_volume=None,
                  dilated_template_mask=None, output_dir=None, caching=False,
                  verbose=True, use_rats_tool=True,
                  mask_clipping_fraction=.1):
         self.template = template
-        self.brain_extracted_template = brain_extracted_template
+        self.template_brain_mask = template_brain_mask
         self.dilated_template_mask = dilated_template_mask
         self.brain_volume = brain_volume
         self.output_dir = output_dir
@@ -350,11 +396,11 @@ class TemplateRegistrator(BaseEstimator, TransformerMixin):
                                  "and 0.9, you provided {}"
                                  "".format(self.mask_clipping_fraction))
 
-    def _check_fitted(self):
-        if not hasattr(self, 'terminal_output'):
+    def _check_anat_fitted(self):
+        if not hasattr(self, '_normalization_transform'):
             raise ValueError('It seems that %s has not been fitted. '
-                             'You must call fit() before calling transform().'
-                             % self.__class__.__name__)
+                             'You must call fit_anat() before calling '
+                             'transform_anat().' % self.__class__.__name__)
 
     def _set_output_dir(self):
         if self.output_dir is None:
@@ -363,24 +409,84 @@ class TemplateRegistrator(BaseEstimator, TransformerMixin):
         if not os.path.isdir(self.output_dir):
             os.makedirs(self.output_dir)
 
-    def check_segmentation(self, in_file):
-        _, brain_file = self.segment(in_file)
-        print(mask_report(brain_file, self.brain_volume))
+    def check_mask_computation(self, in_file):
+        """ Quality check mask computation for the chosen
+            `mask_clipping_fraction` parameter.
+        """
+        self._fit()
+        if self.mask_clipping_fraction:
+            brain_mask_file = compute_brain_mask(
+                in_file, self.brain_volume, write_dir=self.output_dir,
+                caching=self.caching,
+                terminal_output=self.terminal_output,
+                use_rats_tool=self.use_rats_tool,
+                cl_frac=self.mask_clipping_fraction)
+        else:
+            brain_mask_file = compute_brain_mask(
+                in_file, self.brain_volume, write_dir=self.output_dir,
+                caching=self.caching,
+                terminal_output=self.terminal_output,
+                use_rats_tool=self.use_rats_tool,
+                bias_correct=False)
 
-    def fit(self, y=None):
+        print(mask_report(brain_mask_file, self.brain_volume))
+
+    def _fit(self):
         self._check_inputs()
         self._set_output_dir()
-        if not self.brain_extracted_template:
-            brain_extracted_template = self.segment(self.template,
-                                                    unifize=False)
-            setattr(self, 'brain_extracted_template', brain_extracted_template)
+        if self.verbose:
+            self.terminal_output = 'stream'
+        else:
+            self.terminal_output = 'none'
+        return self
 
+    def fit_anat(self, anat_file, brain_mask_file=None):
+        """ Estimates noramlization from anatomical to template space.
+        """
+        self._fit()
+        if not self.template_brain_mask:
+            _, self.template_brain_ = self.segment(self.template,
+                                                   unifize=False)
+        else:
+            self.template_brain_ = _apply_mask(
+                self.template, self.template_brain_mask,
+                write_dir=self.output_dir,
+                caching=self.caching,
+                terminal_output=self.terminal_output)
         if self.verbose:
             self.terminal_output = 'stream'
         else:
             self.terminal_output = 'none'
 
+        self.anat_ = anat_file
+        file_to_mask, brain_file = self.segment(anat_file)
+        self._unifized_anat_ = file_to_mask
+        self.anat_brain_ = brain_file
+
+        normalization = anats_to_template(
+            [self._unifized_anat_], [self.anat_brain_], self.template,
+            self.template_brain_, write_dir=self.output_dir,
+            dilated_head_mask_filename=self.dilated_template_mask,
+            caching=self.caching, verbose=self.verbose, maxlev=0)  # XXX maxlev
+
+        self.registered_anat = normalization.registered[0]
+        self._normalization_pretransform = normalization.pretransforms[0]
+        self._normalization_transform = normalization.transforms[0]
         return self
+
+    def transform_anat(self, in_file, interpolation='wsinc5'):
+        self._check_fitted()
+        transformed_file = _apply_transforms(in_file, self.anat_,
+                                             self.output_dir,
+                                             [self._normalization_pretransform,
+                                              self._normalization_transform],
+                                             interpolation=interpolation,
+                                             caching=self.caching,
+                                             verbose=self.verbose)
+        return transformed_file
+
+    def fit_transform_anat(self, anat_file, in_file, **fit_params):
+        return self.fit(anat_file, **fit_params).transform(in_file)
 
     def segment(self, in_file, unifize=True):
         if unifize:
@@ -411,72 +517,16 @@ class TemplateRegistrator(BaseEstimator, TransformerMixin):
                                  terminal_output=self.terminal_output)
         return file_to_mask, brain_file
 
-    def transform(self, anat_file, y=None):
-        """ Estimates noramlization from anatomical to template space.
-        """
+    def _check_modality_fitted(self, modality):
+        coreg_transform = '_{}_to_anat_transform'.format(modality)
+        if not hasattr(self, coreg_transform):
+            raise ValueError('It seems that %s has not been fitted. '
+                             'You must call fit_modality() before calling '
+                             'transform_modality().' % self.__class__.__name__)
+
+    def fit_modality(self, in_file, modality, slice_timing=True, t_r=None,
+                     prior_rigid_body_registration=False, voxel_size=None):
         self._check_fitted()
-
-        for attribute in ['anat_', '_unifized_anat_', 'anat_brain_',
-                          '_normalization_transform',
-                          '_normalization_pretransform']:
-            if hasattr(self, attribute):
-                delattr(self, attribute)
-
-        setattr(self, 'anat_', anat_file)
-        file_to_mask, brain_file = self.segment(anat_file)
-        setattr(self, '_unifized_anat_', file_to_mask)
-        setattr(self, 'anat_brain_', brain_file)
-
-        normalization = anats_to_template(
-            [self._unifized_anat_], [self.anat_brain_], self.template,
-            self.brain_extracted_template, write_dir=self.output_dir,
-            dilated_head_mask_filename=self.dilated_template_mask,
-            caching=self.caching, verbose=self.verbose, maxlev=0)  # XXX maxlev
-
-        setattr(self, '_normalization_pretransform',
-                normalization.pretransforms[0])
-        setattr(self, '_normalization_transform',
-                normalization.transforms[0])
-        return normalization.registered[0]
-
-    def fit_transform(self, anat_file, **fit_params):
-        return self.fit(**fit_params).transform(anat_file)
-
-    def inverse_transform(self, in_file, interpolation='wsinc5'):
-        """Use provided loadings to compute corresponding linear component
-        combination in whole-brain voxel space
-        Parameters
-        ----------
-        loadings: list of numpy array (n_samples x n_components)
-            Component signals to tranform back into voxel signals
-        Returns
-        -------
-        reconstructed_imgs: list of nibabel.Nifti1Image
-            For each loading, reconstructed Nifti1Image
-        """
-        self._check_fitted()
-        self._check_transformed()
-
-        inverted_in_file = _apply_transforms(in_file, self.anat_,
-                                             self.output_dir,
-                                             [self._normalization_pretransform,
-                                              self._normalization_transform],
-                                             inverse=True,
-                                             interpolation=interpolation,
-                                             caching=self.caching,
-                                             verbose=self.verbose)
-        return inverted_in_file
-
-    def transform_modality(self, in_file, modality,
-                           slice_timing=True, t_r=None,
-                           prior_rigid_body_registration=False,
-                           voxel_size=None):
-        self._check_fitted()
-        self._check_transformed()
-
-        for attribute in [modality + '_brain_', '_unbiased_' + modality]:
-            if hasattr(self, attribute):
-                delattr(self, attribute)
 
         if modality == 'perf':
             to_coregister_file = in_file
@@ -528,11 +578,11 @@ class TemplateRegistrator(BaseEstimator, TransformerMixin):
                                      write_dir=self.output_dir,
                                      caching=self.caching,
                                      terminal_output=self.terminal_output)
-            setattr(self, modality + '_brain_', brain_file)
         else:
             brain_file = None
 
         if modality == 'func':
+            self.func_brain_ = brain_file
             coregistration = coregister_func(
                 self._unifized_anat_, unbiased_file,
                 self.output_dir,
@@ -540,11 +590,15 @@ class TemplateRegistrator(BaseEstimator, TransformerMixin):
                 func_brain_file=brain_file,
                 prior_rigid_body_registration=prior_rigid_body_registration,
                 caching=self.caching)
-            setattr(self, '_coreg_func_warps', coregistration.coreg_warps_)
             coreg_modality_file = _apply_perslice_warp(
                 allineated_file, self._coreg_func_warps, .1, .1,
                 write_dir=self.output_dir, caching=self.caching)
+            self._func_unditort_warps = coregistration.coreg_warps_
+            self.anat_in_func_space = coregistration.coreg_anat_
+            self.undistorted_func = coreg_modality_file
+            self._func_to_anat_transform = coregistration.coreg_transform_
         elif modality == 'perf':
+            self.perf_brain_ = brain_file
             coregistration = coregister_perf(
                 self._unifized_anat_, unbiased_file,
                 self.output_dir,
@@ -552,14 +606,11 @@ class TemplateRegistrator(BaseEstimator, TransformerMixin):
                 m0_brain_file=brain_file,
                 prior_rigid_body_registration=prior_rigid_body_registration,
                 caching=self.caching)
-            setattr(self, '_coreg_perf_warps', coregistration.coreg_warps_)
             coreg_modality_file = coregistration.coreg_m0_
-
-        setattr(self, 'coreg_{}_'.format(modality), coreg_modality_file)
-        setattr(self, 'anat_in_{}_space'.format(modality),
-                coregistration.coreg_anat_)
-        setattr(self, '_{}_coreg_transform'.format(modality),
-                coregistration.coreg_transform_)
+            self._perf_unditort_warps = coregistration.coreg_warps_
+            self.anat_in_perf_space = coregistration.coreg_anat_
+            self.undistorted_perf = coreg_modality_file
+            self._perf_to_anat_transform = coregistration.coreg_transform_
 
         normalized_file = _transform_to_template(
             coreg_modality_file, self.template, self.output_dir,
@@ -570,53 +621,50 @@ class TemplateRegistrator(BaseEstimator, TransformerMixin):
 
         return normalized_file
 
-    def fit_transform_modality(self, anat_file, in_file, modality,
-                               slice_timing=True, t_r=None,
-                               prior_rigid_body_registration=False,
-                               voxel_size=None, **fit_transform_params):
-        self.fit_transform(anat_file, **fit_transform_params)
-        return self.transform_modality(
-            in_file, modality, slice_timing=slice_timing, t_r=t_r,
-            prior_rigid_body_registration=prior_rigid_body_registration,
-            voxel_size=voxel_size)
+    def transform_modality(self, in_file, modality, interpolation='wsinc5',
+                           voxel_size=None):
+        modality_undistort_warps = self.__getattribute__(
+            '_{}_undistort_warps'.format(modality))
+        coreg_transform_file = self.__getattribute__(
+            '_{}_to_anat_transform'.format(modality))
+        undistorted_file = _apply_perslice_warp(in_file,
+                                                modality_undistort_warps,
+                                                .1,
+                                                .1,
+                                                write_dir=self.output_dir,
+                                                caching=self.caching)
+        normalized_file = _apply_transforms(
+            undistorted_file, self.template, self.output_dir,
+            coreg_transform_file, self._normalization_pretransform,
+            self._normalization_transform,
+            voxel_size=voxel_size, caching=self.caching)
+        return normalized_file
 
-    def _check_transformed(self):
-        if not hasattr(self, '_normalization_transform'):
-            raise ValueError(
-                'It seems that %s has not been transformed. '
-                'You must call transform() before calling transform_modality().'
-                % self.__class__.__name__)
+    def fit_transform_modality(self, modality_file, modality, apply_to_file,
+                               interpolation='wsinc5',
+                               voxel_size=None, **fit_params):
+        self._check_fitted()
+        return self.fit_modality(
+            modality_file, modality, **fit_params).transform_modaliy(
+            apply_to_file, interpolation=interpolation, voxel_size=voxel_size)
 
     def inverse_transform_modality(self, in_file, modality,
                                    interpolation='wsinc5'):
-        """Use provided loadings to compute corresponding linear component
-        combination in whole-brain voxel space
-        Parameters
-        ----------
-        loadings: list of numpy array (n_samples x n_components)
-            Component signals to tranform back into voxel signals
-        Returns
-        -------
-        reconstructed_imgs: list of nibabel.Nifti1Image
-            For each loading, reconstructed Nifti1Image
+        """ Trasnforms the given file from template space to modality space.
         """
         self._check_fitted()
-        self._check_transformed()
-        coreg_transform_key = '_{}_coreg_transform'.format(modality)
-        coreg_anat_key = 'anat_in_{}_space'.format(modality)
-        if not hasattr(self, coreg_transform_key):
-            raise ValueError(
-                'It seems that {0} has not been {1} modality transformed. '
-                'You must call transform_modality() before calling '
-                'inverse_transform_modality().'.format(self.__class__.__name__,
-                                                       modality))
-        inverted_in_file = _apply_transforms(in_file, self[coreg_anat_key],
-                                             self.output_dir,
-                                             [self[coreg_transform_key],
-                                              self._normalization_pretransform,
-                                              self._normalization_transform],
-                                             inverse=True,
-                                             interpolation=interpolation,
-                                             caching=self.caching,
-                                             verbose=self.verbose)
-        return inverted_in_file
+        self._check_modality_fitted()
+        coreg_transform_file = self.__getattribute__(
+            '_{}_to_anat_transform'.format(modality))
+        modality_file = self.__getattribute__(modality)
+
+        inverted_file = _apply_transforms(in_file, modality_file,
+                                          self.output_dir,
+                                          [coreg_transform_file,
+                                           self._normalization_pretransform,
+                                           self._normalization_transform],
+                                          inverse=True,
+                                          interpolation=interpolation,
+                                          caching=self.caching,
+                                          verbose=self.verbose)
+        return inverted_file
