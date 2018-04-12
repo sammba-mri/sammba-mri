@@ -16,7 +16,8 @@ from sammba import testing_data
 def test_anats_to_common():
     anat_file = os.path.join(os.path.dirname(testing_data.__file__),
                              'anat.nii.gz')
-    brain_file = compute_brain_mask(anat_file, 400, use_rats_tool=False)
+    brain_file = compute_brain_mask(anat_file, 400, tst.tmpdir,
+                                    use_rats_tool=False)
 
     # Check error is raised if wrong registration kind
     assert_raises_regex(ValueError, "Registration kind must be one of ",
@@ -36,7 +37,8 @@ def test_anats_to_common():
 def test_anats_to_template():
     anat_file = os.path.join(os.path.dirname(testing_data.__file__),
                              'anat.nii.gz')
-    brain_file = compute_brain_mask(anat_file, 400, use_rats_tool=False)
+    brain_file = compute_brain_mask(anat_file, 400, tst.tmpdir,
+                                    use_rats_tool=False)
 
     # test common space of one image is itself
     register_result = struct.anats_to_template([anat_file], [brain_file],

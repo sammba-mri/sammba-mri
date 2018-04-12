@@ -9,7 +9,8 @@ from sammba.interfaces import segmentation
 from .utils import fix_obliquity
 from .fmri_session import FMRISession
 from .struct import anats_to_template
-from .base import (_rigid_body_register, _warp, _per_slice_qwarp)
+from .base import (_rigid_body_register, compute_brain_mask, _warp,
+                   _apply_mask, _per_slice_qwarp)
 
 
 def _realign(func_filename, write_dir, caching=False,
@@ -965,13 +966,25 @@ def fmri_sessions_to_template(sessions, t_r, head_template_filename,
         sessions[n] = animal_data
 
     anat_filenames = [animal_data.anat for animal_data in sessions]
+    brain_mask_filenames = [compute_brain_mask(anat, brain_volume, write_dir,
+                                               use_rats_tool=use_rats_tool)
+                            for anat in anat_filenames]
+    brain_filenames = [_apply_mask(anat, brain_mask, write_dir)
+                       for (anat, brain_mask) in zip(anat_filenames,
+                                                     brain_mask_filenames)]
+    if brain_template_filename is None:
+        brain_mask_template_filename = compute_brain_mask(
+            head_template_filename, brain_volume, write_dir,
+            use_rats_tool=use_rats_tool)
+        brain_template_filename = _apply_mask(
+            head_template_filename, brain_mask_template_filename, write_dir)
+
     anats_registration = anats_to_template(
         anat_filenames,
+        brain_filenames,
         head_template_filename,
+        brain_template_filename,
         animal_data.output_dir_,
-        brain_volume,
-        use_rats_tool=use_rats_tool,
-        brain_template_filename=brain_template_filename,
         dilated_head_mask_filename=dilated_head_mask_filename,
         maxlev=maxlev,
         caching=caching, verbose=verbose)
