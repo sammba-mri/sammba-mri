@@ -36,14 +36,14 @@ def test_anats_to_template():
 
     # Check error is raised if wrong registration kind
     assert_raises_regex(ValueError, "Registration kind must be one of ",
-                        struct.anats_to_template, [anat_file], tst.tmpdir, 400,
-                        registration_kind='rigidd')
+                        struct.anats_to_template, [anat_file], anat_file,
+                        tst.tmpdir, 400, registration_kind='rigidd')
 
     # test common space of one image is itself
     register_result = struct.anats_to_template([anat_file], anat_file,
                                                tst.tmpdir,
                                                400, use_rats_tool=False,
-                                               maxlev=0, verbose=0)
+                                               verbose=0)
     transform = np.loadtxt(register_result.pre_transforms[0])
     assert_array_almost_equal(transform,
                               [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0], decimal=1)
