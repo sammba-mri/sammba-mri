@@ -292,7 +292,7 @@ class TemplateRegistrator(BaseEstimator, TransformerMixin):
                 allineated_file, self._func_undistort_warps, .1, .1,
                 write_dir=self.output_dir, caching=self.caching)
 
-            self.registered_func = _apply_transforms(
+            self.registered_func_ = _apply_transforms(
                 self.undistorted_func, self.template, self.output_dir,
                 [self._normalization_transform,
                  self._normalization_pretransform,
@@ -312,7 +312,7 @@ class TemplateRegistrator(BaseEstimator, TransformerMixin):
             self.anat_in_perf_space = coregistration.coreg_anat_
             self._perf_to_anat_transform = coregistration.coreg_transform_
 
-            self.registered_perf = _apply_transforms(
+            self.registered_perf_ = _apply_transforms(
                 self.undistorted_perf, self.template, self.output_dir,
                 [self._normalization_transform,
                  self._normalization_pretransform,

@@ -16,35 +16,35 @@ retest = data_fetchers.fetch_zurich_test_retest(subjects=range(5),
 # Load the template
 # -------------------
 dorr = data_fetchers.fetch_atlas_dorr_2008(downsample='100')
-template_filename = dorr.t2
+template = dorr.t2
 
 ##############################################################################
-# Extract the brain template
-# --------------------------
+# Load the brain mask of the template
+# -----------------------------------
+import os
+
 dorr_masks = data_fetchers.fetch_masks_dorr_2008(downsample='100')
-template_brain_mask = dorr_masks.brain
+template_brain_mask = os.path.join('ica', 'dorr_100_mask.nii.gz')
+if not os.path.isfile(template_brain_mask):
+    dorr_masks.brain.to_filename(template_brain_mask)
 
 ##############################################################################
 # Register to the template
 # ------------------------
 from sammba.registration import TemplateRegistrator
 
+registrator = TemplateRegistrator(brain_volume=400, caching=True,
+                                  template=template,
+                                  template_brain_mask=template_brain_mask)
+
 registered_funcs = []
 for anat, func in zip(retest.anat, retest.func):
-    output_dir = os.path.join(write_dir,
-                              os.path.basename(os.path.dirname(anat)))
-    registrator = template_registrator.TemplateRegistrator(
-        anat=anat,
-        template=template_filename,
-        brain_extracted_template=brain_extracted_template,
-        caching=False, output_dir=output_dir,
-        brain_volume=400)
-    registrator.segment()
-    registrator.normalize()
-    normalized_func = registrator.normalize_modality(func, 'func', t_r=1.,
-                                                     voxel_size=(.3, .3, .3),
-                                                 prior_rigid_body_registration=True)
-    registered_funcs.append(normalized_func)
+    animal_id = os.path.basename(os.path.dirname(anat))
+    registrator.output_dir = os.path.join('ica', animal_id)
+    registrator.fit_anat(anat)
+    registrator.fit_modality(func, 'func', t_r=1., voxel_size=(.3, .3, .3),
+                             prior_rigid_body_registration=True)
+    registered_funcs.append(registrator.registered_func_)
 
 ##############################################################################
 # Run ICA
@@ -65,5 +65,6 @@ components_img = canica.masker_.inverse_transform(canica.components_)
 from nilearn import plotting
 
 plotting.plot_prob_atlas(components_img,
-                         anat_img='/home/Promane/2014-ROMANE/5_Experimental-Plan-Experiments-Results/mouse/XNAT_CSD_MRI_MOUSE/20170925_goodposttemplate/Qw4_meanhead200.nii.gz',
+                         bg_img=registrator.template_brain_,
+                         display_mode='z',
                          title='All ICA components')

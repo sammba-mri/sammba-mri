@@ -862,9 +862,9 @@ def _apply_transforms(to_register_filename, target_filename,
     else:
         out_resample = resample(in_file=target_filename,
                                 voxel_size=voxel_size,
-                                outputtype=fname_presuffix(target_filename,
-                                                           suffix='_resampled',
-                                                           newpath=write_dir),
+                                out_file=fname_presuffix(target_filename,
+                                                         suffix='_resampled',
+                                                         newpath=write_dir),
                                 environ=environ)
         resampled_template_filename = out_resample.outputs.out_file
 
