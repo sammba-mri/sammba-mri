@@ -902,7 +902,7 @@ def anats_to_template(anat_filenames, head_template_filename, write_dir,
 
     if registration_kind != 'nonlinear':
         registered = allineated_filenames
-        warp_transforms = None
+        warp_transforms = [None]
     else:
         intermediate_files.extend(allineated_filenames)
         warp_transforms = []

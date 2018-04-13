@@ -556,13 +556,17 @@ def _func_to_template(func_coreg_filename, template_filename, write_dir,
 
     if caching:
         memory = Memory(write_dir)
-        warp_apply = memory.cache(afni.NwarpApply)
         resample = memory.cache(afni.Resample)
-        warp_apply.interface().set_default_terminal_output(terminal_output)
-        resample.interface().set_default_terminal_output(terminal_output)
+        catmatvec = memory.cache(afni.CatMatvec)
+        allineate = memory.cache(afni.Allineate)
+        warp_apply = memory.cache(afni.NwarpApply)
+        for step in [resample, allineate, warp_apply]:
+            step.interface().set_default_terminal_output(terminal_output)
     else:
-        warp_apply = afni.NwarpApply(terminal_output=terminal_output).run
         resample = afni.Resample(terminal_output=terminal_output).run
+        catmatvec = afni.CatMatvec().run
+        allineate = afni.Allineate(terminal_output=terminal_output).run
+        warp_apply = afni.NwarpApply(terminal_output=terminal_output).run
         environ['AFNI_DECONFLICT'] = 'OVERWRITE'
 
     current_dir = os.getcwd()
@@ -578,15 +582,29 @@ def _func_to_template(func_coreg_filename, template_filename, write_dir,
                                 environ=environ)
         func_template_filename = out_resample.outputs.out_file
 
-    warp = "'{0} {1} {2}'".format(anat_to_template_warp_filename,
-                                  anat_to_template_oned_filename,
-                                  func_to_anat_oned_filename)
-
-    _ = warp_apply(in_file=func_coreg_filename,
-                   master=func_template_filename,
-                   warp=warp,
-                   out_file=normalized_filename,
-                   environ=environ)
+    if anat_to_template_warp_filename is None:
+        affine_transform_filename = fname_presuffix(func_to_anat_oned_filename,
+                                                    suffix='_to_template')
+        _ = catmatvec(in_file=[(anat_to_template_oned_filename, 'ONELINE'),
+                               (func_to_anat_oned_filename, 'ONELINE')],
+                      oneline=True,
+                      out_file=affine_transform_filename)
+        _ = allineate(
+            in_file=func_coreg_filename,
+            master=func_template_filename,
+            in_matrix=affine_transform_filename,
+            out_file=normalized_filename,
+            environ=environ)
+    else:
+        warp = "'{0} {1} {2}'".format(anat_to_template_warp_filename,
+                                      anat_to_template_oned_filename,
+                                      func_to_anat_oned_filename)
+    
+        _ = warp_apply(in_file=func_coreg_filename,
+                       master=func_template_filename,
+                       warp=warp,
+                       out_file=normalized_filename,
+                       environ=environ)
     os.chdir(current_dir)
     return normalized_filename
 
@@ -598,6 +616,7 @@ def fmri_sessions_to_template(sessions, t_r, head_template_filename,
                               dilated_head_mask_filename=None,
                               prior_rigid_body_registration=False,
                               slice_timing=True,
+                              registration_kind='affine',
                               maxlev=2,
                               func_voxel_size=None,
                               caching=False, verbose=True):
@@ -633,6 +652,9 @@ def fmri_sessions_to_template(sessions, t_r, head_template_filename,
     dilated_head_mask_filename : str, optional
         Path to a dilated head mask, passed to
         sammba.registration.anats_to_template
+
+    registration_kind : one of {'rigid', 'affine', 'nonlinear'}, optional
+        The allowed transform kind from anat to template.
 
     maxlev : int or None, optional
         Maximal level for the warp when registering anat to template. Passed to
@@ -720,6 +742,7 @@ def fmri_sessions_to_template(sessions, t_r, head_template_filename,
         use_rats_tool=use_rats_tool,
         brain_template_filename=brain_template_filename,
         dilated_head_mask_filename=dilated_head_mask_filename,
+        registration_kind=registration_kind,
         maxlev=maxlev,
         caching=caching, verbose=verbose)
     for n, (animal_data, normalized_anat_filename) in enumerate(zip(

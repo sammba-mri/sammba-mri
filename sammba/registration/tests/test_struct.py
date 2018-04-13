@@ -48,4 +48,4 @@ def test_anats_to_template():
     assert_array_almost_equal(transform,
                               [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0], decimal=1)
     assert_true(os.path.isfile(register_result.registered[0]))
-    assert_true(register_result.transforms is None)
+    assert_true(register_result.transforms[0] is None)
