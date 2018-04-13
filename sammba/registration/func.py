@@ -588,7 +588,8 @@ def _func_to_template(func_coreg_filename, template_filename, write_dir,
         _ = catmatvec(in_file=[(anat_to_template_oned_filename, 'ONELINE'),
                                (func_to_anat_oned_filename, 'ONELINE')],
                       oneline=True,
-                      out_file=affine_transform_filename)
+                      out_file=affine_transform_filename,
+                      environ=environ)
         _ = allineate(
             in_file=func_coreg_filename,
             master=func_template_filename,
