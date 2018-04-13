@@ -1,16 +1,15 @@
 import os
 from .base import (compute_brain_mask, _bias_correct,
                    _afni_bias_correct, _apply_mask,
-                   _apply_perslice_warp, _apply_transforms,
-                   mask_report)
+                   _apply_perslice_warp, _apply_transforms)
 from .perfusion import coregister as coregister_perf
 from .func import _realign, _slice_time
 from .func import coregister as coregister_func
 from .struct import anats_to_template
-from sklearn.base import BaseEstimator, TransformerMixin
+from .base_registrator import BaseRegistrator
 
 
-class TemplateRegistrator(BaseEstimator, TransformerMixin):
+class TemplateRegistrator(BaseRegistrator):
     """
     Encapsulation for anatomical data, relative to registration to a template.
 
@@ -69,7 +68,6 @@ class TemplateRegistrator(BaseEstimator, TransformerMixin):
         if not os.path.isfile(self.template):
             raise IOError('`template` must be an existing '
                           'image file, you gave {0}'.format(self.template))
-
         if self.brain_volume is None:
             raise IOError('`brain_volume` must be provided')
 
@@ -86,45 +84,6 @@ class TemplateRegistrator(BaseEstimator, TransformerMixin):
                              'You must call fit_anat() before calling '
                              'transform_anat() or fit_modality().'
                              % self.__class__.__name__)
-
-    def _set_output_dir(self):
-        if self.output_dir is None:
-            self.output_dir = os.getcwd()
-
-        self.output_dir = os.path.abspath(self.output_dir)
-        if not os.path.isdir(self.output_dir):
-            os.makedirs(self.output_dir)
-
-    def check_segmentation(self, in_file):
-        """ Quality check mask computation for the chosen
-            `mask_clipping_fraction` parameter.
-        """
-        self._fit()
-        if self.mask_clipping_fraction:
-            brain_mask_file = compute_brain_mask(
-                in_file, self.brain_volume, write_dir=self.output_dir,
-                caching=self.caching,
-                terminal_output=self.terminal_output,
-                use_rats_tool=self.use_rats_tool,
-                cl_frac=self.mask_clipping_fraction)
-        else:
-            brain_mask_file = compute_brain_mask(
-                in_file, self.brain_volume, write_dir=self.output_dir,
-                caching=self.caching,
-                terminal_output=self.terminal_output,
-                use_rats_tool=self.use_rats_tool,
-                bias_correct=False)
-
-        return mask_report(brain_mask_file, self.brain_volume)
-
-    def _fit(self):
-        self._check_inputs()
-        self._set_output_dir()
-        if self.verbose:
-            self.terminal_output = 'stream'
-        else:
-            self.terminal_output = 'none'
-        return self
 
     def fit_anat(self, anat_file, brain_mask_file=None):
         """ Estimates registration from anatomical to template space.

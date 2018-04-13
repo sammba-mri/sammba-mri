@@ -1,4 +1,3 @@
-import os
 from .base import (compute_brain_mask, _bias_correct,
                    _afni_bias_correct, _apply_mask,
                    _apply_perslice_warp,
@@ -6,10 +5,10 @@ from .base import (compute_brain_mask, _bias_correct,
 from .perfusion import coregister as coregister_perf
 from .func import _realign, _slice_time
 from .func import coregister as coregister_func
-from sklearn.base import BaseEstimator, TransformerMixin
+from .base_registrator import BaseRegistrator
 
 
-class AnatCoregistrator(BaseEstimator, TransformerMixin):
+class AnatCoregistrator(BaseRegistrator):
     """
     Encapsulation for anatomical data, relative to registration to a template.
 
@@ -61,74 +60,6 @@ class AnatCoregistrator(BaseEstimator, TransformerMixin):
                 raise ValueError("'mask_clipping_fraction' must be between 0.1"
                                  "and 0.9, you provided {}"
                                  "".format(self.mask_clipping_fraction))
-
-    def _set_output_dir(self):
-        if self.output_dir is None:
-            self.output_dir = os.getcwd()
-        self.output_dir = os.path.abspath(self.output_dir)
-
-        if not os.path.isdir(self.output_dir):
-            os.makedirs(self.output_dir)
-
-    def segment(self, in_file, unifize=True):
-        if unifize:
-            file_to_mask = _afni_bias_correct(
-                in_file, write_dir=self.output_dir,
-                terminal_output=self.terminal_output, caching=self.caching)
-        else:
-            file_to_mask = in_file
-
-        if self.mask_clipping_fraction:
-            brain_mask_file = compute_brain_mask(
-                in_file, self.brain_volume, write_dir=self.output_dir,
-                caching=self.caching,
-                terminal_output=self.terminal_output,
-                use_rats_tool=self.use_rats_tool,
-                cl_frac=self.mask_clipping_fraction)
-        else:
-            brain_mask_file = compute_brain_mask(
-                in_file, self.brain_volume, write_dir=self.output_dir,
-                caching=self.caching,
-                terminal_output=self.terminal_output,
-                use_rats_tool=self.use_rats_tool,
-                bias_correct=False)
-
-        brain_file = _apply_mask(file_to_mask, brain_mask_file,
-                                 write_dir=self.output_dir,
-                                 caching=self.caching,
-                                 terminal_output=self.terminal_output)
-        return file_to_mask, brain_file
-
-    def check_segmentation(self, in_file):
-        """ Quality check mask computation for the chosen
-            `mask_clipping_fraction` parameter.
-        """
-        self._fit()
-        if self.mask_clipping_fraction:
-            brain_mask_file = compute_brain_mask(
-                in_file, self.brain_volume, write_dir=self.output_dir,
-                caching=self.caching,
-                terminal_output=self.terminal_output,
-                use_rats_tool=self.use_rats_tool,
-                cl_frac=self.mask_clipping_fraction)
-        else:
-            brain_mask_file = compute_brain_mask(
-                in_file, self.brain_volume, write_dir=self.output_dir,
-                caching=self.caching,
-                terminal_output=self.terminal_output,
-                use_rats_tool=self.use_rats_tool,
-                bias_correct=False)
-
-        return mask_report(brain_mask_file, self.brain_volume)
-
-    def _fit(self, y=None):
-        self._check_inputs()
-        if self.verbose:
-            self.terminal_output = 'stream'
-        else:
-            self.terminal_output = 'none'
-        self._set_output_dir()
-        return self
 
     def fit_anat(self, anat_file, brain_mask_file=None):
         self._fit()
