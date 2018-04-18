@@ -110,19 +110,11 @@ def compute_brain_mask(head_file, brain_volume, write_dir, bias_correct=True,
     return out_compute_mask.outputs.out_file
 
 
-def _apply_mask(head_file, brain_mask_file, write_dir, bias_correct=True,
+def _apply_mask(head_file, mask_file, write_dir, bias_correct=True,
                 caching=False, terminal_output='allatonce'):
     """
     Parameters
     ----------
-    brain_volume : int
-        Volume of the brain used for brain extraction.
-        Typically 400 for mouse and 1800 for rat.
-
-    use_rats_tool : bool, optional
-        If True, brain mask is computed using RATS Mathematical Morphology.
-        Otherwise, a histogram-based brain segmentation is used.
-
     caching : bool, optional
         Wether or not to use caching.
 
@@ -148,11 +140,25 @@ def _apply_mask(head_file, brain_mask_file, write_dir, bias_correct=True,
         calc = afni.Calc(terminal_output=terminal_output).run
         environ['AFNI_DECONFLICT'] = 'OVERWRITE'
 
+    # Check mask is binary
+    mask_img = nibabel.load(mask_file)
+    mask = mask_img.get_data()
+    values = np.unique(mask)
+    if len(values) == 2:
+        # If there are 2 different values, one of them must be 0 (background)
+        if not 0 in values:
+            raise ValueError('Background of the mask must be represented with'
+                             '0. Given mask contains: %s.' % values)
+    elif len(values) != 2:
+        # If there are more than 2 values, the mask is invalid
+        raise ValueError('Given mask is not made of 2 values: %s'
+                         '. Cannot interpret as true or false' % values)
+
     out_calc_mask = calc(in_file_a=head_file,
-                         in_file_b=brain_mask_file,
+                         in_file_b=mask_file,
                          expr='a*b',
                          out_file=fname_presuffix(head_file,
-                                                  suffix='_brain',
+                                                  suffix='_masked',
                                                   newpath=write_dir),
                          environ=environ)
 

@@ -53,7 +53,7 @@ class TemplateRegistrator(BaseRegistrator):
                  template_brain_mask=None, brain_volume=None,
                  dilated_template_mask=None, output_dir=None, caching=False,
                  verbose=True, use_rats_tool=True,
-                 mask_clipping_fraction=.1):
+                 mask_clipping_fraction=.2, convergence=0.005):
         self.template = template
         self.template_brain_mask = template_brain_mask
         self.dilated_template_mask = dilated_template_mask
@@ -63,6 +63,7 @@ class TemplateRegistrator(BaseRegistrator):
         self.caching = caching
         self.verbose = verbose
         self.mask_clipping_fraction = mask_clipping_fraction
+        self.convergence = convergence
 
     def _check_inputs(self):
         if not os.path.isfile(self.template):
@@ -98,21 +99,26 @@ class TemplateRegistrator(BaseRegistrator):
                 write_dir=self.output_dir,
                 caching=self.caching,
                 terminal_output=self.terminal_output)
-        if self.verbose:
-            self.terminal_output = 'stream'
-        else:
-            self.terminal_output = 'none'
 
         self.anat_ = anat_file
-        file_to_mask, brain_file = self.segment(anat_file)
-        self._unifized_anat_ = file_to_mask
-        self.anat_brain_ = brain_file
-
+        if brain_mask_file is None:
+            self._unifized_anat_, self.anat_brain_ = self.segment(self.anat_)
+        else:
+            self._unifized_anat_ = _afni_bias_correct(
+                self.anat_, write_dir=self.output_dir,
+                terminal_output=self.terminal_output, caching=self.caching)
+            self.anat_brain_ = _apply_mask(
+                self._unifized_anat_, brain_mask_file,
+                write_dir=self.output_dir,
+                caching=self.caching,
+                terminal_output=self.terminal_output)
+        
         normalization = anats_to_template(
             [self._unifized_anat_], [self.anat_brain_], self.template,
             self.template_brain_, write_dir=self.output_dir,
             dilated_head_mask_filename=self.dilated_template_mask,
-            caching=self.caching, verbose=self.verbose, maxlev=0)  # XXX maxlev
+            caching=self.caching, verbose=self.verbose, maxlev=None,
+            convergence=self.convergence)  # XXX maxlev
 
         self.registered_anat = normalization.registered[0]
         self._normalization_pretransform = normalization.pretransforms[0]
