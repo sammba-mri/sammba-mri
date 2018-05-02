@@ -1,8 +1,7 @@
 import os
 import numpy as np
 import nibabel
-from sklearn.base import _pprint
-from sklearn.utils.fixes import signature
+from nilearn.image.resampling import coord_transform
 from ..externals.nipype.caching import Memory
 from ..externals.nipype.interfaces import afni, ants
 from ..externals.nipype.utils.filemanip import fname_presuffix
@@ -11,9 +10,10 @@ from .utils import fix_obliquity, _get_afni_output_type, compute_n4_max_shrink
 
 
 def mask_report(mask_file, expected_volume):
-    """
+    """ Outputs the mask
     Parameters
     ----------
+    mask_file
     registrator : registrator object conatining brain_volume and
         mask_clipping_fraction
 
@@ -24,8 +24,18 @@ def mask_report(mask_file, expected_volume):
     mask_img = nibabel.load(mask_file)
     volume = segmentation.compute_volume(mask_img)
     volume_accuracy = volume / expected_volume * 100.
-    return "extracted volume is {0:0.1f}% of expected volume".format(
-        volume_accuracy)
+
+    mask_data = mask_img.get_data()
+    i, j, k = np.where(mask_data != 0)
+    voxels_coords = np.array(coord_transform(i, j, k, mask_img.affine)).T
+    x_range, y_range, z_range = voxels_coords.max(axis=0) - \
+        voxels_coords.min(axis=0)
+    print(voxels_coords.max(axis=0))
+    print(voxels_coords.min(axis=0))
+    return "extracted volume is {0:0.1f}% of expected volume, sizes "\
+           "x: {1:0.2f}, y: {2:0.2f}, z: {3:0.2f}".format(volume_accuracy,
+                                                          x_range, y_range,
+                                                          z_range)
 
 
 def compute_brain_mask(head_file, brain_volume, write_dir, bias_correct=True,
