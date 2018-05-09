@@ -145,35 +145,6 @@ class TemplateRegistrator(BaseRegistrator):
         """
         return self.fit(anat_file, **fit_params).transform(apply_to_file)
 
-    def segment(self, in_file, unifize=True):
-        if unifize:
-            file_to_mask = _afni_bias_correct(
-                in_file, write_dir=self.output_dir,
-                terminal_output=self.terminal_output, caching=self.caching)
-        else:
-            file_to_mask = in_file
-
-        if self.mask_clipping_fraction:
-            brain_mask_file = compute_brain_mask(
-                in_file, self.brain_volume, write_dir=self.output_dir,
-                caching=self.caching,
-                terminal_output=self.terminal_output,
-                use_rats_tool=self.use_rats_tool,
-                cl_frac=self.mask_clipping_fraction)
-        else:
-            brain_mask_file = compute_brain_mask(
-                in_file, self.brain_volume, write_dir=self.output_dir,
-                caching=self.caching,
-                terminal_output=self.terminal_output,
-                use_rats_tool=self.use_rats_tool,
-                bias_correct=False)
-
-        brain_file = _apply_mask(file_to_mask, brain_mask_file,
-                                 write_dir=self.output_dir,
-                                 caching=self.caching,
-                                 terminal_output=self.terminal_output)
-        return file_to_mask, brain_file
-
     def _check_modality_fitted(self, modality):
         coreg_transform = '_{}_to_anat_transform'.format(modality)
         if not hasattr(self, coreg_transform):
