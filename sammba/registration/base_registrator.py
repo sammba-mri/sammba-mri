@@ -24,6 +24,7 @@ class BaseRegistrator(BaseEstimator, TransformerMixin):
             os.makedirs(self.output_dir)
 
     def segment(self, in_file, unifize=True):
+        self._fit()
         if unifize:
             file_to_mask = _afni_bias_correct(
                 in_file, write_dir=self.output_dir,
