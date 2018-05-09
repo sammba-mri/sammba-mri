@@ -4,7 +4,7 @@ import nibabel
 from sklearn.base import _pprint
 from sklearn.utils.fixes import signature
 from ..externals.nipype.caching import Memory
-from ..externals.nipype.interfaces import afni, ants
+from ..externals.nipype.interfaces import afni, ants, fsl
 from ..externals.nipype.utils.filemanip import fname_presuffix
 from ..interfaces import segmentation
 from .utils import fix_obliquity, _get_afni_output_type, compute_n4_max_shrink
@@ -135,9 +135,14 @@ def _apply_mask(head_file, mask_file, write_dir, bias_correct=True,
     if caching:
         memory = Memory(write_dir)
         calc = memory.cache(afni.Calc)
-        calc.interface().set_default_terminal_output(terminal_output)
+        copy = memory.cache(afni.Copy)
+        copy_geom = memory.cache(fsl.CopyGeom)
+        for step in [calc, copy, copy_geom]:
+            calc.interface().set_default_terminal_output(terminal_output)
     else:
         calc = afni.Calc(terminal_output=terminal_output).run
+        copy = afni.Copy(terminal_output=terminal_output).run
+        copy_geom = fsl.CopyGeom(terminal_output=terminal_output).run
         environ['AFNI_DECONFLICT'] = 'OVERWRITE'
 
     # Check mask is binary
@@ -153,6 +158,11 @@ def _apply_mask(head_file, mask_file, write_dir, bias_correct=True,
         # If there are more than 2 values, the mask is invalid
         raise ValueError('Given mask is not made of 2 values: %s'
                          '. Cannot interpret as true or false' % values)
+    try:
+        np.testing.assert_array_equal(nibabel.load(mask_file).affine,
+                                      nibabel.load(head_file).affine)
+    except AssertionError:
+        raise ValueError('Given mask and file do not have the same affine')
 
     out_calc_mask = calc(in_file_a=head_file,
                          in_file_b=mask_file,
@@ -161,8 +171,23 @@ def _apply_mask(head_file, mask_file, write_dir, bias_correct=True,
                                                   suffix='_masked',
                                                   newpath=write_dir),
                          environ=environ)
+    if caching:
+        out_copy = copy(
+            in_file=out_calc_mask.outputs.out_file,
+            out_file=fname_presuffix(out_calc_mask.outputs.out_file,
+                                     suffix='_copied',
+                                     newpath=write_dir),
+            environ=environ)
+        masked_file = out_copy.outputs.out_file
+    else:
+        masked_file = out_calc_mask.outputs.out_file
 
-    return out_calc_mask.outputs.out_file
+
+    out_copy_geom = copy_geom(dest_file=masked_file, in_file=head_file)
+    np.testing.assert_array_equal(nibabel.load(out_copy_geom.outputs.out_file).affine,
+                                  nibabel.load(head_file).affine)
+
+    return out_copy_geom.outputs.out_file
 
 
 def _delete_orientation(in_file, write_dir, min_zoom=.1, caching=False,

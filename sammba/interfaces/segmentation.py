@@ -430,6 +430,23 @@ class MathMorphoMask(CommandLine):
     output_spec = MathMorphoMaskOutputSpec
     _cmd = 'RATS_MM'
 
+    def _run_interface(self, runtime):
+        runtime = super(MathMorphoMask, self)._run_interface(runtime)
+
+        if runtime is not None:
+            if isdefined(self.inputs.out_file):
+                tmp_file = os.path.abspath(self.inputs.out_file)
+            else:
+                tmp_file = os.path.abspath(
+                    self._filename_from_source('out_file'))
+
+            # Ensure the affine is the same
+            mask_data = nibabel.load(tmp_file).get_data()
+            mask_img = image.new_img_like(self.inputs.in_file, mask_data)
+            mask_img.to_filename(tmp_file)
+
+        return runtime
+
     def _list_outputs(self):
         outputs = self.output_spec().get()
         if isdefined(self.inputs.out_file):
