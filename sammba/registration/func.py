@@ -9,7 +9,7 @@ from sammba.interfaces import segmentation
 from .utils import fix_obliquity
 from .fmri_session import FMRISession
 from .struct import anats_to_template
-from .base import (_rigid_body_register, compute_brain_mask, _warp,
+from .base import (_afni_calc, _rigid_body_register, compute_brain_mask, _warp,
                    _apply_mask, _per_slice_qwarp)
 
 
@@ -18,29 +18,26 @@ def _realign(func_filename, write_dir, caching=False,
     if caching:
         memory = Memory(write_dir)
         clip_level = memory.cache(afni.ClipLevel)
-        calc = memory.cache(afni.Calc)
         volreg = memory.cache(afni.Volreg)
         allineate = memory.cache(afni.Allineate)
         copy = memory.cache(afni.Copy)
         copy_geom = memory.cache(fsl.CopyGeom)
         tstat = memory.cache(afni.TStat)
-        for step in [volreg, allineate, tstat, calc, copy, copy_geom]:
+        for step in [volreg, allineate, tstat, copy, copy_geom]:
             step.interface().set_default_terminal_output(terminal_output)
     else:
         clip_level = afni.ClipLevel().run
-        calc = afni.Calc(terminal_output=terminal_output).run
         volreg = afni.Volreg(terminal_output=terminal_output).run
         allineate = afni.Allineate(terminal_output=terminal_output).run
         copy_geom = fsl.CopyGeom(terminal_output=terminal_output).run
         tstat = afni.TStat(terminal_output=terminal_output).run
 
     out_clip_level = clip_level(in_file=func_filename)
-    out_calc_threshold = calc(
+    out_calc_threshold = _afni_calc(
         in_file_a=func_filename,
         expr='ispositive(a-{0}) * a'.format(out_clip_level.outputs.clip_val),
-        out_file=fname_presuffix(func_filename,
-                                 suffix='_calc',
-                                 newpath=write_dir))
+        write_dir=write_dir, caching=caching, terminal_output=terminal_output,
+        environ=environ)
     thresholded_filename = out_calc_threshold.outputs.out_file
 
     out_volreg = volreg(  # XXX dfile not saved

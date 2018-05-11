@@ -120,7 +120,47 @@ def compute_brain_mask(head_file, brain_volume, write_dir, bias_correct=True,
     return out_compute_mask.outputs.out_file
 
 
-def _apply_mask(head_file, mask_file, write_dir, bias_correct=True,
+# TODO : generalize to more input files
+def _afni_calc(in_file_a, expr, write_dir,
+               caching=False, terminal_output='allatonce', environ={}):
+    if caching:
+        memory = Memory(write_dir)
+        calc = memory.cache(afni.Calc)
+        copy = memory.cache(afni.Copy)
+        copy_geom = memory.cache(fsl.CopyGeom)
+        for step in [calc, copy, copy_geom]:
+            calc.interface().set_default_terminal_output(terminal_output)
+    else:
+        calc = afni.Calc(terminal_output=terminal_output).run
+        copy = afni.Copy(terminal_output=terminal_output).run
+        copy_geom = fsl.CopyGeom(terminal_output=terminal_output).run
+
+    out_calc = calc(in_file_a=in_file_a,
+                    expr=expr,
+                    out_file=fname_presuffix(in_file_a,
+                                             suffix='_calc',
+                                             newpath=write_dir),
+                    environ=environ)
+    if caching:
+        out_copy = copy(
+            in_file=out_calc.outputs.out_file,
+            out_file=fname_presuffix(out_calc.outputs.out_file,
+                                     suffix='_copied',
+                                     newpath=write_dir),
+            environ=environ)
+        masked_file = out_copy.outputs.out_file
+    else:
+        masked_file = out_calc.outputs.out_file
+
+    out_copy_geom = copy_geom(dest_file=masked_file, in_file=in_file_a)
+    np.testing.assert_array_equal(nibabel.load(out_copy_geom.outputs.out_file).affine,
+                                  nibabel.load(in_file_a).affine)
+    print('*' * 50)
+
+    return out_copy_geom
+
+
+def _apply_mask(head_file, mask_file, write_dir,
                 caching=False, terminal_output='allatonce'):
     """
     Parameters
@@ -285,32 +325,27 @@ def _rigid_body_register(moving_head_file, reference_head_file,
     environ = {}
     if caching:
         memory = Memory(write_dir)
-        calc = memory.cache(afni.Calc)
         allineate = memory.cache(afni.Allineate)
         allineate2 = memory.cache(afni.Allineate)
         catmatvec = memory.cache(afni.CatMatvec)
-        for step in [calc, allineate, allineate2]:
+        for step in [allineate, allineate2]:
             step.interface().set_default_terminal_output(terminal_output)
     else:
-        calc = afni.Calc(terminal_output=terminal_output).run
         allineate = afni.Allineate(terminal_output=terminal_output).run
         allineate2 = afni.Allineate(terminal_output=terminal_output).run  # TODO: remove after fixed bug
         catmatvec = afni.CatMatvec().run
         environ['AFNI_DECONFLICT'] = 'OVERWRITE'
 
-    out_cacl = calc(in_file_a=moving_head_file,
-                    in_file_b=moving_brain_mask,
-                    expr='a*b',
-                    outputtype=_get_afni_output_type(moving_head_file),
-                    environ=environ)
-    moving_brain_file = out_cacl.outputs.out_file
+    moving_brain_file = _apply_mask(moving_head_file, moving_brain_mask,
+                                    write_dir,
+                                    caching=caching,
+                                    terminal_output=terminal_output)
 
-    out_cacl = calc(in_file_a=reference_head_file,
-                    in_file_b=reference_brain_mask,
-                    expr='a*b',
-                    outputtype=_get_afni_output_type(reference_head_file),
-                    environ=environ)
-    reference_brain_file = out_cacl.outputs.out_file
+    reference_brain_file = _apply_mask(reference_head_file,
+                                       reference_brain_mask,
+                                       write_dir,
+                                       caching=caching,
+                                       terminal_output=terminal_output)
     output_files = [moving_brain_file, reference_brain_file]
 
     # Compute the transformation from functional to anatomical brain
@@ -489,6 +524,10 @@ def _per_slice_qwarp(to_qwarp_file, reference_file,
     warped_slices = []
     warp_files = []
     output_files = []
+    print('*' * 50)
+    print('*' * 50)
+    print('*' * 20, nibabel.load(to_qwarp_file).shape)
+    print('*' * 20, nibabel.load(reference_file).shape)
     for (resampled_sliced_to_qwarp_file,
          resampled_sliced_reference_file) in zip(
             resampled_sliced_to_qwarp_files,
