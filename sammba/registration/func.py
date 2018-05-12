@@ -2,6 +2,7 @@ import os
 import numpy as np
 import nibabel
 from sklearn.datasets.base import Bunch
+from sklearn.utils import deprecated
 from sammba.externals.nipype.caching import Memory
 from sammba.externals.nipype.interfaces import afni, ants, fsl
 from sammba.externals.nipype.utils.filemanip import fname_presuffix
@@ -261,6 +262,8 @@ def coregister(unifized_anat_file, unbiased_mean_func_file, write_dir,
                  coreg_warps_=warp_files)
 
 
+@deprecated("Function 'coregister_fmri_session' is deprecated and will be "
+            "removed in future release. Use class 'Coregistrator' instead.")
 def coregister_fmri_session(session_data, t_r, write_dir, brain_volume,
                             use_rats_tool=True,
                             slice_timing=True,
@@ -761,6 +764,9 @@ def coregister_fmri_session(session_data, t_r, write_dir, brain_volume,
                 os.remove(out_file)
 
 
+@deprecated("Function '_func_to_template' is deprecated and will be "
+            "removed in future release. Use function '_apply_transforms'  "
+            "from 'sammba.registration.base' module")
 def _func_to_template(func_coreg_filename, template_filename, write_dir,
                       func_to_anat_oned_filename,
                       anat_to_template_oned_filename,
@@ -842,6 +848,9 @@ def _func_to_template(func_coreg_filename, template_filename, write_dir,
     return normalized_filename
 
 
+@deprecated("Function 'fmri_sessions_to_template' is deprecated "
+            "and will be removed in future release. Use class "
+            "'TemplateRegistrator' instead.")
 def fmri_sessions_to_template(sessions, t_r, head_template_filename,
                               write_dir,
                               brain_volume, use_rats_tool=True,

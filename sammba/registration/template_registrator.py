@@ -5,7 +5,7 @@ from .base import (compute_brain_mask, _bias_correct,
 from .perfusion import coregister as coregister_perf
 from .func import _realign, _slice_time
 from .func import coregister as coregister_func
-from .struct import anats_to_template
+from .struct import anat_to_template
 from .base_registrator import BaseRegistrator
 
 
@@ -112,17 +112,17 @@ class TemplateRegistrator(BaseRegistrator):
                 write_dir=self.output_dir,
                 caching=self.caching,
                 terminal_output=self.terminal_output)
-        
-        normalization = anats_to_template(
-            [self._unifized_anat_], [self.anat_brain_], self.template,
+
+        normalization = anat_to_template(
+            self._unifized_anat_, self.anat_brain_, self.template,
             self.template_brain_, write_dir=self.output_dir,
             dilated_head_mask_filename=self.dilated_template_mask,
             caching=self.caching, verbose=self.verbose, maxlev=None,
             convergence=self.convergence)  # XXX maxlev
 
-        self.registered_anat = normalization.registered[0]
-        self._normalization_pretransform = normalization.pretransforms[0]
-        self._normalization_transform = normalization.transforms[0]
+        self.registered_anat = normalization.registered
+        self._normalization_pretransform = normalization.pretransform
+        self._normalization_transform = normalization.transform
         return self
 
     def transform_anat(self, in_file, interpolation='wsinc5'):
