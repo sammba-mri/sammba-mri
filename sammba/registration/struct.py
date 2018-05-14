@@ -654,7 +654,7 @@ def anats_to_common(anat_filenames, write_dir, brain_volume,
 
 def anats_to_template(anat_filenames, head_template_filename, write_dir,
                       brain_volume, use_rats_tool=True,
-                      registration_kind='affine',
+                      registration_kind='nonlinear',
                       brain_template_filename=None,
                       dilated_head_mask_filename=None, convergence=.005,
                       maxlev=None,

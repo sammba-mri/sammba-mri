@@ -617,7 +617,7 @@ def fmri_sessions_to_template(sessions, t_r, head_template_filename,
                               dilated_head_mask_filename=None,
                               prior_rigid_body_registration=False,
                               slice_timing=True,
-                              registration_kind='affine',
+                              registration_kind='nonlinear',
                               maxlev=2,
                               func_voxel_size=None,
                               caching=False, verbose=True):
