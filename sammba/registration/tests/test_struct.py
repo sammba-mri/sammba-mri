@@ -42,8 +42,8 @@ def test_anats_to_template():
     # test common space of one image is itself
     register_result = struct.anats_to_template([anat_file], anat_file,
                                                tst.tmpdir,
-                                               registration_kind='affine',
-                                               400, use_rats_tool=False,
+                                               400, registration_kind='affine',
+                                               use_rats_tool=False,
                                                verbose=0)
     transform = np.loadtxt(register_result.pre_transforms[0])
     assert_array_almost_equal(transform,
