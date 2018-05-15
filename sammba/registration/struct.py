@@ -609,9 +609,9 @@ def anats_to_common(anat_filenames, brain_mask_files,
                  transforms=warp_files)
 
 
-def anat_to_template(unbiased_anat_filename, unbiased_brain_file,
+def anat_to_template(anat_filename, brain_filename,
                      head_template_filename,
-                     brain_extracted_template_filename, write_dir=None,
+                     brain_template_filename, write_dir=None,
                      dilated_head_mask_filename=None, convergence=.005,
                      maxlev=None,
                      caching=False, verbose=1, unifize_kwargs=None,
@@ -621,16 +621,16 @@ def anat_to_template(unbiased_anat_filename, unbiased_brain_file,
     Parameters
     ----------
     anat_filename : str
-        Paths to the anatomical image, bias field corrected.
+        Paths to the head image to register.
 
-    unbiased_brain_file : str
-        Paths to the brain mask image.
+    brain_filename : str
+        Paths to the brain extracted image.
 
     head_template_filename : str
         Path to the head template.
 
-    brain_template_mask_filename : str
-        Path to a brain mask for the template.
+    brain_template_filename : str
+        Path to the brain extracted template.
 
     write_dir : str, optional
         Path to an existant directory to save output files to. If None, the
@@ -675,6 +675,12 @@ def anat_to_template(unbiased_anat_filename, unbiased_brain_file,
         - `transform` : str.
                         Paths to the warp transform from the allineated
                         image to the final registered image.
+    Note
+    ----
+    Please note that if the template was made with bias corrected images,
+    then the anatomical image should also be processed the same way for better
+    results. This dictum applies in general: the template and anatomical images
+    should be pre-processed the same way, as far as practicable.
     """
     environ = {}
     if verbose:
@@ -730,13 +736,13 @@ def anat_to_template(unbiased_anat_filename, unbiased_brain_file,
     # image could do in one 3dQwarp step using allineate flags but will
     # separate as 3dAllineate performs well on brain image, and 3dQwarp
     # well on whole head
-    affine_transform_filename = fname_presuffix(unbiased_brain_file,
+    affine_transform_filename = fname_presuffix(brain_filename,
                                                 suffix='_aff.aff12.1D',
                                                 use_ext=False)
     out_allineate = allineate(
-        in_file=unbiased_brain_file,
-        reference=brain_extracted_template_filename,
-        master=brain_extracted_template_filename,
+        in_file=brain_filename,
+        reference=brain_template_filename,
+        master=brain_template_filename,
         out_matrix=affine_transform_filename,
         two_blur=convergence * 11. / .05,
         cost='nmi',
@@ -744,18 +750,17 @@ def anat_to_template(unbiased_anat_filename, unbiased_brain_file,
         two_pass=True,
         center_of_mass='',
         maxrot=90,
-        out_file=fname_presuffix(unbiased_brain_file, suffix='_aff'),
+        out_file=fname_presuffix(brain_filename, suffix='_aff'),
         environ=environ,
         **verbosity_quietness_kwargs)
     intermediate_files.append(out_allineate.outputs.out_file)
 
     # Apply the registration to the whole head
     out_allineate_apply = allineate_apply(
-        in_file=unbiased_anat_filename,
+        in_file=anat_filename,
         master=head_template_filename,
         in_matrix=affine_transform_filename,
-        out_file=fname_presuffix(unbiased_anat_filename,
-                                 suffix='_affine_general'),
+        out_file=fname_presuffix(anat_filename, suffix='_affine_general'),
         environ=environ,
         **verbosity_quietness_kwargs)
     allineated_filename = out_allineate_apply.outputs.out_file

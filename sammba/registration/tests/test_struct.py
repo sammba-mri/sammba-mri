@@ -34,17 +34,17 @@ def test_anats_to_common():
 
 
 @with_setup(tst.setup_tmpdata, tst.teardown_tmpdata)
-def test_anats_to_template():
+def test_anat_to_template():
     anat_file = os.path.join(os.path.dirname(testing_data.__file__),
                              'anat.nii.gz')
     brain_file = compute_brain_mask(anat_file, 400, tst.tmpdir,
                                     use_rats_tool=False)
 
     # test common space of one image is itself
-    register_result = struct.anats_to_template([anat_file], [brain_file],
-                                               anat_file, brain_file,
-                                               write_dir=tst.tmpdir,
-                                               maxlev=0, verbose=0)
+    register_result = struct.anat_to_template(anat_file, brain_file,
+                                              anat_file, brain_file,
+                                              write_dir=tst.tmpdir,
+                                              maxlev=0, verbose=0)
     transform = np.loadtxt(register_result.pre_transforms[0])
     assert_array_almost_equal(transform,
                               [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0], decimal=1)
