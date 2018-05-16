@@ -4,6 +4,7 @@ from sammba.externals.nipype.utils.filemanip import fname_presuffix
 from sammba.externals.nipype.caching import Memory
 from sklearn.datasets.base import Bunch
 from sklearn.utils import deprecated
+from sammba.interfaces import segmentation
 
 
 def anats_to_common(anat_filenames, brain_mask_files,
