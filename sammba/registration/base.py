@@ -144,15 +144,10 @@ def _apply_mask(head_file, mask_file, write_dir,
     environ = {}
     if caching:
         memory = Memory(write_dir)
-        calc = memory.cache(afni.Calc)
-        copy = memory.cache(afni.Copy)
-        copy_geom = memory.cache(fsl.CopyGeom)
-        for step in [calc, copy, copy_geom]:
-            calc.interface().set_default_terminal_output(terminal_output)
+        apply_mask = memory.cache(fsl.ApplyMask)
+        apply_mask.interface().set_default_terminal_output(terminal_output)
     else:
-        calc = afni.Calc(terminal_output=terminal_output).run
-        copy = afni.Copy(terminal_output=terminal_output).run
-        copy_geom = fsl.CopyGeom(terminal_output=terminal_output).run
+        apply_mask = fsl.ApplyMask(terminal_output=terminal_output).run
         environ['AFNI_DECONFLICT'] = 'OVERWRITE'
 
     # Check mask is binary
@@ -174,30 +169,12 @@ def _apply_mask(head_file, mask_file, write_dir,
     except AssertionError:
         raise ValueError('Given mask and file do not have the same affine')
 
-    out_calc_mask = calc(in_file_a=head_file,
-                         in_file_b=mask_file,
-                         expr='a*b',
-                         out_file=fname_presuffix(head_file,
-                                                  suffix='_masked',
-                                                  newpath=write_dir),
-                         environ=environ)
-    if caching:
-        out_copy = copy(
-            in_file=out_calc_mask.outputs.out_file,
-            out_file=fname_presuffix(out_calc_mask.outputs.out_file,
-                                     suffix='_copied',
-                                     newpath=write_dir),
-            environ=environ)
-        masked_file = out_copy.outputs.out_file
-    else:
-        masked_file = out_calc_mask.outputs.out_file
-
-
-    out_copy_geom = copy_geom(dest_file=masked_file, in_file=head_file)
-    np.testing.assert_array_equal(nibabel.load(out_copy_geom.outputs.out_file).affine,
-                                  nibabel.load(head_file).affine)
-
-    return out_copy_geom.outputs.out_file
+    out_apply_mask = apply_mask(in_file=head_file,
+                                mask_file=mask_file,
+                                out_file=fname_presuffix(head_file,
+                                                         suffix='_masked',
+                                                         newpath=write_dir))
+    return out_apply_mask.outputs.out_file
 
 
 def _delete_orientation(in_file, write_dir, min_zoom=.1, caching=False,
@@ -287,21 +264,25 @@ def _rigid_body_register(moving_head_file, reference_head_file,
         memory = Memory(write_dir)
         allineate = memory.cache(afni.Allineate)
         allineate2 = memory.cache(afni.Allineate)
-        apply_mask = memory.cache(fsl.ApplyMask)
         catmatvec = memory.cache(afni.CatMatvec)
-        for step in [allineate, allineate2, apply_mask]:
+        for step in [allineate, allineate2]:
             step.interface().set_default_terminal_output(terminal_output)
     else:
         allineate = afni.Allineate(terminal_output=terminal_output).run
         allineate2 = afni.Allineate(terminal_output=terminal_output).run
-        apply_mask = fsl.ApplyMask(terminal_output=terminal_output).run
         catmatvec = afni.CatMatvec().run
         environ['AFNI_DECONFLICT'] = 'OVERWRITE'
 
-    moving_brain_file = apply_mask(in_file=moving_head_file,
-                                   mask_file=moving_brain_mask)
-    reference_brain_file = apply_mask(in_file=reference_head_file,
-                                      mask_file=reference_brain_mask)
+    moving_brain_file = _apply_mask(moving_head_file, moving_head_file,
+                                    write_dir=write_dir,
+                                    caching=caching,
+                                    terminal_output=terminal_output)
+
+    reference_brain_file = _apply_mask(reference_head_file,
+                                       reference_brain_mask,
+                                       write_dir=write_dir,
+                                       caching=caching,
+                                       terminal_output=terminal_output)
     output_files = [moving_brain_file, reference_brain_file]
 
     # Compute the transformation from functional to anatomical brain
@@ -398,56 +379,38 @@ def _per_slice_qwarp(to_qwarp_file, reference_file,
     if caching:
         memory = Memory(write_dir)
         resample = memory.cache(afni.Resample)
-        slicer = memory.cache(afni.ZCutUp)
+        slicer = memory.cache(fsl.Slice)
         warp_apply = memory.cache(afni.NwarpApply)
         qwarp = memory.cache(afni.Qwarp)
-        merge = memory.cache(afni.Zcat)
+        merge = memory.cache(fsl.Merge)
         for step in [resample, slicer, warp_apply, qwarp, merge]:
             step.interface().set_default_terminal_output(terminal_output)
     else:
         resample = afni.Resample(terminal_output=terminal_output).run
-        slicer = afni.ZCutUp(terminal_output=terminal_output).run
+        slicer = fsl.Slice(terminal_output=terminal_output).run
         warp_apply = afni.NwarpApply(terminal_output=terminal_output).run
         qwarp = afni.Qwarp(terminal_output=terminal_output).run
-        merge = afni.Zcat(terminal_output=terminal_output).run
+        merge = fsl.Merge(terminal_output=terminal_output).run
         environ['AFNI_DECONFLICT'] = 'OVERWRITE'
 
     # Slice anatomical image
     reference_img = nibabel.load(reference_file)
-    reference_n_slices = reference_img.header.get_data_shape()[2]
     per_slice_dir = os.path.join(write_dir, 'per_slice')
     if not os.path.isdir(per_slice_dir):
         os.makedirs(per_slice_dir)
-    sliced_reference_files = []
-    for slice_n in range(reference_n_slices):
-        out_slicer = slicer(in_file=reference_file,
-                            keep='{0} {0}'.format(slice_n),
-                            out_file=fname_presuffix(
-                                reference_file, newpath=per_slice_dir,
-                                suffix='_sl%d' % slice_n),
-                            environ=environ)
-        oblique_slice = fix_obliquity(out_slicer.outputs.out_file,
-                          reference_file,
-                          overwrite=overwrite, verbose=verbose,
-                          caching=caching, caching_dir=per_slice_dir)
-        sliced_reference_files.append(oblique_slice)
+
+    out_slicer = slicer(in_file=reference_file,
+                        out_base_name=fname_presuffix(reference_file,
+                                                      newpath=per_slice_dir,
+                                                      use_ext=False))
+    sliced_reference_files = out_slicer.outputs.out_files
 
     # Slice mean functional
-    sliced_to_qwarp_files = []
-    img = nibabel.load(to_qwarp_file)
-    n_slices = img.header.get_data_shape()[2]
-    for slice_n in range(n_slices):
-        out_slicer = slicer(in_file=to_qwarp_file,
-                            keep='{0} {0}'.format(slice_n),
-                            out_file=fname_presuffix(
-                                to_qwarp_file, newpath=per_slice_dir,
-                                suffix='_sl%d' % slice_n),
-                            environ=environ)
-        oblique_slice = fix_obliquity(out_slicer.outputs.out_file,
-                          to_qwarp_file,
-                          overwrite=overwrite, verbose=verbose,
-                          caching=caching, caching_dir=per_slice_dir)
-        sliced_to_qwarp_files.append(oblique_slice)
+    out_slicer = slicer(in_file=to_qwarp_file,
+                        out_base_name=fname_presuffix(to_qwarp_file,
+                                                      newpath=per_slice_dir,
+                                                      use_ext=False))
+    sliced_to_qwarp_files = out_slicer.outputs.out_files
 
     # Below line is to deal with slices where there is no signal (for example
     # rostral end of some anatomicals)
@@ -547,12 +510,13 @@ def _per_slice_qwarp(to_qwarp_file, reference_file,
 
     out_merge_func = merge(
         in_files=oblique_resampled_warped_slices,
-        out_file=fname_presuffix(to_qwarp_file, suffix='_perslice',
-                                 newpath=write_dir),
+        dimension='z',
+        merged_file=fname_presuffix(to_qwarp_file, suffix='_perslice',
+                                    newpath=write_dir),
         environ=environ)
 
     # Fix the obliquity
-    oblique_merged = fix_obliquity(out_merge_func.outputs.out_file,
+    oblique_merged = fix_obliquity(out_merge_func.outputs.merged_file,
                                    reference_file,
                                    overwrite=overwrite, verbose=verbose,
                                    caching=caching, caching_dir=per_slice_dir)
@@ -567,21 +531,11 @@ def _per_slice_qwarp(to_qwarp_file, reference_file,
     # Apply the precomputed warp slice by slice
     if apply_to_file is not None:
         # slice functional
-        sliced_apply_to_files = []
-        for slice_n in range(n_slices):
-            out_slicer = slicer(in_file=apply_to_file,
-                                keep='{0} {0}'.format(slice_n),
-                                out_file=fname_presuffix(
-                                    apply_to_file, newpath=per_slice_dir,
-                                    suffix='_sl%d' % slice_n),
-                                environ=environ)
-            oblique_slice = fix_obliquity(out_slicer.outputs.out_file,
-                                          apply_to_file,
-                                          overwrite=overwrite, verbose=verbose,
-                                          caching=caching,
-                                          caching_dir=per_slice_dir)
-            sliced_apply_to_files.append(oblique_slice)
-
+        out_slicer = slicer(in_file=apply_to_file,
+                            out_base_name=fname_presuffix(apply_to_file,
+                                                          newpath=per_slice_dir,
+                                                          use_ext=False))
+        sliced_apply_to_files = out_slicer.outputs.out_files
         warped_apply_to_slices = []
         for (sliced_apply_to_file, warp_file) in zip(
                 sliced_apply_to_files, warp_files):
@@ -611,13 +565,14 @@ def _per_slice_qwarp(to_qwarp_file, reference_file,
         # Finally, merge all slices !
         out_merge_apply_to = merge(
             in_files=oblique_warped_apply_to_slices,
-            out_file=fname_presuffix(apply_to_file, suffix='_perslice',
-                                     newpath=write_dir),
+            dimension='z',
+            merged_file=fname_presuffix(apply_to_file, suffix='_perslice',
+                                        newpath=write_dir),
             environ=environ)
 
         # Fix the obliquity
         merged_apply_to_file = fix_obliquity(
-            out_merge_apply_to.outputs.out_file, apply_to_file,
+            out_merge_apply_to.outputs.merged_file, apply_to_file,
             overwrite=overwrite, verbose=verbose, caching=caching,
             caching_dir=per_slice_dir)
 
@@ -650,7 +605,7 @@ def _apply_perslice_warp(apply_to_file, warp_files,
     if caching:
         memory = Memory(write_dir)
         resample = memory.cache(afni.Resample)
-        slicer = memory.cache(afni.ZCutUp)
+        slicer = memory.cache(fsl.Slice)
         warp_apply = memory.cache(afni.NwarpApply)
         qwarp = memory.cache(afni.Qwarp)
         merge = memory.cache(afni.Zcat)
@@ -658,7 +613,7 @@ def _apply_perslice_warp(apply_to_file, warp_files,
             step.interface().set_default_terminal_output(terminal_output)
     else:
         resample = afni.Resample(terminal_output=terminal_output).run
-        slicer = afni.ZCutUp(terminal_output=terminal_output).run
+        slicer = fsl.Slice(terminal_output=terminal_output).run
         warp_apply = afni.NwarpApply(terminal_output=terminal_output).run
         qwarp = afni.Qwarp(terminal_output=terminal_output).run
         merge = afni.Zcat(terminal_output=terminal_output).run
@@ -721,13 +676,14 @@ def _apply_perslice_warp(apply_to_file, warp_files,
     # Finally, merge all slices !
     out_merge_apply_to = merge(
         in_files=oblique_warped_apply_to_slices,
-        out_file=fname_presuffix(apply_to_file, suffix='_perslice',
-                                 newpath=write_dir),
+        dimension='z',
+        merged_file=fname_presuffix(apply_to_file, suffix='_perslice',
+                                    newpath=write_dir),
         environ=environ)
 
     # Fix the obliquity
     merged_apply_to_file = fix_obliquity(
-        out_merge_apply_to.outputs.out_file, apply_to_file,
+        out_merge_apply_to.outputs.merged_file, apply_to_file,
         overwrite=overwrite, verbose=verbose, caching=caching,
         caching_dir=per_slice_dir)
 

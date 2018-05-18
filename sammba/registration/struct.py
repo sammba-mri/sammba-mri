@@ -1,5 +1,5 @@
 import os
-from sammba.externals.nipype.interfaces import afni
+from sammba.externals.nipype.interfaces import afni, fsl
 from sammba.externals.nipype.utils.filemanip import fname_presuffix
 from sammba.externals.nipype.caching import Memory
 from sklearn.datasets.base import Bunch
@@ -700,17 +700,16 @@ def anat_to_template(anat_filename, brain_filename,
     if caching:
         memory = Memory(write_dir)
         clip_level = memory.cache(afni.ClipLevel)
-        calc = memory.cache(afni.Calc)
+        threshold = memory.cache(fsl.Threshold)
         mask_tool = memory.cache(afni.MaskTool)
         allineate = memory.cache(afni.Allineate)
         allineate2 = memory.cache(afni.Allineate)
         qwarp = memory.cache(afni.Qwarp)
-        for step in [allineate, allineate2, calc,
-                     mask_tool, qwarp]:
+        for step in [allineate, allineate2, threshold, mask_tool, qwarp]:
             step.interface().set_default_terminal_output(terminal_output)
     else:
         clip_level = afni.ClipLevel().run
-        calc = afni.Calc(terminal_output=terminal_output).run
+        threshold = fsl.Threshold(terminal_output=terminal_output).run
         mask_tool = afni.MaskTool(terminal_output=terminal_output).run
         allineate = afni.Allineate(terminal_output=terminal_output).run
         allineate_apply = afni.Allineate(terminal_output=terminal_output).run
@@ -721,17 +720,16 @@ def anat_to_template(anat_filename, brain_filename,
     intermediate_files = []
     if dilated_head_mask_filename is None:
         out_clip_level = clip_level(in_file=head_template_filename)
-        out_calc_threshold = calc(
-            in_file_a=head_template_filename,
-            expr='ispositive(a-{0})*a'.format(out_clip_level.outputs.clip_val),
-            outputtype='NIFTI_GZ')
-        out_mask_tool = mask_tool(in_file=out_calc_threshold.outputs.out_file,
+        out_threshold = threshold(
+            in_file=head_template_filename,
+            thresh=out_clip_level.outputs.clip_val)
+        out_mask_tool = mask_tool(in_file=out_threshold.outputs.out_file,
                                   dilate_inputs='3',
                                   outputtype='NIFTI_GZ',
                                   environ=environ,
                                   verbose=verbose)
         dilated_head_mask_filename = out_mask_tool.outputs.out_file
-        intermediate_files.append(out_calc_threshold.outputs.out_file)
+        intermediate_files.append(out_threshold.outputs.out_file)
 
     # the actual T1anat to template registration using the brain extracted
     # image could do in one 3dQwarp step using allineate flags but will
