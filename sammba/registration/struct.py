@@ -612,16 +612,10 @@ def anats_to_common(anat_filenames, brain_mask_files,
                  transforms=warp_files)
 
 
-<<<<<<< HEAD
 def anats_to_template(anat_filenames, head_template_filename, write_dir,
                       brain_volume, use_rats_tool=True,
                       registration_kind='nonlinear',
                       brain_template_filename=None,
-=======
-def anats_to_template(unbiased_anat_filenames, unbiased_brain_files,
-                      head_template_filename,
-                      brain_extracted_template_filename, write_dir=None,
->>>>>>> rebase
                       dilated_head_mask_filename=None, convergence=.005,
                       maxlev=None,
                       caching=False, verbose=1, unifize_kwargs=None,
@@ -633,7 +627,6 @@ def anats_to_template(unbiased_anat_filenames, unbiased_brain_files,
         Paths to the anatomical images.
     head_template_filename : str
         Path to the head template.
-<<<<<<< HEAD
     write_dir : str
         Path to an existant directory to save output files to.
     brain_volume : int
@@ -648,16 +641,6 @@ def anats_to_template(unbiased_anat_filenames, unbiased_brain_files,
         Path to a brain template. Note that this must coincide with the brain
         from the given head template. If None, the brain is extracted from
         the template with RATS.
-=======
-
-    brain_template_mask_filename : str
-        Path to a brain mask for the template.
-
-    write_dir : str, optional
-        Path to an existant directory to save output files to. If None, the
-        current directory is used.
-
->>>>>>> rebase
     dilated_head_mask_filename : str, optional
         Path to a dilated head mask. Note that this must be compliant with the
         the given head template. If None, the mask is set to the non-background
@@ -730,16 +713,13 @@ def anats_to_template(unbiased_anat_filenames, unbiased_brain_files,
         mask_tool = memory.cache(afni.MaskTool)
         allineate = memory.cache(afni.Allineate)
         allineate2 = memory.cache(afni.Allineate)
+        unifize = memory.cache(afni.Unifize)
         qwarp = memory.cache(afni.Qwarp)
-<<<<<<< HEAD
         for step in [compute_mask,  allineate, allineate2, calc,
                      mask_tool, unifize, qwarp]:
-=======
-        for step in [allineate, allineate2, calc,
-                     mask_tool, qwarp]:
->>>>>>> rebase
             step.interface().set_default_terminal_output(terminal_output)
     else:
+        unifize = afni.Unifize(terminal_output=terminal_output).run
         clip_level = afni.ClipLevel().run
         compute_mask = ComputeMask(terminal_output=terminal_output).run
         calc = afni.Calc(terminal_output=terminal_output).run
@@ -778,7 +758,6 @@ def anats_to_template(unbiased_anat_filenames, unbiased_brain_files,
         dilated_head_mask_filename = out_mask_tool.outputs.out_file
         intermediate_files.append(out_calc_threshold.outputs.out_file)
 
-<<<<<<< HEAD
     if brain_masking_unifize_kwargs is None:
         brain_masking_unifize_kwargs = {}
 
@@ -816,13 +795,16 @@ def anats_to_template(unbiased_anat_filenames, unbiased_brain_files,
     else:
         warp_type = 'affine_general'
 
-=======
->>>>>>> rebase
     affine_transforms = []
     allineated_filenames = []
     for (unbiased_anat_filename,
-         masked_anat_filename) in zip(unbiased_anat_filenames,
-                                      unbiased_brain_files):
+         brain_mask_file) in zip(unbiased_anat_filenames,
+                                 brain_mask_files):
+        out_calc_mask = calc(in_file_a=unbiased_anat_filename,
+                             in_file_b=brain_mask_file,
+                             expr='a*b',
+                             outputtype='NIFTI_GZ')
+        masked_anat_filename = out_calc_mask.outputs.out_file
 
         # the actual T1anat to template registration using the brain extracted
         # image could do in one 3dQwarp step using allineate flags but will
@@ -833,10 +815,10 @@ def anats_to_template(unbiased_anat_filenames, unbiased_brain_files,
                                                     use_ext=False)
         out_allineate = allineate(
             in_file=masked_anat_filename,
-            reference=brain_extracted_template_filename,
-            master=brain_extracted_template_filename,
+            reference=brain_template_filename,
+            master=brain_template_filename,
             out_matrix=affine_transform_filename,
-            two_blur=convergence * 11. / .05,
+            two_blur=1,
             cost='nmi',
             convergence=convergence,
             two_pass=True,
@@ -913,4 +895,4 @@ def anats_to_template(unbiased_anat_filenames, unbiased_brain_files,
     # XXX can't we just catenate the affine to the warp?
     return Bunch(registered=registered,
                  transforms=warp_transforms,
-                 pretransforms=affine_transforms)
+                 pre_transforms=affine_transforms)
