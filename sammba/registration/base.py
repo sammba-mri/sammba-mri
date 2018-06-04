@@ -1,18 +1,48 @@
 import os
 import numpy as np
 import nibabel
-from sklearn.base import _pprint
-from sklearn.utils.fixes import signature
+from nilearn.image.resampling import coord_transform
 from ..externals.nipype.caching import Memory
-from ..externals.nipype.interfaces import afni, ants
+from ..externals.nipype.interfaces import afni, ants, fsl
 from ..externals.nipype.utils.filemanip import fname_presuffix
 from ..interfaces import segmentation
 from .utils import fix_obliquity, _get_afni_output_type, compute_n4_max_shrink
 
 
+def mask_report(mask_file, expected_volume):
+    """ Outputs the mask
+    Parameters
+    ----------
+    mask_file : str
+        Path to the mask image
+    expected_volume : float
+        Expected volume in the mask.
+    
+    """
+
+    # TODO: symmetry, length and width
+    mask_img = nibabel.load(mask_file)
+    volume = segmentation.compute_volume(mask_img)
+    volume_accuracy = volume / expected_volume * 100.
+
+    mask_data = mask_img.get_data()
+    i, j, k = np.where(mask_data != 0)
+    voxels_coords = np.array(coord_transform(i, j, k, mask_img.affine)).T
+    x_range, y_range, z_range = voxels_coords.max(axis=0) - \
+        voxels_coords.min(axis=0)
+    print(voxels_coords.max(axis=0))
+    print(voxels_coords.min(axis=0))
+    return "extracted volume is {0:0.1f}% of expected volume, sizes "\
+           "x: {1:0.2f}, y: {2:0.2f}, z: {3:0.2f}".format(volume_accuracy,
+                                                          x_range, y_range,
+                                                          z_range)
+
+
 def compute_brain_mask(head_file, brain_volume, write_dir, bias_correct=True,
                        caching=False,
                        terminal_output='allatonce',
+                       lower_cutoff=.2, upper_cutoff=.85, closing=0,
+                       connected=True, dilation_size=(1, 1, 2), opening=5,
                        use_rats_tool=True, **unifize_kwargs):
     """
     Parameters
@@ -20,21 +50,16 @@ def compute_brain_mask(head_file, brain_volume, write_dir, bias_correct=True,
     brain_volume : int
         Volume of the brain used for brain extraction.
         Typically 400 for mouse and 1800 for rat.
-
     use_rats_tool : bool, optional
         If True, brain mask is computed using RATS Mathematical Morphology.
         Otherwise, a histogram-based brain segmentation is used.
-
     caching : bool, optional
         Wether or not to use caching.
-
     unifize_kwargs : dict, optional
         Is passed to sammba.externals.nipype.interfaces.afni.Unifize.
-
     Returns
     -------
     path to brain extracted image.
-
     Notes
     -----
     If `use_rats_tool` is turned on, RATS tool is used for brain extraction
@@ -46,8 +71,15 @@ def compute_brain_mask(head_file, brain_volume, write_dir, bias_correct=True,
             raise ValueError('Can not locate Rats')
         else:
             ComputeMask = segmentation.MathMorphoMask
+            compute_mask_args = {}
     else:
         ComputeMask = segmentation.HistogramMask
+        compute_mask_args = {'lower_cutoff': lower_cutoff,
+                             'upper_cutoff': upper_cutoff,
+                             'closing': closing,
+                             'connected': connected,
+                             'dilation_size': dilation_size,
+                             'opening': opening}
 
     environ = {}
     if caching:
@@ -69,7 +101,7 @@ def compute_brain_mask(head_file, brain_volume, write_dir, bias_correct=True,
         out_unifize = unifize(
             in_file=head_file,
             out_file=fname_presuffix(head_file,
-                                     suffix='_unifized_for_brain_mask',
+                                     suffix='_unifized_for_extraction',
                                      newpath=write_dir),
             environ=environ,
             **unifize_kwargs)
@@ -84,7 +116,8 @@ def compute_brain_mask(head_file, brain_volume, write_dir, bias_correct=True,
                                  suffix='_brain_mask',
                                  newpath=write_dir),
         volume_threshold=brain_volume,
-        intensity_threshold=int(out_clip_level.outputs.clip_val))
+        intensity_threshold=int(out_clip_level.outputs.clip_val),
+        **compute_mask_args)
 
     if not caching and bias_correct:
         os.remove(out_unifize.outputs.out_file)
@@ -92,29 +125,18 @@ def compute_brain_mask(head_file, brain_volume, write_dir, bias_correct=True,
     return out_compute_mask.outputs.out_file
 
 
-def _apply_mask(head_file, brain_mask_file, write_dir, bias_correct=True,
+def _apply_mask(head_file, mask_file, write_dir,
                 caching=False, terminal_output='allatonce'):
     """
     Parameters
     ----------
-    brain_volume : int
-        Volume of the brain used for brain extraction.
-        Typically 400 for mouse and 1800 for rat.
-
-    use_rats_tool : bool, optional
-        If True, brain mask is computed using RATS Mathematical Morphology.
-        Otherwise, a histogram-based brain segmentation is used.
-
     caching : bool, optional
         Wether or not to use caching.
-
     unifize_kwargs : dict, optional
         Is passed to sammba.externals.nipype.interfaces.afni.Unifize.
-
     Returns
     -------
     path to brain extracted image.
-
     Notes
     -----
     If `use_rats_tool` is turned on, RATS tool is used for brain extraction
@@ -124,23 +146,38 @@ def _apply_mask(head_file, brain_mask_file, write_dir, bias_correct=True,
     environ = {}
     if caching:
         memory = Memory(write_dir)
-        calc = memory.cache(afni.Calc)
-        calc.interface().set_default_terminal_output(terminal_output)
+        apply_mask = memory.cache(fsl.ApplyMask)
+        apply_mask.interface().set_default_terminal_output(terminal_output)
     else:
-        calc = afni.Calc(terminal_output=terminal_output).run
+        apply_mask = fsl.ApplyMask(terminal_output=terminal_output).run
         environ['AFNI_DECONFLICT'] = 'OVERWRITE'
 
-    out_calc_mask = calc(in_file_a=head_file,
-                         in_file_b=brain_mask_file,
-                         expr='a*b',
-                         out_file=fname_presuffix(head_file,
-                                                  suffix='_brain',
-                                                  newpath=write_dir))
+    # Check mask is binary
+    mask_img = nibabel.load(mask_file)
+    mask = mask_img.get_data()
+    values = np.unique(mask)
+    if len(values) == 2:
+        # If there are 2 different values, one of them must be 0 (background)
+        if not 0 in values:
+            raise ValueError('Background of the mask must be represented with'
+                             '0. Given mask contains: %s.' % values)
+    elif len(values) != 2:
+        # If there are more than 2 values, the mask is invalid
+        raise ValueError('Given mask is not made of 2 values: %s'
+                         '. Cannot interpret as true or false' % values)
+    try:
+        np.testing.assert_array_equal(nibabel.load(mask_file).affine,
+                                      nibabel.load(head_file).affine)
+    except AssertionError:
+        raise ValueError('Given mask {0} and file {1} do not have the same '
+                         'affine'.format(mask_file, head_file))
 
-    if not caching:
-        os.remove(brain_mask_file)
-
-    return out_calc_mask.outputs.out_file
+    out_apply_mask = apply_mask(in_file=head_file,
+                                mask_file=mask_file,
+                                out_file=fname_presuffix(head_file,
+                                                         suffix='_masked',
+                                                         newpath=write_dir))
+    return out_apply_mask.outputs.out_file
 
 
 def _delete_orientation(in_file, write_dir, min_zoom=.1, caching=False,
@@ -179,20 +216,32 @@ def _delete_orientation(in_file, write_dir, min_zoom=.1, caching=False,
 
 def _bias_correct(in_file, write_dir, caching=False,
                   terminal_output='allatonce'):
+    if ants.base.Info().version is None:
+        BiasCorrect = afni.Unifize
+    else:
+        BiasCorrect = ants.N4BiasFieldCorrection
+
     if caching:
         memory = Memory(write_dir)
-        bias_correct = memory.cache(ants.N4BiasFieldCorrection)
+        bias_correct = memory.cache(BiasCorrect)
         bias_correct.interface().set_default_terminal_output(terminal_output)
     else:
-        bias_correct = ants.N4BiasFieldCorrection(
+        bias_correct = BiasCorrect(
             terminal_output=terminal_output).run
 
-    out_bias_correct = bias_correct(
-        input_image=in_file,
-        shrink_factor=compute_n4_max_shrink(in_file),
-        output_image=fname_presuffix(in_file, suffix='_unbiased',
+    if ants.base.Info().version is None:
+        out_bias_correct = bias_correct(
+            in_file=in_file,
+            out_file=fname_presuffix(in_file, suffix='_unbiased',
                                      newpath=write_dir))
-    return out_bias_correct.outputs.output_image
+        return out_bias_correct.outputs.out_file
+    else:
+        out_bias_correct = bias_correct(
+            input_image=in_file,
+            shrink_factor=compute_n4_max_shrink(in_file),
+            output_image=fname_presuffix(in_file, suffix='_unbiased',
+                                         newpath=write_dir))
+        return out_bias_correct.outputs.output_image
 
 
 def _afni_bias_correct(in_file, write_dir, caching=False,
@@ -228,32 +277,27 @@ def _rigid_body_register(moving_head_file, reference_head_file,
     environ = {}
     if caching:
         memory = Memory(write_dir)
-        calc = memory.cache(afni.Calc)
         allineate = memory.cache(afni.Allineate)
         allineate2 = memory.cache(afni.Allineate)
         catmatvec = memory.cache(afni.CatMatvec)
-        for step in [calc, allineate, allineate2]:
+        for step in [allineate, allineate2]:
             step.interface().set_default_terminal_output(terminal_output)
     else:
-        calc = afni.Calc(terminal_output=terminal_output).run
         allineate = afni.Allineate(terminal_output=terminal_output).run
-        allineate2 = afni.Allineate(terminal_output=terminal_output).run  # TODO: remove after fixed bug
+        allineate2 = afni.Allineate(terminal_output=terminal_output).run
         catmatvec = afni.CatMatvec().run
         environ['AFNI_DECONFLICT'] = 'OVERWRITE'
 
-    out_cacl = calc(in_file_a=moving_head_file,
-                    in_file_b=moving_brain_mask,
-                    expr='a*b',
-                    outputtype=_get_afni_output_type(moving_head_file),
-                    environ=environ)
-    moving_brain_file = out_cacl.outputs.out_file
+    moving_brain_file = _apply_mask(moving_head_file, moving_head_file,
+                                    write_dir=write_dir,
+                                    caching=caching,
+                                    terminal_output=terminal_output)
 
-    out_cacl = calc(in_file_a=reference_head_file,
-                    in_file_b=reference_brain_mask,
-                    expr='a*b',
-                    outputtype=_get_afni_output_type(reference_head_file),
-                    environ=environ)
-    reference_brain_file = out_cacl.outputs.out_file
+    reference_brain_file = _apply_mask(reference_head_file,
+                                       reference_brain_mask,
+                                       write_dir=write_dir,
+                                       caching=caching,
+                                       terminal_output=terminal_output)
     output_files = [moving_brain_file, reference_brain_file]
 
     # Compute the transformation from functional to anatomical brain
@@ -264,7 +308,7 @@ def _rigid_body_register(moving_head_file, reference_head_file,
         out_matrix=fname_presuffix(reference_brain_file,
                                    suffix='_shr.aff12.1D',
                                    use_ext=False,
-                                   new_path=write_dir),
+                                   newpath=write_dir),
         center_of_mass='',
         warp_type='shift_rotate',
         out_file=fname_presuffix(reference_brain_file, suffix='_shr'),
@@ -274,7 +318,7 @@ def _rigid_body_register(moving_head_file, reference_head_file,
 
     # apply the inverse transform to register the anatomical to the func
     catmatvec_out_file = fname_presuffix(rigid_transform_file, suffix='INV',
-                                         new_path=write_dir)
+                                         newpath=write_dir)
     if not os.path.isfile(catmatvec_out_file):
         _ = catmatvec(in_file=[(rigid_transform_file, 'I')],
                       oneline=True,
@@ -286,7 +330,7 @@ def _rigid_body_register(moving_head_file, reference_head_file,
         master=reference_head_file,
         in_matrix=catmatvec_out_file,
         out_file=fname_presuffix(moving_head_file, suffix='_shr',
-                                 new_path=write_dir),
+                                 newpath=write_dir),
         environ=environ)
 
     # Remove intermediate output
@@ -350,56 +394,38 @@ def _per_slice_qwarp(to_qwarp_file, reference_file,
     if caching:
         memory = Memory(write_dir)
         resample = memory.cache(afni.Resample)
-        slicer = memory.cache(afni.ZCutUp)
+        slicer = memory.cache(fsl.Slice)
         warp_apply = memory.cache(afni.NwarpApply)
         qwarp = memory.cache(afni.Qwarp)
-        merge = memory.cache(afni.Zcat)
+        merge = memory.cache(fsl.Merge)
         for step in [resample, slicer, warp_apply, qwarp, merge]:
             step.interface().set_default_terminal_output(terminal_output)
     else:
         resample = afni.Resample(terminal_output=terminal_output).run
-        slicer = afni.ZCutUp(terminal_output=terminal_output).run
+        slicer = fsl.Slice(terminal_output=terminal_output).run
         warp_apply = afni.NwarpApply(terminal_output=terminal_output).run
         qwarp = afni.Qwarp(terminal_output=terminal_output).run
-        merge = afni.Zcat(terminal_output=terminal_output).run
+        merge = fsl.Merge(terminal_output=terminal_output).run
         environ['AFNI_DECONFLICT'] = 'OVERWRITE'
 
     # Slice anatomical image
     reference_img = nibabel.load(reference_file)
-    reference_n_slices = reference_img.header.get_data_shape()[2]
     per_slice_dir = os.path.join(write_dir, 'per_slice')
     if not os.path.isdir(per_slice_dir):
         os.makedirs(per_slice_dir)
-    sliced_reference_files = []
-    for slice_n in range(reference_n_slices):
-        out_slicer = slicer(in_file=reference_file,
-                            keep='{0} {0}'.format(slice_n),
-                            out_file=fname_presuffix(
-                                reference_file, newpath=per_slice_dir,
-                                suffix='_sl%d' % slice_n),
-                            environ=environ)
-        oblique_slice = fix_obliquity(out_slicer.outputs.out_file,
-                          reference_file,
-                          overwrite=overwrite, verbose=verbose,
-                          caching=caching, caching_dir=per_slice_dir)
-        sliced_reference_files.append(oblique_slice)
+
+    out_slicer = slicer(in_file=reference_file,
+                        out_base_name=fname_presuffix(reference_file,
+                                                      newpath=per_slice_dir,
+                                                      use_ext=False))
+    sliced_reference_files = out_slicer.outputs.out_files
 
     # Slice mean functional
-    sliced_to_qwarp_files = []
-    img = nibabel.load(to_qwarp_file)
-    n_slices = img.header.get_data_shape()[2]
-    for slice_n in range(n_slices):
-        out_slicer = slicer(in_file=to_qwarp_file,
-                            keep='{0} {0}'.format(slice_n),
-                            out_file=fname_presuffix(
-                                to_qwarp_file, newpath=per_slice_dir,
-                                suffix='_sl%d' % slice_n),
-                            environ=environ)
-        oblique_slice = fix_obliquity(out_slicer.outputs.out_file,
-                          to_qwarp_file,
-                          overwrite=overwrite, verbose=verbose,
-                          caching=caching, caching_dir=per_slice_dir)
-        sliced_to_qwarp_files.append(oblique_slice)
+    out_slicer = slicer(in_file=to_qwarp_file,
+                        out_base_name=fname_presuffix(to_qwarp_file,
+                                                      newpath=per_slice_dir,
+                                                      use_ext=False))
+    sliced_to_qwarp_files = out_slicer.outputs.out_files
 
     # Below line is to deal with slices where there is no signal (for example
     # rostral end of some anatomicals)
@@ -432,6 +458,10 @@ def _per_slice_qwarp(to_qwarp_file, reference_file,
     warped_slices = []
     warp_files = []
     output_files = []
+    print('*' * 50)
+    print('*' * 50)
+    print('*' * 20, nibabel.load(to_qwarp_file).shape)
+    print('*' * 20, nibabel.load(reference_file).shape)
     for (resampled_sliced_to_qwarp_file,
          resampled_sliced_reference_file) in zip(
             resampled_sliced_to_qwarp_files,
@@ -495,12 +525,13 @@ def _per_slice_qwarp(to_qwarp_file, reference_file,
 
     out_merge_func = merge(
         in_files=oblique_resampled_warped_slices,
-        out_file=fname_presuffix(to_qwarp_file, suffix='_perslice',
-                                 newpath=write_dir),
+        dimension='z',
+        merged_file=fname_presuffix(to_qwarp_file, suffix='_perslice',
+                                    newpath=write_dir),
         environ=environ)
 
     # Fix the obliquity
-    oblique_merged = fix_obliquity(out_merge_func.outputs.out_file,
+    oblique_merged = fix_obliquity(out_merge_func.outputs.merged_file,
                                    reference_file,
                                    overwrite=overwrite, verbose=verbose,
                                    caching=caching, caching_dir=per_slice_dir)
@@ -515,21 +546,11 @@ def _per_slice_qwarp(to_qwarp_file, reference_file,
     # Apply the precomputed warp slice by slice
     if apply_to_file is not None:
         # slice functional
-        sliced_apply_to_files = []
-        for slice_n in range(n_slices):
-            out_slicer = slicer(in_file=apply_to_file,
-                                keep='{0} {0}'.format(slice_n),
-                                out_file=fname_presuffix(
-                                    apply_to_file, newpath=per_slice_dir,
-                                    suffix='_sl%d' % slice_n),
-                                environ=environ)
-            oblique_slice = fix_obliquity(out_slicer.outputs.out_file,
-                                          apply_to_file,
-                                          overwrite=overwrite, verbose=verbose,
-                                          caching=caching,
-                                          caching_dir=per_slice_dir)
-            sliced_apply_to_files.append(oblique_slice)
-
+        out_slicer = slicer(in_file=apply_to_file,
+                            out_base_name=fname_presuffix(apply_to_file,
+                                                          newpath=per_slice_dir,
+                                                          use_ext=False))
+        sliced_apply_to_files = out_slicer.outputs.out_files
         warped_apply_to_slices = []
         for (sliced_apply_to_file, warp_file) in zip(
                 sliced_apply_to_files, warp_files):
@@ -559,13 +580,14 @@ def _per_slice_qwarp(to_qwarp_file, reference_file,
         # Finally, merge all slices !
         out_merge_apply_to = merge(
             in_files=oblique_warped_apply_to_slices,
-            out_file=fname_presuffix(apply_to_file, suffix='_perslice',
-                                     newpath=write_dir),
+            dimension='z',
+            merged_file=fname_presuffix(apply_to_file, suffix='_perslice',
+                                        newpath=write_dir),
             environ=environ)
 
         # Fix the obliquity
         merged_apply_to_file = fix_obliquity(
-            out_merge_apply_to.outputs.out_file, apply_to_file,
+            out_merge_apply_to.outputs.merged_file, apply_to_file,
             overwrite=overwrite, verbose=verbose, caching=caching,
             caching_dir=per_slice_dir)
 
@@ -598,18 +620,18 @@ def _apply_perslice_warp(apply_to_file, warp_files,
     if caching:
         memory = Memory(write_dir)
         resample = memory.cache(afni.Resample)
-        slicer = memory.cache(afni.ZCutUp)
+        slicer = memory.cache(fsl.Slice)
         warp_apply = memory.cache(afni.NwarpApply)
         qwarp = memory.cache(afni.Qwarp)
-        merge = memory.cache(afni.Zcat)
+        merge = memory.cache(fsl.Merge)
         for step in [resample, slicer, warp_apply, qwarp, merge]:
             step.interface().set_default_terminal_output(terminal_output)
     else:
         resample = afni.Resample(terminal_output=terminal_output).run
-        slicer = afni.ZCutUp(terminal_output=terminal_output).run
+        slicer = fsl.Slice(terminal_output=terminal_output).run
         warp_apply = afni.NwarpApply(terminal_output=terminal_output).run
         qwarp = afni.Qwarp(terminal_output=terminal_output).run
-        merge = afni.Zcat(terminal_output=terminal_output).run
+        merge = fsl.Merge(terminal_output=terminal_output).run
         environ['AFNI_DECONFLICT'] = 'OVERWRITE'
 
     apply_to_img = nibabel.load(apply_to_file)
@@ -626,19 +648,11 @@ def _apply_perslice_warp(apply_to_file, warp_files,
 
     # slice functional
     sliced_apply_to_files = []
-    for slice_n in range(n_slices):
-        out_slicer = slicer(in_file=apply_to_file,
-                            keep='{0} {0}'.format(slice_n),
-                            out_file=fname_presuffix(
-                                apply_to_file, newpath=per_slice_dir,
-                                suffix='_sl%d' % slice_n),
-                            environ=environ)
-        oblique_slice = fix_obliquity(out_slicer.outputs.out_file,
-                                      apply_to_file,
-                                      overwrite=overwrite, verbose=verbose,
-                                      caching=caching,
-                                      caching_dir=per_slice_dir)
-        sliced_apply_to_files.append(oblique_slice)
+    out_slicer = slicer(in_file=apply_to_file,
+                        out_base_name=fname_presuffix(apply_to_file,
+                                                      newpath=per_slice_dir,
+                                                      use_ext=False))
+    sliced_apply_to_files = out_slicer.outputs.out_files
 
     warped_apply_to_slices = []
     for (sliced_apply_to_file, warp_file) in zip(
@@ -669,13 +683,14 @@ def _apply_perslice_warp(apply_to_file, warp_files,
     # Finally, merge all slices !
     out_merge_apply_to = merge(
         in_files=oblique_warped_apply_to_slices,
-        out_file=fname_presuffix(apply_to_file, suffix='_perslice',
-                                 newpath=write_dir),
+        dimension='z',
+        merged_file=fname_presuffix(apply_to_file, suffix='_perslice',
+                                    newpath=write_dir),
         environ=environ)
 
     # Fix the obliquity
     merged_apply_to_file = fix_obliquity(
-        out_merge_apply_to.outputs.out_file, apply_to_file,
+        out_merge_apply_to.outputs.merged_file, apply_to_file,
         overwrite=overwrite, verbose=verbose, caching=caching,
         caching_dir=per_slice_dir)
 
@@ -697,31 +712,23 @@ def _transform_to_template(to_register_filename, template_filename, write_dir,
                            caching=False, verbose=True):
     """ Applies successive transforms to a given image to put it in
     template space.
-
     Parameters
     ----------
     to_register_filename : str
         Path to functional volume, coregistered to a common space with the
         anatomical volume.
-
     template_filename : str
         Template to register the functional to.
-
     func_to_anat_oned_filename : str
         Coregistration transform.
-
     anat_to_template_oned_filename : str
         Path to the affine 1D transform from anatomical to template space.
-
     anat_to_template_warp_filename : str
         Path to the warp transform from anatomical to template space.
-
     voxel_size : 3-tuple of floats, optional
         Voxel size of the registered functional, in mm.
-
     caching : bool, optional
         Wether or not to use caching.
-
     verbose : bool, optional
         If True, all steps are verbose. Note that caching implies some
         verbosity in any case.
@@ -762,7 +769,6 @@ def _transform_to_template(to_register_filename, template_filename, write_dir,
     warp = "'"
     warp += " ".join(transforms)
     warp += "'"
-    print('********************************', nibabel.load(to_register_filename).affine)
     _ = warp_apply(in_file=to_register_filename,
                    master=resampled_template_filename,
                    warp=warp,
@@ -771,63 +777,115 @@ def _transform_to_template(to_register_filename, template_filename, write_dir,
     return normalized_filename
 
 
-class BaseRegistrator(object):
+def _apply_transforms(to_register_filename, target_filename,
+                      write_dir,
+                      transforms,
+                      transforms_kind='nonlinear',
+                      interpolation='wsinc5',
+                      transformed_filename=None,
+                      voxel_size=None,
+                      caching=False, verbose=True, inverse=False):
+    """ Applies successive transforms to a given image to put it in
+    template space.
+    Parameters
+    ----------
+    to_register_filename : str
+        Path to functional volume, coregistered to a common space with the
+        anatomical volume.
+    template_filename : str
+        Template to register the functional to.
+    transforms : list
+        List of transforms in order of 3dNWarpApply application: first must
+        one must be in the target space and last one must be in
+        the source space.
+    inverse : bool, optional
+        If True, after the transforms composition is computed, invert it.
+        If the input transforms would take a dataset from space A to B,
+        then the inverted transform will do the reverse.
+    interpolation : one of {'nearestneighbour', 'linear', 'cubic', 'quintic',
+                            'wsinc5'}, optional
+        Interpolation type.
+    voxel_size : 3-tuple of floats, optional
+        Voxel size of the registered functional, in mm.
+    caching : bool, optional
+        Wether or not to use caching.
+    verbose : bool, optional
+        If True, all steps are verbose. Note that caching implies some
+        verbosity in any case.
     """
-    Base class for all registrators.
-    """
-    @classmethod
-    def _get_param_names(cls):
-        """Get parameter names for the registrato"""
-        # fetch the constructor or the original constructor before
-        # deprecation wrapping if any
-        init = getattr(cls.__init__, 'deprecated_original', cls.__init__)
-        if init is object.__init__:
-            # No explicit constructor to introspect
-            return []
+    environ = {}
+    if verbose:
+        terminal_output = 'allatonce'
+    else:
+        terminal_output = 'none'
 
-        # introspect the constructor arguments to find the model parameters
-        # to represent
-        init_signature = signature(init)
-        # Consider the constructor parameters excluding 'self'
-        parameters = [p for p in init_signature.parameters.values()
-                      if p.name != 'self' and p.kind != p.VAR_KEYWORD]
-        for p in parameters:
-            if p.kind == p.VAR_POSITIONAL:
-                raise RuntimeError("registrators should always "
-                                   "specify their parameters in the signature"
-                                   " of their __init__ (no varargs)."
-                                   " %s with constructor %s doesn't "
-                                   " follow this convention."
-                                   % (cls, init_signature))
-        # Extract and sort argument names excluding 'self'
-        return sorted([p.name for p in parameters])
+    if caching:
+        memory = Memory(write_dir)
+        catmatvec = memory.cache(afni.CatMatvec)
+        allineate = memory.cache(afni.Allineate)
+        warp_apply = memory.cache(afni.NwarpApply)
+        resample = memory.cache(afni.Resample)        
+        for step in [resample, allineate, warp_apply]:
+            step.interface().set_default_terminal_output(terminal_output)
+    else:
+        resample = afni.Resample(terminal_output=terminal_output).run
+        catmatvec = afni.CatMatvec().run
+        allineate = afni.Allineate(terminal_output=terminal_output).run
+        warp_apply = afni.NwarpApply(terminal_output=terminal_output).run
+        environ['AFNI_DECONFLICT'] = 'OVERWRITE'
 
-    def _get_params(self):
-        """Get parameters of the session.
+    if transformed_filename is None:
+        target_basename = os.path.basename(target_filename)
+        target_basename = os.path.splitext(target_basename)[0]
+        target_basename = os.path.splitext(target_basename)[0]
+        transformed_filename = fname_presuffix(
+            to_register_filename, suffix='_to_' + target_basename,
+            newpath=write_dir)
 
-        Returns
-        -------
-        params : mapping of string to any
-            Parameter names mapped to their values.
-        """
-        out = dict()
-        for key in self._get_param_names():
-            value = getattr(self, key, None)
-            out[key] = value
-        return out
+    if voxel_size is None:
+        resampled_template_filename = target_filename
+    else:
+        out_resample = resample(in_file=target_filename,
+                                voxel_size=voxel_size,
+                                out_file=fname_presuffix(target_filename,
+                                                         suffix='_resampled',
+                                                         newpath=write_dir),
+                                environ=environ)
+        resampled_template_filename = out_resample.outputs.out_file
 
-    def _set_params(self, **kwargs):
-        for k, v in kwargs.items():
-            setattr(self, k, v)
-
-    def __repr__(self):
-        class_name = self.__class__.__name__
-        return '%s(%s)' % (class_name, _pprint(self._get_params(),
-                           offset=len(class_name),),)
-
-    def _set_output_dir(self):
-        if self.output_dir is None:
-            self.output_dir = os.getcwd()
-
-        if not os.path.isdir(self.output_dir):
-            os.makedirs(self.output_dir)
+    if transforms_kind is not 'nonlinear':
+        affine_transform_filename = fname_presuffix(transformed_filename,
+                                                    suffix='.aff12.1D',
+                                                    use_ext=False)
+        out_catmatvec = catmatvec(in_file=[(transform, 'ONELINE')
+                                           for transform in transforms],
+                                  oneline=True,
+                                  out_file=affine_transform_filename,
+                                  environ=environ)
+        if inverse:
+            affine_transform_filename = fname_presuffix(transformed_filename,
+                                                        suffix='_INV.aff12.1D',
+                                                        use_ext=False)
+            _ = catmatvec(in_file=[(out_catmatvec.outputs.out_file, 'I')],
+                          oneline=True,
+                          out_file=affine_transform_filename,
+                          environ=environ)
+        _ = allineate(
+            in_file=to_register_filename,
+            master=resampled_template_filename,
+            in_matrix=affine_transform_filename,
+            final_interpolation=interpolation,
+            out_file=transformed_filename,
+            environ=environ)
+    else:
+        warp = "'"
+        warp += " ".join(transforms)
+        warp += "'"
+        _ = warp_apply(in_file=to_register_filename,
+                       master=resampled_template_filename,
+                       warp=warp,
+                       inv_warp=inverse,
+                       interp=interpolation,
+                       out_file=transformed_filename,
+                       environ=environ)
+    return transformed_filename
