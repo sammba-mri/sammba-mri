@@ -11,7 +11,7 @@ from sammba.externals.nipype.interfaces import afni
 from sammba.interfaces import segmentation
 
 
-def _get_afni_outputtype(in_file):
+def _get_afni_output_type(in_file):
     """ Extracts AFNI outputtype name from file extension
     """
     fname, ext = os.path.splitext(in_file)

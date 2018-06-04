@@ -7,8 +7,8 @@ from .base import (_rigid_body_register, _warp, _per_slice_qwarp)
 
 
 def coregister(unifized_anat_file,
-               unbiased_m0_file, write_dir, anat_brain_file=None,
-               m0_brain_file=None,
+               unbiased_m0_file, write_dir, anat_brain_mask_file=None,
+               m0_brain_mask_file=None,
                prior_rigid_body_registration=False,
                apply_to_file=None,
                voxel_size_x=.1, voxel_size_y=.1, caching=False,
@@ -82,17 +82,17 @@ def coregister(unifized_anat_file,
     # Rigid-body registration anat -> mean func #
     #############################################
     if prior_rigid_body_registration:
-        if anat_brain_file is None:
+        if anat_brain_mask_file is None:
             raise ValueError("'anat_brain_mask_file' is needed for prior "
                              "rigid-body registration")
-        if m0_brain_file is None:
+        if m0_brain_mask_file is None:
             raise ValueError("'m0_brain_mask_file' is needed for prior "
                              "rigid-body registration")
         allineated_anat_file, rigid_transform_file = \
             _rigid_body_register(unifized_anat_file,
                                  unbiased_m0_file,
-                                 write_dir, anat_brain_file,
-                                 m0_brain_file, 
+                                 write_dir, anat_brain_mask_file,
+                                 m0_brain_mask_file, 
                                  caching=caching,
                                  terminal_output=terminal_output,
                                  environ=environ)

@@ -896,3 +896,4 @@ def anats_to_template(anat_filenames, head_template_filename, write_dir,
     return Bunch(registered=registered,
                  transforms=warp_transforms,
                  pre_transforms=affine_transforms)
+
