@@ -276,6 +276,9 @@ class Node(EngineBase):
         # Get a dictionary with hashed filenames and a hashvalue
         # of the dictionary itself.
         hashed_inputs, hashvalue = self._get_hashval()
+#	salma: useful to debug failing caching
+#	print('_____________________________________________')
+#	print('This is the hash', hashed_inputs, hashvalue)
         outdir = self.output_dir()
         if op.exists(outdir):
             logger.debug('Output dir: %s', to_str(os.listdir(outdir)))
@@ -319,6 +322,7 @@ class Node(EngineBase):
             logger.debug('Output dir: %s', to_str(os.listdir(outdir)))
         hash_info = self.hash_exists(updatehash=updatehash)
         hash_exists, hashvalue, hashfile, hashed_inputs = hash_info
+	print(hash_info)
         logger.debug(
             'updatehash=%s, overwrite=%s, always_run=%s, hash_exists=%s',
             updatehash, self.overwrite, self._interface.always_run, hash_exists)
