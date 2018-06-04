@@ -32,6 +32,13 @@ VALID_TERMINAL_OUTPUT = ['stream', 'allatonce', 'file', 'file_split',
                          'file_stdout', 'file_stderr', 'none']
 
 
+def compute_volume(mask_img):
+    affine_det = np.abs(np.linalg.det(mask_img.affine[:3, :3]))
+    mask_data = mask_img.get_data()
+    n_voxels_mask = np.sum(mask_data > 0).astype(float)
+    return n_voxels_mask * affine_det
+
+
 class Info(object):
     """Handle RATS version information.
 
@@ -422,6 +429,23 @@ class MathMorphoMask(CommandLine):
     input_spec = MathMorphoMaskInputSpec
     output_spec = MathMorphoMaskOutputSpec
     _cmd = 'RATS_MM'
+
+    def _run_interface(self, runtime):
+        runtime = super(MathMorphoMask, self)._run_interface(runtime)
+
+        if runtime is not None:
+            if isdefined(self.inputs.out_file):
+                tmp_file = os.path.abspath(self.inputs.out_file)
+            else:
+                tmp_file = os.path.abspath(
+                    self._filename_from_source('out_file'))
+
+            # Ensure the affine is the same
+            mask_data = nibabel.load(tmp_file).get_data()
+            mask_img = image.new_img_like(self.inputs.in_file, mask_data)
+            mask_img.to_filename(tmp_file)
+
+        return runtime
 
     def _list_outputs(self):
         outputs = self.output_spec().get()
