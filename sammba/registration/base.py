@@ -11,10 +11,12 @@ from .utils import fix_obliquity, _get_afni_output_type, compute_n4_max_shrink
 
 def mask_report(mask_file, expected_volume):
     """ Outputs the mask
+
     Parameters
     ----------
     mask_file : str
         Path to the mask image
+
     expected_volume : float
         Expected volume in the mask.
     
@@ -50,16 +52,21 @@ def compute_brain_mask(head_file, brain_volume, write_dir, bias_correct=True,
     brain_volume : int
         Volume of the brain used for brain extraction.
         Typically 400 for mouse and 1800 for rat.
+
     use_rats_tool : bool, optional
         If True, brain mask is computed using RATS Mathematical Morphology.
         Otherwise, a histogram-based brain segmentation is used.
+
     caching : bool, optional
         Wether or not to use caching.
+
     unifize_kwargs : dict, optional
         Is passed to sammba.externals.nipype.interfaces.afni.Unifize.
+
     Returns
     -------
     path to brain extracted image.
+
     Notes
     -----
     If `use_rats_tool` is turned on, RATS tool is used for brain extraction
@@ -132,11 +139,14 @@ def _apply_mask(head_file, mask_file, write_dir,
     ----------
     caching : bool, optional
         Wether or not to use caching.
+
     unifize_kwargs : dict, optional
         Is passed to sammba.externals.nipype.interfaces.afni.Unifize.
+
     Returns
     -------
     path to brain extracted image.
+
     Notes
     -----
     If `use_rats_tool` is turned on, RATS tool is used for brain extraction
@@ -712,23 +722,31 @@ def _transform_to_template(to_register_filename, template_filename, write_dir,
                            caching=False, verbose=True):
     """ Applies successive transforms to a given image to put it in
     template space.
+
     Parameters
     ----------
     to_register_filename : str
         Path to functional volume, coregistered to a common space with the
         anatomical volume.
+
     template_filename : str
         Template to register the functional to.
+
     func_to_anat_oned_filename : str
         Coregistration transform.
+
     anat_to_template_oned_filename : str
         Path to the affine 1D transform from anatomical to template space.
+
     anat_to_template_warp_filename : str
         Path to the warp transform from anatomical to template space.
+
     voxel_size : 3-tuple of floats, optional
         Voxel size of the registered functional, in mm.
+
     caching : bool, optional
         Wether or not to use caching.
+
     verbose : bool, optional
         If True, all steps are verbose. Note that caching implies some
         verbosity in any case.
@@ -787,28 +805,36 @@ def _apply_transforms(to_register_filename, target_filename,
                       caching=False, verbose=True, inverse=False):
     """ Applies successive transforms to a given image to put it in
     template space.
+
     Parameters
     ----------
     to_register_filename : str
         Path to functional volume, coregistered to a common space with the
         anatomical volume.
+
     template_filename : str
         Template to register the functional to.
+
     transforms : list
         List of transforms in order of 3dNWarpApply application: first must
         one must be in the target space and last one must be in
         the source space.
+
     inverse : bool, optional
         If True, after the transforms composition is computed, invert it.
         If the input transforms would take a dataset from space A to B,
         then the inverted transform will do the reverse.
+
     interpolation : one of {'nearestneighbour', 'linear', 'cubic', 'quintic',
                             'wsinc5'}, optional
         Interpolation type.
+
     voxel_size : 3-tuple of floats, optional
         Voxel size of the registered functional, in mm.
+
     caching : bool, optional
         Wether or not to use caching.
+
     verbose : bool, optional
         If True, all steps are verbose. Note that caching implies some
         verbosity in any case.
