@@ -3,7 +3,8 @@ from sammba.externals.nipype.interfaces import afni
 from sammba.externals.nipype.utils.filemanip import fname_presuffix
 from sammba.externals.nipype.caching import Memory
 from sklearn.datasets.base import Bunch
-from sammba.interfaces import segmentation
+from .base import BaseRegistrator, compute_brain_mask, _bias_correct, unifize
+from .perfusion import coregister as coregister_perf
 
 
 def anats_to_common(anat_filenames, brain_mask_files,
