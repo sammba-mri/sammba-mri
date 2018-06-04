@@ -22,37 +22,36 @@ func_filename = retest.func[0]
 print(func_filename)
 
 ##############################################################################
-# We encapsulate them in an object called `FMRISession`
-from sammba.registration import FMRISession
+# We call the `AnatCoregistrator`, which coregisters the anatomical to
+# a given modality
+from sammba.registration import AnatCoregistrator
 
-animal_session = FMRISession(anat=anat_filename, func=func_filename,
-                             animal_id='1366')
-
-##############################################################################
-# Define the write directory
-# --------------------------
-# Note that this directory needs to be empty, to ovoid overwrting conflicts.
-import os
-
-write_dir = os.path.join(os.getcwd(), 'zurich_fmri')
-if not os.path.exists(write_dir):
-    os.makedirs(write_dir)
+coregistrator = AnatCoregistrator(output_dir='animal_1366', brain_volume=400,
+                                  caching=True)
+print(coregistrator)
 
 ##############################################################################
-# Functional to anatomical registration
+# `AnatCoregistrator` comes with a parameter `mask_clipping_fraction=.2` which
+# sometimes needs to be changed to get a good brain mask. This can be done
+# with `check_segmentation` method
+print(coregistrator.check_segmentation(anat_filename))
+
+coregistrator.mask_clipping_fraction = .1
+
+##############################################################################
+# Anatomical to functional registration
 # -------------------------------------
-from sammba.registration import coregister_fmri_session
-
-coregister_fmri_session(animal_session, 1., write_dir, 400,
-                        slice_timing=True,
-                        prior_rigid_body_registration=True)
+coregistrator.fit_anat(anat_filename)
+coregistrator.fit_modality(func_filename, 'func',
+                           slice_timing=False,
+                           prior_rigid_body_registration=True)
 
 ###############################################################################
 # Check out the results
 # ---------------------
 from nilearn import plotting, image
 
-display = plotting.plot_epi(image.mean_img(animal_session.coreg_func_),
+display = plotting.plot_epi(image.mean_img(coregistrator.undistorted_func),
                             title='coreg anat edges on top of mean coreg EPI')
-display.add_edges(animal_session.coreg_anat_)
+display.add_edges(coregistrator.anat_in_func_space)
 plotting.show()

@@ -11,6 +11,42 @@ from sammba.externals.nipype.interfaces import afni
 from sammba.interfaces import segmentation
 
 
+def _get_afni_output_type(in_file):
+    """ Extracts AFNI outputtype name from file extension
+    """
+    fname, ext = os.path.splitext(in_file)
+    if '.gz' in ext:
+        _, ext2 = os.path.splitext(fname)
+        ext = ext2 + ext
+    if ext == '.nii':
+        output_type = 'NIFTI'
+    elif ext == '.nii.gz':
+        output_type = 'NIFTI_GZ'
+    else:
+        raise ValueError('Unknown extension for {}'.format(in_file))
+
+    return output_type
+
+
+def compute_n4_max_shrink(in_file):
+    """ Computes the maximal allowed shrink factor for ANTS
+    N4BiasFieldCorrection.
+    Note
+    -----
+    To lessen computation time, N4BiasFieldCorrection can resample the input
+    image. The shrink factor, specified as a single integer, describes this
+    resampling. The default shrink factor is 4 which is only applied to the
+    first two or three dimensions assumed spatial. The spacing for each
+    dimension is computed as
+    dimension - shrink - dimension % shrink
+    N4BiasFieldCorrection raises and error when one obtained spacing is not
+    positive.
+    """
+    img = nibabel.load(in_file)
+    spatial_shapes = img.shape[:3]
+    return min(4, min(spatial_shapes) / 2)
+
+
 def _reset_affines(in_file, out_file, overwrite=False, axes_to_permute=None,
                    axes_to_flip=None, xyzscale=None, center_mass=None,
                    verbose=1):
@@ -77,7 +113,7 @@ def fix_obliquity(to_fix_filename, reference_filename, caching=False,
     else:
         terminal_output = 'none'
 
-    if overwrite:
+    if caching:
         environ = {'AFNI_DECONFLICT': 'OVERWRITE'}
     else:
         environ = {}
@@ -109,24 +145,26 @@ def fix_obliquity(to_fix_filename, reference_filename, caching=False,
     orig_to_fix_filename = fname_presuffix(os.path.join(
         tmp_folder, to_fix_basename), suffix='+orig.BRIK',
         use_ext=False)
-    if not os.path.isfile(orig_to_fix_filename) or overwrite:
-        out_copy = copy(in_file=to_fix_filename,
-                        out_file=orig_to_fix_filename,
-                        environ=environ)
-        orig_to_fix_filename = out_copy.outputs.out_file
+    out_copy = copy(in_file=to_fix_filename,
+                    out_file=orig_to_fix_filename,
+                    environ=environ)
+    orig_to_fix_filename = out_copy.outputs.out_file
 
     out_refit = refit(in_file=orig_to_fix_filename,
                       atrcopy=(orig_reference_filename,
                                'IJK_TO_DICOM_REAL'))
 
-    out_copy = copy(in_file=out_refit.outputs.out_file,
-                    environ={'AFNI_DECONFLICT': 'OVERWRITE'},
-                    out_file=to_fix_filename)
+    if caching:
+        out_copy = copy(in_file=out_refit.outputs.out_file,
+                        out_file=fname_presuffix(to_fix_filename,
+                                                 suffix='_oblique'))
+    else:
+        out_copy = copy(in_file=out_refit.outputs.out_file,
+                        environ={'AFNI_DECONFLICT': 'OVERWRITE'},
+                        out_file=to_fix_filename)
 
-    if overwrite:
+    if not caching:
         shutil.rmtree(tmp_folder)
-        if caching:
-            memory.clear_previous_run()
 
     return out_copy.outputs.out_file
 

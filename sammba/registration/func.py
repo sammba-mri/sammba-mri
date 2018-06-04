@@ -1,6 +1,8 @@
 import os
 import numpy as np
 import nibabel
+from sklearn.datasets.base import Bunch
+from sklearn.utils import deprecated
 from sammba.externals.nipype.caching import Memory
 from sammba.externals.nipype.interfaces import afni, ants, fsl
 from sammba.externals.nipype.utils.filemanip import fname_presuffix
@@ -8,8 +10,263 @@ from sammba.interfaces import segmentation
 from .utils import fix_obliquity
 from .fmri_session import FMRISession
 from .struct import anats_to_template
+from .base import (_rigid_body_register, compute_brain_mask, _warp,
+                   _apply_mask, _per_slice_qwarp)
 
 
+def _realign(func_filename, write_dir, caching=False,
+             terminal_output='allatonce', environ={}):
+    if caching:
+        memory = Memory(write_dir)
+        clip_level = memory.cache(afni.ClipLevel)
+        threshold = memory.cache(fsl.Threshold)
+        volreg = memory.cache(afni.Volreg)
+        allineate = memory.cache(afni.Allineate)
+        copy = memory.cache(afni.Copy)
+        copy_geom = memory.cache(fsl.CopyGeom)
+        tstat = memory.cache(afni.TStat)
+        for step in [threshold, volreg, allineate, tstat, copy, copy_geom]:
+            step.interface().set_default_terminal_output(terminal_output)
+    else:
+        clip_level = afni.ClipLevel().run
+        threshold = fsl.Threshold(terminal_output=terminal_output).run
+        volreg = afni.Volreg(terminal_output=terminal_output).run
+        allineate = afni.Allineate(terminal_output=terminal_output).run
+        copy_geom = fsl.CopyGeom(terminal_output=terminal_output).run
+        tstat = afni.TStat(terminal_output=terminal_output).run
+
+    out_clip_level = clip_level(in_file=func_filename)
+
+    out_threshold = threshold(in_file=func_filename,
+                              thresh=out_clip_level.outputs.clip_val,
+                              out_file=fname_presuffix(func_filename,
+                                                       suffix='_thresholded',
+                                                       newpath=write_dir))
+    thresholded_filename = out_threshold.outputs.out_file
+
+    out_volreg = volreg(  # XXX dfile not saved
+        in_file=thresholded_filename,
+        out_file=fname_presuffix(thresholded_filename,
+                                 suffix='_volreg',
+                                 newpath=write_dir),
+        environ=environ,
+        oned_file=fname_presuffix(thresholded_filename,
+                                  suffix='_volreg.1Dfile.1D', use_ext=False,
+                                  newpath=write_dir),
+        oned_matrix_save=fname_presuffix(thresholded_filename,
+                                         suffix='_volreg.aff12.1D',
+                                         use_ext=False,
+                                         newpath=write_dir))
+
+    # Apply the registration to the whole head
+    out_allineate = allineate(in_file=func_filename,
+                              master=func_filename,
+                              in_matrix=out_volreg.outputs.oned_matrix_save,
+                              out_file=fname_presuffix(func_filename,
+                                                       suffix='_volreg',
+                                                       newpath=write_dir),
+                              environ=environ)
+
+    # 3dAllineate removes the obliquity. This is not a good way to readd it as
+    # removes motion correction info in the header if it were an AFNI file...as
+    # it happens it's NIfTI which does not store that so irrelevant!
+    if caching:
+        out_copy = copy(
+            in_file=out_allineate.outputs.out_file,
+            out_file=fname_presuffix(out_allineate.outputs.out_file,
+                                     suffix='_oblique',
+                                     newpath=write_dir),
+            environ=environ)
+        oblique_allineated_filename = out_copy.outputs.out_file
+    else:
+        oblique_allineated_filename = out_allineate.outputs.out_file
+
+    out_copy_geom = copy_geom(dest_file=oblique_allineated_filename,
+                              in_file=out_volreg.outputs.out_file)
+
+    oblique_allineated_filename = out_copy_geom.outputs.out_file
+
+    # Create a (hopefully) nice mean image for use in the registration
+    out_tstat = tstat(in_file=oblique_allineated_filename, args='-mean',
+                      out_file=fname_presuffix(oblique_allineated_filename,
+                                               suffix='_tstat',
+                                               newpath=write_dir),
+                      environ=environ)
+
+    # Remove intermediate outputs
+    if not caching:
+        for output_file in [thresholded_filename,
+                            out_volreg.outputs.oned_matrix_save,
+                            out_volreg.outputs.out_file,
+                            out_volreg.outputs.md1d_file]:
+            os.remove(output_file)
+    return (oblique_allineated_filename, out_tstat.outputs.out_file,
+            out_volreg.outputs.oned_file)
+
+
+def _slice_time(func_file, t_r, write_dir, caching=False,
+                terminal_output='allatonce'):
+    environ = {}
+    if caching:
+        memory = Memory(write_dir)
+        tshift = memory.cache(afni.TShift)
+        tshift.interface().set_default_terminal_output(terminal_output)
+    else:
+        tshift = afni.TShift(terminal_output=terminal_output).run
+        environ['AFNI_DECONFLICT'] = 'OVERWRITE'
+
+    out_tshift = tshift(
+        in_file=func_file,
+        out_file=fname_presuffix(func_file, suffix='_tshifted',
+                                 newpath=write_dir),
+        tpattern='altplus',
+        tr=str(t_r),
+        environ=environ)
+    return out_tshift.outputs.out_file
+
+
+def coregister(unifized_anat_file, unbiased_mean_func_file, write_dir,
+               anat_brain_file=None,
+               func_brain_file=None,
+               slice_timing=True, t_r=None,
+               prior_rigid_body_registration=False,
+               voxel_size_x=.1, voxel_size_y=.1, caching=False,
+               verbose=True, **environ_kwargs):
+    """
+    Coregistration of the subject's functional and anatomical images.
+    The functional volume is aligned to the anatomical, first with a
+    rigid body registration and then on a per-slice basis (only a fine
+    correction, this is mostly for correction of EPI distortion).
+
+    Parameters
+    ----------
+    unbiased_mean_func_file : str
+        Path to the slice-time corrected, volume registrated, averaged
+        and bias field corrected functional file
+
+    prior_rigid_body_registration : bool, optional
+        If True, a rigid-body registration of the anat to the func is
+        performed prior to the warp. Useful if the images headers have
+        missing/wrong information.
+    voxel_size_x : float, optional
+        Resampling resolution for the x-axis, in mm.
+    voxel_size_y : float, optional
+        Resampling resolution for the y-axis, in mm.
+    caching : bool, optional
+        Wether or not to use caching.
+    verbose : bool, optional
+        If True, all steps are verbose. Note that caching implies some
+        verbosity in any case.
+    environ_kwargs : extra arguments keywords
+        Extra arguments keywords, passed to interfaces environ variable.
+    Returns
+    -------
+    The following attributes are added
+        - `coreg_func_` : str
+                          Path to paths to the coregistered functional
+                          image.
+        - `coreg_anat_` : str
+                          Path to paths to the coregistered functional
+                          image.
+        - `coreg_transform_` : str
+                               Path to the transform from anat to func.
+    Notes
+    -----
+    If `use_rats_tool` is turned on, RATS tool is used for brain extraction
+    and has to be cited. For more information, see
+    `RATS <http://www.iibi.uiowa.edu/content/rats-overview/>`_
+    """
+
+    environ = {'AFNI_DECONFLICT': 'OVERWRITE'}
+    for (key, value) in environ_kwargs.items():
+        environ[key] = value
+
+    if verbose:
+        terminal_output = 'allatonce'
+    else:
+        terminal_output = 'none'
+
+    if caching:
+        memory = Memory(write_dir)
+        catmatvec = memory.cache(afni.CatMatvec)
+        overwrite = False
+    else:
+        catmatvec = afni.CatMatvec().run
+        overwrite = True
+
+    output_files = []
+
+    #############################################
+    # Rigid-body registration anat -> mean func #
+    #############################################
+    if prior_rigid_body_registration:
+        if anat_brain_file is None:
+            raise ValueError("'anat_brain_mask_file' is needed for prior "
+                             "rigid-body registration")
+        if func_brain_file is None:
+            raise ValueError("'func_brain_mask_file' is needed for prior "
+                             "rigid-body registration")
+        allineated_anat_file, rigid_transform_file = \
+            _rigid_body_register(unifized_anat_file,
+                                 unbiased_mean_func_file,
+                                 anat_brain_file,
+                                 func_brain_file,
+                                 write_dir=write_dir,
+                                 caching=caching,
+                                 terminal_output=terminal_output)
+        output_files.extend([rigid_transform_file,
+                             allineated_anat_file])
+    else:
+        allineated_anat_file = unifized_anat_file
+
+    ############################################
+    # Nonlinear registration anat -> mean func #
+    ############################################
+    registered_anat_oblique_file, mat_file =\
+        _warp(allineated_anat_file, unbiased_mean_func_file, write_dir,
+              caching=caching, verbose=verbose,
+              terminal_output=terminal_output, overwrite=overwrite,
+              environ=environ)
+
+    output_files.append(mat_file)
+    transform_file = fname_presuffix(registered_anat_oblique_file,
+                                     suffix='_func_to_anat.aff12.1D',
+                                     use_ext=False)
+    if prior_rigid_body_registration:
+        _ = catmatvec(in_file=[(rigid_transform_file, 'ONELINE'),
+                               (mat_file, 'ONELINE')],
+                      oneline=True,
+                      out_file=transform_file)
+    else:
+        _ = catmatvec(in_file=[(mat_file, 'ONELINE')],
+                      oneline=True,
+                      out_file=transform_file)
+
+    ##################################################
+    # Per-slice non-linear registration func -> anat #
+    ##################################################
+    warped_mean_func_file, warp_files, _ =\
+        _per_slice_qwarp(unbiased_mean_func_file,
+                         registered_anat_oblique_file, voxel_size_x,
+                         voxel_size_y,
+                         write_dir=write_dir,
+                         overwrite=overwrite,
+                         caching=caching, terminal_output=terminal_output,
+                         environ=environ)
+
+    # Update the outputs
+    if not caching:
+        for out_file in output_files:
+            os.remove(out_file)
+
+    return Bunch(coreg_func_=warped_mean_func_file,
+                 coreg_anat_=registered_anat_oblique_file,
+                 coreg_transform_=transform_file,
+                 coreg_warps_=warp_files)
+
+
+@deprecated("Function 'coregister_fmri_session' is deprecated and will be "
+            "removed in future release. Use class 'Coregistrator' instead.")
 def coregister_fmri_session(session_data, t_r, write_dir, brain_volume,
                             use_rats_tool=True,
                             slice_timing=True,
@@ -333,7 +590,7 @@ def coregister_fmri_session(session_data, t_r, write_dir, brain_volume,
     transform_filename = fname_presuffix(registered_anat_filename,
                                          suffix='_anat_to_func.aff12.1D',
                                          use_ext=False)
-    if False:#prior_rigid_body_registration:
+    if prior_rigid_body_registration:
         _ = catmatvec(in_file=[(mat_filename, 'ONELINE'),
                                (rigid_transform_file, 'ONELINE')],
                       oneline=True,
@@ -510,6 +767,9 @@ def coregister_fmri_session(session_data, t_r, write_dir, brain_volume,
                 os.remove(out_file)
 
 
+@deprecated("Function '_func_to_template' is deprecated and will be "
+            "removed in future release. Use function '_apply_transforms'  "
+            "from 'sammba.registration.base' module")
 def _func_to_template(func_coreg_filename, template_filename, write_dir,
                       func_to_anat_oned_filename,
                       anat_to_template_oned_filename,
@@ -610,6 +870,9 @@ def _func_to_template(func_coreg_filename, template_filename, write_dir,
     return normalized_filename
 
 
+@deprecated("Function 'fmri_sessions_to_template' is deprecated "
+            "and will be removed in future release. Use class "
+            "'TemplateRegistrator' instead.")
 def fmri_sessions_to_template(sessions, t_r, head_template_filename,
                               write_dir,
                               brain_volume, use_rats_tool=True,
@@ -735,13 +998,25 @@ def fmri_sessions_to_template(sessions, t_r, head_template_filename,
         sessions[n] = animal_data
 
     anat_filenames = [animal_data.anat for animal_data in sessions]
+    brain_mask_filenames = [compute_brain_mask(anat, brain_volume, write_dir,
+                                               use_rats_tool=use_rats_tool)
+                            for anat in anat_filenames]
+    brain_filenames = [_apply_mask(anat, brain_mask, write_dir)
+                       for (anat, brain_mask) in zip(anat_filenames,
+                                                     brain_mask_filenames)]
+    if brain_template_filename is None:
+        brain_mask_template_filename = compute_brain_mask(
+            head_template_filename, brain_volume, write_dir,
+            use_rats_tool=use_rats_tool)
+        brain_template_filename = _apply_mask(
+            head_template_filename, brain_mask_template_filename, write_dir)
+
     anats_registration = anats_to_template(
         anat_filenames,
+        brain_filenames,
         head_template_filename,
+        brain_template_filename,
         animal_data.output_dir_,
-        brain_volume,
-        use_rats_tool=use_rats_tool,
-        brain_template_filename=brain_template_filename,
         dilated_head_mask_filename=dilated_head_mask_filename,
         registration_kind=registration_kind,
         maxlev=maxlev,
