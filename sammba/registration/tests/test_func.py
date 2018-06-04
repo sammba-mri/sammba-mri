@@ -20,14 +20,14 @@ def test_coregister():
     mean_func_file = os.path.join( tst.tmpdir, 'mean_func.nii.gz')
     mean_img(func_file).to_filename(mean_func_file)
 
-    c = func.coregister(anat_file, mean_func_file, tst.tmpdir,
-                        slice_timing=False, verbose=False)
-    assert_true(_check_same_fov(nibabel.load(c.coreg_func_),
-                                nibabel.load(c.coreg_anat_)))
-    assert_true(_check_same_obliquity(c.coreg_anat_,
-                                      c.coreg_func_))
-    assert_true(os.path.isfile(c.coreg_transform_))
-    assert_equal(tst.tmpdir, c.output_dir_)
+    bunch = func.coregister(anat_file, mean_func_file, tst.tmpdir,
+                            slice_timing=False, verbose=False)
+    assert_true(_check_same_fov(nibabel.load(bunch.coreg_func_),
+                                nibabel.load(bunch.coreg_anat_)))
+    assert_true(_check_same_obliquity(bunch.coreg_anat_,
+                                      bunch.coreg_func_))
+    assert_true(os.path.isfile(bunch.coreg_transform_))
+    assert_equal(tst.tmpdir, bunch.output_dir_)
 
     # Check environement variables setting
     current_dir = os.getcwd()  # coregister_fmri_session changes the directory
