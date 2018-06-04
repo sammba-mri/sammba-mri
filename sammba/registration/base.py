@@ -10,7 +10,7 @@ from ..interfaces import segmentation
 from .utils import fix_obliquity, _get_afni_output_type, compute_n4_max_shrink
 
 
-def compute_brain_mask(head_file, brain_volume, write_dir, unifize=True,
+def compute_brain_mask(head_file, brain_volume, write_dir, bias_correct=True,
                        caching=False,
                        terminal_output='allatonce',
                        use_rats_tool=True, **unifize_kwargs):
@@ -63,10 +63,9 @@ def compute_brain_mask(head_file, brain_volume, write_dir, unifize=True,
         unifize = afni.Unifize(terminal_output=terminal_output).run
         environ['AFNI_DECONFLICT'] = 'OVERWRITE'
 
-    if unifize:
+    if bias_correct:
         if unifize_kwargs is None:
             unifize_kwargs = {}
-
         out_unifize = unifize(
             in_file=head_file,
             out_file=fname_presuffix(head_file,
@@ -74,21 +73,74 @@ def compute_brain_mask(head_file, brain_volume, write_dir, unifize=True,
                                      newpath=write_dir),
             environ=environ,
             **unifize_kwargs)
-        head_file = out_unifize.outputs.out_file
+        file_to_mask = out_unifize.outputs.out_file
+    else:
+        file_to_mask = head_file
 
-    out_clip_level = clip_level(in_file=head_file)
+    out_clip_level = clip_level(in_file=file_to_mask)
     out_compute_mask = compute_mask(
-        in_file=head_file,
-        out_file=fname_presuffix(head_file,
+        in_file=file_to_mask,
+        out_file=fname_presuffix(file_to_mask,
                                  suffix='_brain_mask',
                                  newpath=write_dir),
         volume_threshold=brain_volume,
         intensity_threshold=int(out_clip_level.outputs.clip_val))
 
-    if not caching and unifize:
+    if not caching and bias_correct:
         os.remove(out_unifize.outputs.out_file)
 
     return out_compute_mask.outputs.out_file
+
+
+def _apply_mask(head_file, brain_mask_file, write_dir, bias_correct=True,
+                caching=False, terminal_output='allatonce'):
+    """
+    Parameters
+    ----------
+    brain_volume : int
+        Volume of the brain used for brain extraction.
+        Typically 400 for mouse and 1800 for rat.
+
+    use_rats_tool : bool, optional
+        If True, brain mask is computed using RATS Mathematical Morphology.
+        Otherwise, a histogram-based brain segmentation is used.
+
+    caching : bool, optional
+        Wether or not to use caching.
+
+    unifize_kwargs : dict, optional
+        Is passed to sammba.externals.nipype.interfaces.afni.Unifize.
+
+    Returns
+    -------
+    path to brain extracted image.
+
+    Notes
+    -----
+    If `use_rats_tool` is turned on, RATS tool is used for brain extraction
+    and has to be cited. For more information, see
+    `RATS <http://www.iibi.uiowa.edu/content/rats-overview/>`_
+    """
+    environ = {}
+    if caching:
+        memory = Memory(write_dir)
+        calc = memory.cache(afni.Cacl)
+        calc.interface().set_default_terminal_output(terminal_output)
+    else:
+        calc = afni.Calc(terminal_output=terminal_output).run
+        environ['AFNI_DECONFLICT'] = 'OVERWRITE'
+
+    out_calc_mask = calc(in_file_a=head_file,
+                         in_file_b=brain_mask_file,
+                         expr='a*b',
+                         out_file=fname_presuffix(head_file,
+                                                  suffix='_brain',
+                                                  newpath=write_dir))
+
+    if not caching:
+        os.remove(brain_mask_file)
+
+    return out_calc_mask.outputs.out_file
 
 
 def _delete_orientation(in_file, write_dir, min_zoom=.1, caching=False,
@@ -143,8 +195,9 @@ def _bias_correct(in_file, write_dir, caching=False,
     return out_bias_correct.outputs.output_image
 
 
-def unifize(in_file, write_dir, caching=False, terminal_output='allatonce',
-            **unifize_kwargs):
+def _afni_bias_correct(in_file, write_dir, caching=False,
+                       terminal_output='allatonce',
+                       **unifize_kwargs):
     environ = {}
     if caching:
         memory = Memory(write_dir)
