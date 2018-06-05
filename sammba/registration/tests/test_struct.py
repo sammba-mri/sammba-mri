@@ -55,7 +55,6 @@ def test_anat_to_template():
                                               anat_file, brain_file, anat_file,
                                               tst.tmpdir,
                                               registration_kind='rigid',
-                                              use_rats_tool=False,
                                               verbose=0)
     transform = np.loadtxt(register_result.pre_transforms[0])
     assert_array_almost_equal(transform,

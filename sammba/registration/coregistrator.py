@@ -204,21 +204,23 @@ class Coregistrator(BaseRegistrator):
             self._perf_undistort_warps = coregistration.coreg_warps_
             self.anat_in_perf_space = coregistration.coreg_anat_
             self._perf_to_anat_transform = coregistration.coreg_transform_
-        else:
-            raise ValueError("Only 'func' and 'perf' modalities are "
-                             "implemented")
 
         return self
 
     def transform_modality_like(self, apply_to_file, modality):
         """ Applies modality coregristration to a file in the modality space.
         """
+        if modality not in ['perf', 'func']:
+            raise ValueError("Only 'func' and 'perf' modalities are "
+                 "implemented")
+
         self._check_anat_fitted()
         modality_coreg_warps = '_coreg_{}_warps'.format(modality)
         if not hasattr(self, modality_coreg_warps):
-            raise ValueError('It seems that %s has not been transformed. '
+            raise ValueError('It seems that {0} has not been {1} fitted. '
                              'You must call fit_modality() before calling '
-                             'transform_modality().' % self.__class__.__name__)
+                             'transform_modality().'.format(
+                                     self.__class__.__name__, modality))
 
         coreg_apply_to_file = _apply_perslice_warp(
             apply_to_file, self.__getattribute__(modality_coreg_warps), .1, .1,
