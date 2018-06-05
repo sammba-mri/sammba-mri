@@ -670,6 +670,12 @@ def anat_to_template(anat_filename, brain_filename,
     results. This dictum applies in general: the template and anatomical images
     should be pre-processed the same way, as far as practicable.
     """
+    registration_kinds = ['rigid', 'affine', 'nonlinear']
+    if registration_kind not in registration_kinds:
+        raise ValueError(
+            'Registration kind must be one of {0}, you entered {1}'.format(
+                registration_kinds, registration_kind))
+
     environ = {}
     if verbose:
         terminal_output = 'stream'

@@ -31,7 +31,7 @@ def test_anats_to_common():
         verbose=0)
     transform = np.loadtxt(rigid.transforms[0])
     assert_array_almost_equal(transform,
-                              [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0])
+                              [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0], decimal=1)
 
 
 @with_setup(tst.setup_tmpdata, tst.teardown_tmpdata)

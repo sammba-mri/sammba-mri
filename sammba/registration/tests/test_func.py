@@ -27,7 +27,6 @@ def test_coregister():
     assert_true(_check_same_obliquity(bunch.coreg_anat_,
                                       bunch.coreg_func_))
     assert_true(os.path.isfile(bunch.coreg_transform_))
-    assert_equal(tst.tmpdir, bunch.output_dir_)
 
     # Check environement variables setting
     current_dir = os.getcwd()  # coregister_fmri_session changes the directory
