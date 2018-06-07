@@ -30,9 +30,9 @@ def test_coregister():
 
     # Check environement variables setting
     current_dir = os.getcwd()  # coregister_fmri_session changes the directory
-    assert_raises_regex(RuntimeError,
-                        "already exists", anat_file, mean_func_file,
-                        tst.tmpdir, slice_timing=False,  AFNI_DECONFLICT='NO')
+    assert_raises_regex(RuntimeError, "already exists", func.coregister,
+                        anat_file, mean_func_file, tst.tmpdir,
+                        slice_timing=False,  AFNI_DECONFLICT='NO')
     os.chdir(current_dir)
 
 

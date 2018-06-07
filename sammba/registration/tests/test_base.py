@@ -11,5 +11,5 @@ def test_compute_brain_mask():
     anat_file = os.path.join(os.path.dirname(testing_data.__file__),
                              'anat.nii.gz')
     brain_mask_file = base.compute_brain_mask(
-        anat_file, 400, tst.tmpdir, use_rats_tool=False, unifize=False)
+        anat_file, 400, tst.tmpdir, use_rats_tool=False)
     assert_true(os.path.isfile(brain_mask_file))

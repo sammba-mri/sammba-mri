@@ -52,8 +52,8 @@ def test_anat_to_template():
 
     # test common space of one image is itself
     register_result = struct.anat_to_template(anat_file,  brain_file,
-                                              anat_file, brain_file, anat_file,
-                                              tst.tmpdir,
+                                              anat_file, brain_file,
+                                              write_dir=tst.tmpdir,
                                               registration_kind='rigid',
                                               verbose=0)
     transform = np.loadtxt(register_result.pre_transforms[0])
