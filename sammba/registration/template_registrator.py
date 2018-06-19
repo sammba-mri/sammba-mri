@@ -302,18 +302,6 @@ class TemplateRegistrator(BaseRegistrator):
             voxel_size=voxel_size, caching=self.caching)
         return normalized_file
 
-    def fit_transform_modality_like(self, modality_file, modality,
-                                    apply_to_file,
-                                    interpolation='wsinc5',
-                                    voxel_size=None, **fit_params):
-        """ Estimates registration from the space of the given modality to the
-            template space then transforms the given file.
-        """
-        self._check_anat_fitted()
-        return self.fit_modality(
-            modality_file, modality, **fit_params).transform_modality_like(
-            apply_to_file, interpolation=interpolation, voxel_size=voxel_size)
-
     def inverse_transform_towards_modality(self, in_file, modality,
                                            interpolation='wsinc5'):
         """ Trasnforms the given file from template space to modality space.
