@@ -22,6 +22,7 @@ from builtins import map, range
 import os
 import os.path as op
 import re
+import fnmatch
 from glob import glob
 import tempfile
 
@@ -429,14 +430,18 @@ class Slice(FSLCommand):
         outputs = self._outputs().get()
         ext = Info.output_type_to_ext(self.inputs.output_type)
         suffix = '_slice_*' + ext
+        exact_pattern = '_slice_[0-9][0-9][0-9][0-9]' + ext
         if isdefined(self.inputs.out_base_name):
             fname_template = os.path.abspath(
                 self.inputs.out_base_name + suffix)
+            fname_exact_pattern = os.path.abspath(
+                self.inputs.out_base_name + exact_pattern)
         else:
             fname_template = fname_presuffix(self.inputs.in_file,
                                              suffix=suffix, use_ext=False)
-
-        outputs['out_files'] = sorted(glob(fname_template))
+            fname_exact_pattern = fname_presuffix(self.inputs.in_file,
+                                                  suffix=exact_pattern, use_ext=False)
+        outputs['out_files'] = fnmatch.filter(sorted(glob(fname_template)), fname_exact_pattern)
 
         return outputs
 

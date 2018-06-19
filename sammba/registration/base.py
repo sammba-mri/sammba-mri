@@ -279,12 +279,16 @@ def _afni_bias_correct(in_file, write_dir, caching=False,
 def _rigid_body_register(moving_head_file, reference_head_file,
                          moving_brain_mask, reference_brain_mask,
                          write_dir=None,
-                         caching=False, terminal_output='allatonce'):
+                         caching=False, terminal_output='allatonce', environ=None):
     # XXX: add verbosity
     if write_dir is None:
         write_dir = os.path.dirname(moving_head_file)
 
-    environ = {}
+    if environ is None:
+        environ = {}
+        if caching:
+            environ['AFNI_DECONFLICT'] = 'OVERWRITE'
+
     if caching:
         memory = Memory(write_dir)
         allineate = memory.cache(afni.Allineate)
@@ -296,7 +300,6 @@ def _rigid_body_register(moving_head_file, reference_head_file,
         allineate = afni.Allineate(terminal_output=terminal_output).run
         allineate2 = afni.Allineate(terminal_output=terminal_output).run
         catmatvec = afni.CatMatvec().run
-        environ['AFNI_DECONFLICT'] = 'OVERWRITE'
 
     moving_brain_file = _apply_mask(moving_head_file, moving_head_file,
                                     write_dir=write_dir,
@@ -329,12 +332,11 @@ def _rigid_body_register(moving_head_file, reference_head_file,
     # apply the inverse transform to register the anatomical to the func
     catmatvec_out_file = fname_presuffix(rigid_transform_file, suffix='INV',
                                          newpath=write_dir)
-    if not os.path.isfile(catmatvec_out_file):
-        _ = catmatvec(in_file=[(rigid_transform_file, 'I')],
-                      oneline=True,
-                      out_file=catmatvec_out_file)
-        # XXX not cached I don't understand why
-        output_files.append(catmatvec_out_file)
+    _ = catmatvec(in_file=[(rigid_transform_file, 'I')],
+                  oneline=True,
+                  out_file=catmatvec_out_file,
+                  environ=environ)
+    output_files.append(catmatvec_out_file)
     out_allineate_apply = allineate(
         in_file=moving_head_file,
         master=reference_head_file,
@@ -353,18 +355,22 @@ def _rigid_body_register(moving_head_file, reference_head_file,
 
 def _warp(to_warp_file, reference_file, write_dir=None, caching=False,
           terminal_output='allatonce', verbose=True,
-          overwrite=True, environ={}):
-    # XXX: add verbosity and handle environ correctly
-    environ = {}
+          overwrite=True, environ=None):
+    # XXX: add verbosity
     if write_dir is None:
         write_dir = os.path.dirname(to_warp_file)
+
+    if environ is None:
+        environ = {}
+        if caching:
+            environ['AFNI_DECONFLICT'] = 'OVERWRITE'
 
     if caching:
         memory = Memory(write_dir)
         warp = memory.cache(afni.Warp)
     else:
         warp = afni.Warp().run
-        environ['AFNI_DECONFLICT'] = 'OVERWRITE'
+
 
     # 3dWarp doesn't put the obliquity in the header, so do it manually
     # This step generates one file per slice and per time point, so we are
@@ -375,19 +381,20 @@ def _warp(to_warp_file, reference_file, write_dir=None, caching=False,
                     gridset=reference_file,
                     out_file=fname_presuffix(to_warp_file, suffix='_warped',
                                              newpath=write_dir),
-                    verbose=True,
+                    verbose=True,  # mandatory to get the runtime.stdout
                     environ=environ)
     warped_file = out_warp.outputs.out_file
     warped_oblique_file = fix_obliquity(
         warped_file, reference_file,
-        overwrite=overwrite, verbose=verbose, caching=caching,
-        caching_dir=write_dir)
+        verbose=verbose, caching=caching,
+        caching_dir=write_dir, environ=environ)
 
     # Concatenate all the anat to func tranforms
     mat_file = fname_presuffix(warped_oblique_file, suffix='_warp.mat',
                                use_ext=False,
                                newpath=write_dir)
-    if not os.path.isfile(mat_file):
+    # XXX Handle this correctly according to caching
+    if not os.path.isfile(mat_file) or overwrite:
         np.savetxt(mat_file, [out_warp.runtime.stdout], fmt='%s')
     return warped_oblique_file, mat_file
 
@@ -396,10 +403,14 @@ def _per_slice_qwarp(to_qwarp_file, reference_file,
                      voxel_size_x, voxel_size_y, apply_to_file=None,
                      write_dir=None,
                      caching=False, overwrite=True,
-                     verbose=True, terminal_output='allatonce', environ={}):
-    environ = {}
+                     verbose=True, terminal_output='allatonce', environ=None):
     if write_dir is None:
         write_dir = os.path.dirname(to_qwarp_file),
+
+    if environ is None:
+        environ = {}
+        if caching:
+            environ['AFNI_DECONFLICT'] = 'OVERWRITE'
 
     if caching:
         memory = Memory(write_dir)
@@ -416,7 +427,6 @@ def _per_slice_qwarp(to_qwarp_file, reference_file,
         warp_apply = afni.NwarpApply(terminal_output=terminal_output).run
         qwarp = afni.Qwarp(terminal_output=terminal_output).run
         merge = fsl.Merge(terminal_output=terminal_output).run
-        environ['AFNI_DECONFLICT'] = 'OVERWRITE'
 
     # Slice anatomical image
     reference_img = nibabel.load(reference_file)
@@ -468,10 +478,7 @@ def _per_slice_qwarp(to_qwarp_file, reference_file,
     warped_slices = []
     warp_files = []
     output_files = []
-    print('*' * 50)
-    print('*' * 50)
-    print('*' * 20, nibabel.load(to_qwarp_file).shape)
-    print('*' * 20, nibabel.load(reference_file).shape)
+    resampled_sliced_to_qwarp_files_to_remove = resampled_sliced_to_qwarp_files
     for (resampled_sliced_to_qwarp_file,
          resampled_sliced_reference_file) in zip(
             resampled_sliced_to_qwarp_files,
@@ -484,7 +491,9 @@ def _per_slice_qwarp(to_qwarp_file, reference_file,
         if to_qwarp_data.max() == 0 or ref_data.max() == 0:
             # deal with slices where there is no signal
             warped_slices.append(resampled_sliced_to_qwarp_file)
+            resampled_sliced_to_qwarp_files_to_remove.remove(resampled_sliced_to_qwarp_file)
             warp_files.append(None)
+            print('*******************************************')
         else:
             out_qwarp = qwarp(
                 in_file=resampled_sliced_to_qwarp_file,
@@ -499,7 +508,8 @@ def _per_slice_qwarp(to_qwarp_file, reference_file,
                                '-parfix 7 0 -parfix 9 0 '
                                '-parfix 10 0 -parfix 12 0',
                 out_file=warped_slice,
-                environ=environ)
+                environ=environ,
+                verb=verbose)
             # XXX fix qwarp bug : out_qwarp.outputs.warped_source extension is
             # +tlrc.HEAD if base_file and in_file are of different extensions
             warped_slices.append(warped_slice)
@@ -523,15 +533,18 @@ def _per_slice_qwarp(to_qwarp_file, reference_file,
         resampled_warped_slices.append(out_resample.outputs.out_file)
 
     # fix the obliquity
+    print([os.path.isfile(f) for f in resampled_sliced_to_qwarp_files])
     oblique_resampled_warped_slices = []
     for (sliced_reference_file, resampled_warped_slice) in zip(
             sliced_reference_files, resampled_warped_slices):
         oblique_slice = fix_obliquity(resampled_warped_slice,
                                       sliced_reference_file,
-                                      overwrite=overwrite, verbose=verbose,
+                                      verbose=verbose,
                                       caching=caching,
-                                      caching_dir=per_slice_dir)
+                                      caching_dir=per_slice_dir,
+                                      environ=environ)
         oblique_resampled_warped_slices.append(oblique_slice)
+    print([os.path.isfile(f) for f in resampled_sliced_to_qwarp_files])
 
     out_merge_func = merge(
         in_files=oblique_resampled_warped_slices,
@@ -539,20 +552,22 @@ def _per_slice_qwarp(to_qwarp_file, reference_file,
         merged_file=fname_presuffix(to_qwarp_file, suffix='_perslice',
                                     newpath=write_dir),
         environ=environ)
+    print([os.path.isfile(f) for f in resampled_sliced_to_qwarp_files])
 
     # Fix the obliquity
     oblique_merged = fix_obliquity(out_merge_func.outputs.merged_file,
                                    reference_file,
-                                   overwrite=overwrite, verbose=verbose,
-                                   caching=caching, caching_dir=per_slice_dir)
+                                   verbose=verbose,
+                                   caching=caching, caching_dir=per_slice_dir,
+                                   environ=environ)
 
     # Collect the outputs
     output_files.extend(sliced_reference_files +
                         sliced_to_qwarp_files +
                         resampled_sliced_reference_files +
-                        resampled_sliced_to_qwarp_files +
-                        warped_slices + resampled_warped_slices)
-
+                        resampled_sliced_to_qwarp_files_to_remove +
+                        warped_slices + oblique_resampled_warped_slices)
+    print(len(output_files), len(np.unique(output_files)))
     # Apply the precomputed warp slice by slice
     if apply_to_file is not None:
         # slice functional
@@ -582,9 +597,10 @@ def _per_slice_qwarp(to_qwarp_file, reference_file,
                 sliced_apply_to_files, warped_apply_to_slices):
             oblique_slice = fix_obliquity(warped_apply_to_slice,
                                           sliced_apply_to_file,
-                                          overwrite=overwrite, verbose=verbose,
+                                          verbose=verbose,
                                           caching=caching,
-                                          caching_dir=per_slice_dir)
+                                          caching_dir=per_slice_dir,
+                                          environ=environ)
             oblique_warped_apply_to_slices.append(oblique_slice)
 
         # Finally, merge all slices !
@@ -598,11 +614,11 @@ def _per_slice_qwarp(to_qwarp_file, reference_file,
         # Fix the obliquity
         merged_apply_to_file = fix_obliquity(
             out_merge_apply_to.outputs.merged_file, apply_to_file,
-            overwrite=overwrite, verbose=verbose, caching=caching,
-            caching_dir=per_slice_dir)
+            verbose=verbose, caching=caching,
+            caching_dir=per_slice_dir, environ=environ)
 
         # Update the outputs
-        output_files.extend(sliced_apply_to_files + warped_apply_to_slices)
+        output_files.extend(sliced_apply_to_files + oblique_warped_apply_to_slices)
     else:
         merged_apply_to_file = None
 
@@ -619,13 +635,17 @@ def _apply_perslice_warp(apply_to_file, warp_files,
                          write_dir=None,
                          caching=False, overwrite=True,
                          verbose=True, terminal_output='allatonce',
-                         environ={}):
+                         environ=None):
 
     # Apply the precomputed warp slice by slice
 
-    environ = {}
     if write_dir is None:
         write_dir = os.path.dirname(apply_to_file),
+
+    if environ is None:
+        environ = {}
+        if caching:
+            environ['AFNI_DECONFLICT'] = 'OVERWRITE'
 
     if caching:
         memory = Memory(write_dir)
@@ -685,9 +705,10 @@ def _apply_perslice_warp(apply_to_file, warp_files,
             sliced_apply_to_files, warped_apply_to_slices):
         oblique_slice = fix_obliquity(warped_apply_to_slice,
                                       sliced_apply_to_file,
-                                      overwrite=overwrite, verbose=verbose,
+                                      verbose=verbose,
                                       caching=caching,
-                                      caching_dir=per_slice_dir)
+                                      caching_dir=per_slice_dir,
+                                      environ=environ)
         oblique_warped_apply_to_slices.append(oblique_slice)
 
     # Finally, merge all slices !
@@ -701,11 +722,11 @@ def _apply_perslice_warp(apply_to_file, warp_files,
     # Fix the obliquity
     merged_apply_to_file = fix_obliquity(
         out_merge_apply_to.outputs.merged_file, apply_to_file,
-        overwrite=overwrite, verbose=verbose, caching=caching,
-        caching_dir=per_slice_dir)
+        verbose=verbose, caching=caching,
+        caching_dir=per_slice_dir, environ=environ)
 
     # Update the outputs
-    output_files.extend(sliced_apply_to_files + warped_apply_to_slices)
+    output_files.extend(sliced_apply_to_files + oblique_warped_apply_to_slices)
 
     if not caching:
         for out_file in output_files:

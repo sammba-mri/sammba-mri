@@ -6,7 +6,7 @@ import nibabel
 from nilearn.datasets.tests import test_utils as tst
 from nilearn._utils.testing import assert_raises_regex
 from sammba import testing_data
-from sammba.registration.base_registrator import Coregistrator
+from sammba.registration.coregistrator import Coregistrator
 
 
 @with_setup(tst.setup_tmpdata, tst.teardown_tmpdata)

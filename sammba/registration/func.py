@@ -14,7 +14,12 @@ from .base import (_rigid_body_register, _warp, _per_slice_qwarp)
 
 
 def _realign(func_filename, write_dir, caching=False,
-             terminal_output='allatonce', environ={}):
+             terminal_output='allatonce', environ=None):
+    if environ is None:
+        environ = {}
+        if caching:
+            environ['AFNI_DECONFLICT'] = 'OVERWRITE'
+
     if caching:
         memory = Memory(write_dir)
         clip_level = memory.cache(afni.ClipLevel)
@@ -104,15 +109,18 @@ def _realign(func_filename, write_dir, caching=False,
 
 
 def _slice_time(func_file, t_r, write_dir, caching=False,
-                terminal_output='allatonce'):
-    environ = {}
+                terminal_output='allatonce', environ=None):
+    if environ is None:
+        environ = {}
+        if caching:
+            environ['AFNI_DECONFLICT'] = 'OVERWRITE'
+
     if caching:
         memory = Memory(write_dir)
         tshift = memory.cache(afni.TShift)
         tshift.interface().set_default_terminal_output(terminal_output)
     else:
         tshift = afni.TShift(terminal_output=terminal_output).run
-        environ['AFNI_DECONFLICT'] = 'OVERWRITE'
 
     out_tshift = tshift(
         in_file=func_file,
@@ -176,10 +184,7 @@ def coregister(unifized_anat_file, unbiased_mean_func_file, write_dir,
     `RATS <http://www.iibi.uiowa.edu/content/rats-overview/>`_
     """
 
-    environ = {'AFNI_DECONFLICT': 'OVERWRITE'}
-    for (key, value) in environ_kwargs.items():
-        environ[key] = value
-
+    environ = {}
     if verbose:
         terminal_output = 'allatonce'
     else:
@@ -192,6 +197,10 @@ def coregister(unifized_anat_file, unbiased_mean_func_file, write_dir,
     else:
         catmatvec = afni.CatMatvec().run
         overwrite = True
+        environ = {'AFNI_DECONFLICT': 'OVERWRITE'}
+
+    for (key, value) in environ_kwargs.items():
+        environ[key] = value
 
     output_files = []
 
@@ -212,7 +221,8 @@ def coregister(unifized_anat_file, unbiased_mean_func_file, write_dir,
                                  func_brain_file,
                                  write_dir=write_dir,
                                  caching=caching,
-                                 terminal_output=terminal_output)
+                                 terminal_output=terminal_output,
+                                 environ=environ)
         output_files.extend([rigid_transform_file,
                              allineated_anat_file])
     else:
@@ -235,11 +245,13 @@ def coregister(unifized_anat_file, unbiased_mean_func_file, write_dir,
         _ = catmatvec(in_file=[(rigid_transform_file, 'ONELINE'),
                                (mat_file, 'ONELINE')],
                       oneline=True,
-                      out_file=transform_file)
+                      out_file=transform_file,
+                      environ=environ)
     else:
         _ = catmatvec(in_file=[(mat_file, 'ONELINE')],
                       oneline=True,
-                      out_file=transform_file)
+                      out_file=transform_file,
+                      environ=environ)
 
     ##################################################
     # Per-slice non-linear registration func -> anat #
@@ -249,7 +261,7 @@ def coregister(unifized_anat_file, unbiased_mean_func_file, write_dir,
                          registered_anat_oblique_file, voxel_size_x,
                          voxel_size_y,
                          write_dir=write_dir,
-                         overwrite=overwrite,
+                         overwrite=overwrite, verbose=verbose,
                          caching=caching, terminal_output=terminal_output,
                          environ=environ)
 
@@ -582,6 +594,7 @@ def coregister_fmri_session(session_data, t_r, write_dir, brain_volume,
     # Concatenate all the anat to func tranforms
     mat_filename = fname_presuffix(registered_anat_filename,
                                    suffix='_warp.mat', use_ext=False)
+    # XXX Handle this correctly according to caching
     if not os.path.isfile(mat_filename):
         np.savetxt(mat_filename, [out_warp.runtime.stdout], fmt='%s')
         output_files.append(mat_filename)

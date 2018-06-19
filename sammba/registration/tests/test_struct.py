@@ -52,8 +52,8 @@ def test_anat_to_template():
                                               write_dir=tst.tmpdir,
                                               registration_kind='rigid',
                                               verbose=0)
-    transform = np.loadtxt(register_result.pre_transforms[0])
-    assert_array_almost_equal(transform,
+    pretransform = np.loadtxt(register_result.pretransform)
+    assert_array_almost_equal(pretransform,
                               [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0], decimal=1)
-    assert_true(os.path.isfile(register_result.registered[0]))
-    assert_true(register_result.transforms[0] is None)
+    assert_true(os.path.isfile(register_result.registered))
+    assert_true(register_result.transform is None)

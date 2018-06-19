@@ -101,8 +101,8 @@ def _reset_affines(in_file, out_file, overwrite=False, axes_to_permute=None,
 
 
 def fix_obliquity(to_fix_filename, reference_filename, caching=False,
-                  caching_dir=None, overwrite=False,
-                  verbose=True):
+                  caching_dir=None,
+                  verbose=True, environ=None):
     if caching_dir is None:
         caching_dir = os.getcwd()
     if caching:
@@ -113,10 +113,11 @@ def fix_obliquity(to_fix_filename, reference_filename, caching=False,
     else:
         terminal_output = 'none'
 
-    if caching:
-        environ = {'AFNI_DECONFLICT': 'OVERWRITE'}
-    else:
-        environ = {}
+    if environ is None:
+        if caching:
+            environ = {}
+        else:
+            environ = {'AFNI_DECONFLICT': 'OVERWRITE'}
 
     if caching:
         copy = memory.cache(afni.Copy)
@@ -135,11 +136,10 @@ def fix_obliquity(to_fix_filename, reference_filename, caching=False,
     orig_reference_filename = fname_presuffix(os.path.join(
         tmp_folder, reference_basename), suffix='+orig.BRIK',
         use_ext=False)
-    if not os.path.isfile(orig_reference_filename) or overwrite:
-        out_copy_oblique = copy(in_file=reference_filename,
-                                out_file=orig_reference_filename,
-                                environ=environ)
-        orig_reference_filename = out_copy_oblique.outputs.out_file
+    out_copy_oblique = copy(in_file=reference_filename,
+                            out_file=orig_reference_filename,
+                            environ=environ)
+    orig_reference_filename = out_copy_oblique.outputs.out_file
 
     to_fix_basename = os.path.basename(to_fix_filename)
     orig_to_fix_filename = fname_presuffix(os.path.join(
@@ -154,16 +154,13 @@ def fix_obliquity(to_fix_filename, reference_filename, caching=False,
                       atrcopy=(orig_reference_filename,
                                'IJK_TO_DICOM_REAL'))
 
-    if caching:
-        out_copy = copy(in_file=out_refit.outputs.out_file,
-                        out_file=fname_presuffix(to_fix_filename,
-                                                 suffix='_oblique'))
-    else:
-        out_copy = copy(in_file=out_refit.outputs.out_file,
-                        environ={'AFNI_DECONFLICT': 'OVERWRITE'},
-                        out_file=to_fix_filename)
+    out_copy = copy(in_file=out_refit.outputs.out_file,
+                    out_file=fname_presuffix(to_fix_filename,
+                                             suffix='_oblique'),
+                    environ=environ)
 
     if not caching:
+        os.remove(to_fix_filename)
         shutil.rmtree(tmp_folder)
 
     return out_copy.outputs.out_file

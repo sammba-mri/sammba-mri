@@ -117,7 +117,8 @@ def coregister(unifized_anat_file,
                                      use_ext=False)
     _ = catmatvec(in_file=[(mat_file, 'ONELINE')],
                   oneline=True,
-                  out_file=transform_file)
+                  out_file=transform_file,
+                  environ=environ)
 
     ##################################################
     # Per-slice non-linear registration func -> anat #
