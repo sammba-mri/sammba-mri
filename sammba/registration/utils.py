@@ -101,7 +101,7 @@ def _reset_affines(in_file, out_file, overwrite=False, axes_to_permute=None,
 
 
 def fix_obliquity(to_fix_filename, reference_filename, caching=False,
-                  caching_dir=None,
+                  caching_dir=None, overwrite=False,
                   verbose=True, environ=None):
     if caching_dir is None:
         caching_dir = os.getcwd()

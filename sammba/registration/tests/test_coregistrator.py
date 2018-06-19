@@ -11,7 +11,7 @@ from sammba.registration.coregistrator import Coregistrator
 
 @with_setup(tst.setup_tmpdata, tst.teardown_tmpdata)
 def test_segment():
-    registrator = Coregistrator(brain_volume=400, write_dir=tst.tmpdir)
+    registrator = Coregistrator(brain_volume=400, output_dir=tst.tmpdir)
     anat_file = os.path.join(os.path.dirname(testing_data.__file__),
                              'anat.nii.gz')
     unifized_file, brain_file = registrator.segment(anat_file)
@@ -25,7 +25,7 @@ def test_coregistrator():
     func_file = os.path.join(os.path.dirname(testing_data.__file__),
                              'func.nii.gz')
 
-    registrator = Coregistrator(write_dir=tst.tmpdir)
+    registrator = Coregistrator(output_dir=tst.tmpdir)
     assert_raises_regex(
         ValueError, 'has not been fitted. ', registrator.fit_modality,
         func_file, 'func')
