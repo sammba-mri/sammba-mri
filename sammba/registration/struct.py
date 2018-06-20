@@ -789,7 +789,6 @@ def anat_to_template(anat_filename, brain_filename,
         environ=environ,
         **verbosity_quietness_kwargs)
     allineated_filename = out_allineate_apply.outputs.out_file
-    intermediate_files.append(allineated_filename)
 
     # Non-linear registration of affine pre-registered whole head image
     # to template. Don't initiate straight from the original with an
