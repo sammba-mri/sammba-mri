@@ -225,7 +225,7 @@ def _delete_orientation(in_file, write_dir, min_zoom=.1, caching=False,
 
 
 def _bias_correct(in_file, write_dir, caching=False,
-                  terminal_output='allatonce'):
+                  terminal_output='allatonce', verbose=True):
     if ants.base.Info().version is None:
         BiasCorrect = afni.Unifize
     else:
@@ -242,6 +242,7 @@ def _bias_correct(in_file, write_dir, caching=False,
     if ants.base.Info().version is None:
         out_bias_correct = bias_correct(
             in_file=in_file,
+            quiet=not(verbose),
             out_file=fname_presuffix(in_file, suffix='_unbiased',
                                      newpath=write_dir))
         return out_bias_correct.outputs.out_file
@@ -249,13 +250,14 @@ def _bias_correct(in_file, write_dir, caching=False,
         out_bias_correct = bias_correct(
             input_image=in_file,
             shrink_factor=compute_n4_max_shrink(in_file),
+            verbose=verbose,
             output_image=fname_presuffix(in_file, suffix='_unbiased',
                                          newpath=write_dir))
         return out_bias_correct.outputs.output_image
 
 
 def _afni_bias_correct(in_file, write_dir, caching=False,
-                       terminal_output='allatonce',
+                       terminal_output='allatonce', verbose=True,
                        **unifize_kwargs):
     environ = {}
     if caching:
@@ -271,6 +273,7 @@ def _afni_bias_correct(in_file, write_dir, caching=False,
                                                    suffix='_unifized',
                                                    newpath=write_dir),
                           environ=environ,
+                          quiet=not(verbose),
                           **unifize_kwargs)
 
     return out_unifize.outputs.out_file
@@ -493,7 +496,6 @@ def _per_slice_qwarp(to_qwarp_file, reference_file,
             warped_slices.append(resampled_sliced_to_qwarp_file)
             resampled_sliced_to_qwarp_files_to_remove.remove(resampled_sliced_to_qwarp_file)
             warp_files.append(None)
-            print('*******************************************')
         else:
             out_qwarp = qwarp(
                 in_file=resampled_sliced_to_qwarp_file,
@@ -533,7 +535,6 @@ def _per_slice_qwarp(to_qwarp_file, reference_file,
         resampled_warped_slices.append(out_resample.outputs.out_file)
 
     # fix the obliquity
-    print([os.path.isfile(f) for f in resampled_sliced_to_qwarp_files])
     oblique_resampled_warped_slices = []
     for (sliced_reference_file, resampled_warped_slice) in zip(
             sliced_reference_files, resampled_warped_slices):
@@ -544,7 +545,6 @@ def _per_slice_qwarp(to_qwarp_file, reference_file,
                                       caching_dir=per_slice_dir,
                                       environ=environ)
         oblique_resampled_warped_slices.append(oblique_slice)
-    print([os.path.isfile(f) for f in resampled_sliced_to_qwarp_files])
 
     out_merge_func = merge(
         in_files=oblique_resampled_warped_slices,
@@ -552,7 +552,6 @@ def _per_slice_qwarp(to_qwarp_file, reference_file,
         merged_file=fname_presuffix(to_qwarp_file, suffix='_perslice',
                                     newpath=write_dir),
         environ=environ)
-    print([os.path.isfile(f) for f in resampled_sliced_to_qwarp_files])
 
     # Fix the obliquity
     oblique_merged = fix_obliquity(out_merge_func.outputs.merged_file,
@@ -567,7 +566,7 @@ def _per_slice_qwarp(to_qwarp_file, reference_file,
                         resampled_sliced_reference_files +
                         resampled_sliced_to_qwarp_files_to_remove +
                         warped_slices + oblique_resampled_warped_slices)
-    print(len(output_files), len(np.unique(output_files)))
+
     # Apply the precomputed warp slice by slice
     if apply_to_file is not None:
         # slice functional

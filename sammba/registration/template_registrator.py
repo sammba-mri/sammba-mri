@@ -129,7 +129,7 @@ class TemplateRegistrator(BaseRegistrator):
         else:
             self._unifized_anat_ = _afni_bias_correct(
                 self.anat_, write_dir=self.output_dir,
-                terminal_output=self.terminal_output, caching=self.caching)
+                terminal_output=self.terminal_output, caching=self.caching, verbose=self.verbose)
             self.anat_brain_ = _apply_mask(
                 self._unifized_anat_, brain_mask_file,
                 write_dir=self.output_dir,
@@ -210,7 +210,8 @@ class TemplateRegistrator(BaseRegistrator):
         unbiased_file = _bias_correct(to_coregister_file,
                                       write_dir=self.output_dir,
                                       terminal_output=self.terminal_output,
-                                      caching=self.caching)
+                                      caching=self.caching,
+                                      verbose=self.verbose)
 
         if prior_rigid_body_registration:
             if self.mask_clipping_fraction:

@@ -129,7 +129,8 @@ class Coregistrator(BaseRegistrator):
         unbiased_file = _bias_correct(to_coregister_file,
                                       write_dir=self.output_dir,
                                       terminal_output=self.terminal_output,
-                                      caching=self.caching)
+                                      caching=self.caching,
+                                      verbose=self.verbose)
 
         if prior_rigid_body_registration:
             if brain_mask_file is None or self._anat_brain_mask is None:
@@ -163,7 +164,8 @@ class Coregistrator(BaseRegistrator):
             else:
                 unifized_anat_file = _afni_bias_correct(
                     self.anat_, write_dir=self.output_dir,
-                    terminal_output=self.terminal_output, caching=self.caching)
+                    terminal_output=self.terminal_output, caching=self.caching,
+                    verbose=self.verbose)
                 self.anat_brain_ = _apply_mask(
                     unifized_anat_file, self._anat_brain_mask,
                     write_dir=self.output_dir,
@@ -172,7 +174,7 @@ class Coregistrator(BaseRegistrator):
         else:
             unifized_anat_file = _afni_bias_correct(
                 self.anat_, write_dir=self.output_dir,
-                terminal_output=self.terminal_output, caching=self.caching)
+                terminal_output=self.terminal_output, caching=self.caching, verbose=self.verbose)
             self.anat_brain_ = None
             modality_brain_file = None
 
