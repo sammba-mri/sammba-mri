@@ -188,9 +188,9 @@ class Coregistrator(BaseRegistrator):
                 prior_rigid_body_registration=prior_rigid_body_registration,
                 caching=self.caching)
             self._func_undistort_warps = coregistration.coreg_warps_
-            self.anat_in_func_space = coregistration.coreg_anat_
+            self.anat_in_func_space_ = coregistration.coreg_anat_
             self._func_to_anat_transform = coregistration.coreg_transform_
-            self.undistorted_func = _apply_perslice_warp(
+            self.undistorted_func_ = _apply_perslice_warp(
                 allineated_file, self._func_undistort_warps, .1, .1,
                 write_dir=self.output_dir, caching=self.caching)
         elif modality == 'perf':
@@ -202,9 +202,9 @@ class Coregistrator(BaseRegistrator):
                 m0_brain_file=modality_brain_file,
                 prior_rigid_body_registration=prior_rigid_body_registration,
                 caching=self.caching)
-            self.undistorted_perf = coregistration.coreg_m0_
+            self.undistorted_perf_ = coregistration.coreg_m0_
             self._perf_undistort_warps = coregistration.coreg_warps_
-            self.anat_in_perf_space = coregistration.coreg_anat_
+            self.anat_in_perf_space_ = coregistration.coreg_anat_
             self._perf_to_anat_transform = coregistration.coreg_transform_
 
         return self

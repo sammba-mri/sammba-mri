@@ -1,10 +1,11 @@
 import os
 from nose import with_setup
-from nose.tools import assert_true
+from nose.tools import assert_true, assert_equal
 import numpy as np
 import nibabel
 from nilearn.datasets.tests import test_utils as tst
 from nilearn._utils.testing import assert_raises_regex
+from nilearn._utils.niimg_conversions import _check_same_fov
 from sammba import testing_data
 from sammba.registration.coregistrator import Coregistrator
 
@@ -32,6 +33,9 @@ def test_coregistrator():
         func_file, 'func')
 
     registrator.fit_anat(anat_file)
+    assert_equal(registrator.anat_, anat_file)
+    assert_true(os.path.isfile(registrator.anat_brain_))
+
     assert_raises_regex(
         ValueError, "Only 'func' and 'perf' ", registrator.fit_modality,
         func_file, 'diffusion')
@@ -43,15 +47,34 @@ def test_coregistrator():
         func_file, 'func', slice_timing=False,
         prior_rigid_body_registration=True)
 
+    # without slice timing
     registrator.fit_modality(func_file, 'func', slice_timing=False)
+    assert_true(os.path.isfile(registrator.undistorted_func_))
+    assert_true(os.path.isfile(registrator.anat_in_func_space_))
+    _check_same_fov(registrator.undistorted_func_, func_file)
+    _check_same_fov(registrator.anat_in_func_space_, func_file)
+
+    # with slice timing
+    registrator.fit_modality(func_file, 'func', t_r=1.)
     assert_raises_regex(
         ValueError, 'has not been perf fitted',
         registrator.transform_modality_like, func_file, 'perf')
 
-    transformed_func_file = registrator.transform_modality_like(func_file, 'func')
-    registered_func_img = nibabel.load(registrator.undistorted_func)
-    transformed_func_img = nibabel.load(transformed_func_file)
+    func_img = nibabel.load(func_file)
+    m0_img = nibabel.Nifti1Image(func_img.get_data()[..., :-1], func_img.affine)
+    m0_file = os.path.join(tst.tmpdir, 'm0.nii.gz')
+    m0_img.to_filename(m0_file)
+    registrator.fit_modality(m0_file, 'perf')
+
+    # test transform_modality_like on an image with same orientation as the functional
+    func_like_img = nibabel.Nifti1Image(np.zeros(func_img.get_data().shape[:-1]),
+                                        func_img.affine)
+    func_like_file = os.path.join(tst.tmpdir, 'func_like.nii.gz')
+    func_like_img.to_filename(func_like_file)
+    transformed_file = registrator.transform_modality_like(func_like_file, 'func')
+    registered_func_img = nibabel.load(registrator.undistorted_func_)
+    transformed_img = nibabel.load(transformed_file)
     np.testing.assert_array_equal(registered_func_img.affine,
-                                  transformed_func_img.affine)
-    np.testing.assert_array_equal(registered_func_img.get_data(),
-                                  transformed_func_img.get_data())
+                                  transformed_img.affine)
+    np.testing.assert_array_equal(registered_func_img.get_data().shape[:-1],
+                                  transformed_img.get_data().shape)

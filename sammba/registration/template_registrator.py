@@ -125,26 +125,26 @@ class TemplateRegistrator(BaseRegistrator):
 
         self.anat_ = anat_file
         if brain_mask_file is None:
-            self._unifized_anat_, self.anat_brain_ = self.segment(self.anat_)
+            self._unifized_anat, self.anat_brain_ = self.segment(self.anat_)
         else:
-            self._unifized_anat_ = _afni_bias_correct(
+            self._unifized_anat = _afni_bias_correct(
                 self.anat_, write_dir=self.output_dir,
                 terminal_output=self.terminal_output, caching=self.caching, verbose=self.verbose)
             self.anat_brain_ = _apply_mask(
-                self._unifized_anat_, brain_mask_file,
+                self._unifized_anat, brain_mask_file,
                 write_dir=self.output_dir,
                 caching=self.caching,
                 terminal_output=self.terminal_output)
 
         normalization = anat_to_template(
-            self._unifized_anat_, self.anat_brain_, self.template,
+            self._unifized_anat, self.anat_brain_, self.template,
             self.template_brain_, write_dir=self.output_dir,
             dilated_head_mask_filename=self.dilated_template_mask,
             caching=self.caching, verbose=self.verbose, maxlev=None,
             convergence=self.convergence,
             registration_kind=self.registration_kind)
 
-        self.registered_anat = normalization.registered
+        self.registered_anat_ = normalization.registered
         if self.registration_kind == 'nonlinear':
             self._normalization_transforms = [normalization.transform,
                                               normalization.pretransform]
@@ -161,7 +161,7 @@ class TemplateRegistrator(BaseRegistrator):
 
         transformed_file = _apply_transforms(
             in_file,
-            self.anat_,
+            self.template,
             self.output_dir,
             self._normalization_transforms,
             transforms_kind=self.registration_kind,
@@ -171,11 +171,11 @@ class TemplateRegistrator(BaseRegistrator):
         return transformed_file
 
     def _check_modality_fitted(self, modality):
-        coreg_transform = '_{}_to_anat_transform'.format(modality)
-        if not hasattr(self, coreg_transform):
-            raise ValueError('It seems that %s has not been fitted. '
+        registered_modality = 'registered_{}_'.format(modality)
+        if not hasattr(self, registered_modality):
+            raise ValueError('It seems that {0} has not been {1} fitted. '
                              'You must call fit_modality() before calling '
-                             'transform_modality().' % self.__class__.__name__)
+                             'transform_modality().'.format(self.__class__.__name__, modality)
 
     def fit_modality(self, in_file, modality, slice_timing=True, t_r=None,
                      prior_rigid_body_registration=False, voxel_size=None):
@@ -241,16 +241,16 @@ class TemplateRegistrator(BaseRegistrator):
         if modality == 'func':
             self.func_brain_ = brain_file
             coregistration = coregister_func(
-                self._unifized_anat_, unbiased_file,
+                self._unifized_anat, unbiased_file,
                 self.output_dir,
                 anat_brain_file=self.anat_brain_,
                 func_brain_file=brain_file,
                 prior_rigid_body_registration=prior_rigid_body_registration,
                 caching=self.caching)
             self._func_undistort_warps = coregistration.coreg_warps_
-            self.anat_in_func_space = coregistration.coreg_anat_
+            self.anat_in_func_space_ = coregistration.coreg_anat_
             self._func_to_anat_transform = coregistration.coreg_transform_
-            self.undistorted_func = _apply_perslice_warp(
+            self.undistorted_func_ = _apply_perslice_warp(
                 allineated_file, self._func_undistort_warps, .1, .1,
                 write_dir=self.output_dir, caching=self.caching)
 
@@ -262,19 +262,19 @@ class TemplateRegistrator(BaseRegistrator):
         elif modality == 'perf':
             self.perf_brain_ = brain_file
             coregistration = coregister_perf(
-                self._unifized_anat_, unbiased_file,
+                self._unifized_anat, unbiased_file,
                 self.output_dir,
                 anat_brain_file=self.anat_brain_,
                 m0_brain_file=brain_file,
                 prior_rigid_body_registration=prior_rigid_body_registration,
                 caching=self.caching)
-            self.undistorted_perf = coregistration.coreg_m0_
+            self.undistorted_perf_ = coregistration.coreg_m0_
             self._perf_undistort_warps = coregistration.coreg_warps_
-            self.anat_in_perf_space = coregistration.coreg_anat_
+            self.anat_in_perf_space_ = coregistration.coreg_anat_
             self._perf_to_anat_transform = coregistration.coreg_transform_
 
             self.registered_perf_ = _apply_transforms(
-                self.undistorted_perf, self.template, self.output_dir,
+                self.undistorted_perf_, self.template, self.output_dir,
                 self._normalization_transforms + [self._perf_to_anat_transform],
                 transforms_kind=self.registration_kind,
                 voxel_size=voxel_size, caching=self.caching)
@@ -286,6 +286,8 @@ class TemplateRegistrator(BaseRegistrator):
         """Transforms the given file from the space of the given modality to
             the template space then .
         """
+        self._check_anat_fitted()
+        self._check_modality_fitted(modality)
         modality_undistort_warps = self.__getattribute__(
             '_{}_undistort_warps'.format(modality))
         coreg_transform_file = self.__getattribute__(
@@ -308,7 +310,7 @@ class TemplateRegistrator(BaseRegistrator):
         """ Trasnforms the given file from template space to modality space.
         """
         self._check_anat_fitted()
-        self._check_modality_fitted()
+        self._check_modality_fitted(modality)
         coreg_transform_file = self.__getattribute__(
             '_{}_to_anat_transform'.format(modality))
         modality_file = self.__getattribute__(modality)
