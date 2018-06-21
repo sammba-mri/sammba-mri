@@ -49,7 +49,7 @@ def test_coregistrator():
         registrator.transform_modality_like, func_file, 'perf')
 
     transformed_func_file = registrator.transform_modality_like(func_file, 'func')
-    registered_func_img = nibabel.load(registrator.registered_func_)
+    registered_func_img = nibabel.load(registrator.undistorted_func)
     transformed_func_img = nibabel.load(transformed_func_file)
     np.testing.assert_array_equal(registered_func_img.affine,
                                   transformed_func_img.affine)

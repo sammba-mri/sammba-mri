@@ -217,14 +217,14 @@ class Coregistrator(BaseRegistrator):
                  "implemented")
 
         self._check_anat_fitted()
-        modality_coreg_warps = '_coreg_{}_warps'.format(modality)
-        if not hasattr(self, modality_coreg_warps):
+        modality_undistort_warps = '_{}_undistort_warps'.format(modality)
+        if not hasattr(self, modality_undistort_warps):
             raise ValueError('It seems that {0} has not been {1} fitted. '
                              'You must call fit_modality() before calling '
                              'transform_modality().'.format(
                                      self.__class__.__name__, modality))
 
         coreg_apply_to_file = _apply_perslice_warp(
-            apply_to_file, self.__getattribute__(modality_coreg_warps), .1, .1,
+            apply_to_file, self.__getattribute__(modality_undistort_warps), .1, .1,
             write_dir=self.output_dir, caching=self.caching)
         return coreg_apply_to_file
