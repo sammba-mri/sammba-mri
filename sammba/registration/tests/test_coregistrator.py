@@ -49,22 +49,26 @@ def test_coregistrator():
 
     # without slice timing
     registrator.fit_modality(func_file, 'func', slice_timing=False)
-    assert_true(os.path.isfile(registrator.undistorted_func_))
-    assert_true(os.path.isfile(registrator.anat_in_func_space_))
-    _check_same_fov(registrator.undistorted_func_, func_file)
-    _check_same_fov(registrator.anat_in_func_space_, func_file)
+    func_img = nibabel.load(func_file)
+    assert_true(_check_same_fov(nibabel.load(registrator.undistorted_func_), func_file))
+    assert_true(_check_same_fov(nibabel.load(registrator.anat_in_func_space_), func_file))
 
     # with slice timing
     registrator.fit_modality(func_file, 'func', t_r=1.)
     assert_raises_regex(
         ValueError, 'has not been perf fitted',
         registrator.transform_modality_like, func_file, 'perf')
-
     func_img = nibabel.load(func_file)
+    _check_same_fov(nibabel.load(registrator.undistorted_func_), func_img)
+    _check_same_fov(nibabel.load(registrator.anat_in_func_space_), func_img)
+
+
     m0_img = nibabel.Nifti1Image(func_img.get_data()[..., :-1], func_img.affine)
     m0_file = os.path.join(tst.tmpdir, 'm0.nii.gz')
     m0_img.to_filename(m0_file)
     registrator.fit_modality(m0_file, 'perf')
+    assert_true(_check_same_fov(nibabel.load(registrator.undistorted_perf_), m0_img))
+    assert_true(_check_same_fov(nibabel.load(registrator.anat_in_perf_space_), m0_img))
 
     # test transform_modality_like on an image with same orientation as the functional
     func_like_img = nibabel.Nifti1Image(np.zeros(func_img.get_data().shape[:-1]),

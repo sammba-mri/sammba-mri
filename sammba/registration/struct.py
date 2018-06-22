@@ -5,6 +5,7 @@ from sammba.externals.nipype.caching import Memory
 from sklearn.datasets.base import Bunch
 from sklearn.utils import deprecated
 from sammba.interfaces import segmentation
+from .utils import fix_obliquity
 
 
 def anats_to_common(anat_filenames, write_dir, brain_volume,
@@ -795,7 +796,7 @@ def anat_to_template(anat_filename, brain_filename,
     # iniwarp due to weird errors (like it creating an Allin it then can't
     # find)
     if registration_kind != 'nonlinear':
-        registered = allineated_filename
+        registered = fix_obliquity(allineated_filename, head_template_filename)
         warp_transform = None
     else:
         intermediate_files.extend(allineated_filename)
@@ -822,7 +823,7 @@ def anat_to_template(anat_filename, brain_filename,
                 out_file=fname_presuffix(allineated_filename, suffix='_warped'),
                 environ=environ,
                 **verbosity_quietness_kwargs)
-        registered = out_qwarp.outputs.warped_source
+        registered = fix_obliquity(out_qwarp.outputs.warped_source, head_template_filename)
         warp_transform = out_qwarp.outputs.source_warp
 
     if not caching:

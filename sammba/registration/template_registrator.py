@@ -175,7 +175,7 @@ class TemplateRegistrator(BaseRegistrator):
         if not hasattr(self, registered_modality):
             raise ValueError('It seems that {0} has not been {1} fitted. '
                              'You must call fit_modality() before calling '
-                             'transform_modality().'.format(self.__class__.__name__, modality)
+                             'transform_modality().'.format(self.__class__.__name__, modality))
 
     def fit_modality(self, in_file, modality, slice_timing=True, t_r=None,
                      prior_rigid_body_registration=False, voxel_size=None):
@@ -183,7 +183,7 @@ class TemplateRegistrator(BaseRegistrator):
             the template space.
         """
         self._check_anat_fitted()
-
+        setattr(self, modality + '_', in_file)
         if modality == 'perf':
             to_coregister_file = in_file
         elif modality == 'func':
@@ -255,7 +255,7 @@ class TemplateRegistrator(BaseRegistrator):
                 write_dir=self.output_dir, caching=self.caching)
 
             self.registered_func_ = _apply_transforms(
-                self.undistorted_func, self.template, self.output_dir,
+                self.undistorted_func_, self.template, self.output_dir,
                 self._normalization_transforms + [self._func_to_anat_transform],
                 transforms_kind=self.registration_kind,
                 voxel_size=voxel_size, caching=self.caching)
@@ -313,7 +313,7 @@ class TemplateRegistrator(BaseRegistrator):
         self._check_modality_fitted(modality)
         coreg_transform_file = self.__getattribute__(
             '_{}_to_anat_transform'.format(modality))
-        modality_file = self.__getattribute__(modality)
+        modality_file = self.__getattribute__(modality + '_')
 
         inverted_file = _apply_transforms(in_file, modality_file,
                                           self.output_dir,

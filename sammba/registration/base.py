@@ -576,10 +576,12 @@ def _per_slice_qwarp(to_qwarp_file, reference_file,
                                                           use_ext=False))
         sliced_apply_to_files = out_slicer.outputs.out_files
         warped_apply_to_slices = []
+        sliced_apply_to_files_to_remove = sliced_apply_to_files
         for (sliced_apply_to_file, warp_file) in zip(
                 sliced_apply_to_files, warp_files):
             if warp_file is None:
                 warped_apply_to_slices.append(sliced_apply_to_file)
+                sliced_apply_to_files_to_remove.remove(sliced_apply_to_file)
             else:
                 out_warp_apply = warp_apply(in_file=sliced_apply_to_file,
                                             master=sliced_apply_to_file,
@@ -617,7 +619,7 @@ def _per_slice_qwarp(to_qwarp_file, reference_file,
             caching_dir=per_slice_dir, environ=environ)
 
         # Update the outputs
-        output_files.extend(sliced_apply_to_files + oblique_warped_apply_to_slices)
+        output_files.extend(sliced_apply_to_files_to_remove + oblique_warped_apply_to_slices)
     else:
         merged_apply_to_file = None
 
@@ -923,6 +925,7 @@ def _apply_transforms(to_register_filename, target_filename,
             final_interpolation=interpolation,
             out_file=transformed_filename,
             environ=environ)
+        transformed_filename = fix_obliquity(transformed_filename, target_filename)
     else:
         warp = "'"
         warp += " ".join(transforms)
