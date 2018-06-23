@@ -81,8 +81,3 @@ def test_coregistrator():
     transformed_file = registrator.transform_modality_like(m0_like_file, 'perf')
     transformed_img = nibabel.load(transformed_file)
     assert_true(_check_same_fov(transformed_img, m0_img))
-
-
-    np.testing.assert_array_almost_equal(transformed_img.affine, m0_img.affine)
-    np.testing.assert_array_equal(transformed_img.shape, m0_img.shape)
-

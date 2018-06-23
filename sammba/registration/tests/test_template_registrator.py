@@ -56,7 +56,8 @@ def test_fit_transform_anat():
     
     # Same tests, with nonlinear registration
     registrator = TemplateRegistrator(template_file, 400, output_dir=tst.tmpdir,
-                                      use_rats_tool=False, verbose=False)
+                                      use_rats_tool=False, verbose=False,
+                                      registration_kind='affine')
     assert_raises_regex(
         ValueError, 'has not been fitted',
         registrator.transform_anat_like, anat_file)
@@ -106,7 +107,7 @@ def test_fit_transform_modality():
     # test fit_modality with func
     registrator.fit_modality(func_file, 'func', slice_timing=False)
     registered_func_img = nibabel.load(registrator.registered_func_)
-    np.testing.assert_array_equal(registered_func_img.affine, template_img.affine)
+    np.testing.assert_array_almost_equal(registered_func_img.affine, template_img.affine)
     np.testing.assert_array_equal(registered_func_img.shape[:-1], template_img.shape)
 
     # test transform_modality
