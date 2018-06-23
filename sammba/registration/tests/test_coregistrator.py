@@ -64,7 +64,7 @@ def test_coregistrator():
     func_like_img.to_filename(func_like_file)
     transformed_file = registrator.transform_modality_like(func_like_file, 'func')
     transformed_img = nibabel.load(transformed_file)
-    np.testing.assert_array_equal(transformed_img.affine, func_img.affine)
+    np.testing.assert_array_almost_equal(transformed_img.affine, func_img.affine)
     np.testing.assert_array_equal(transformed_img.shape, func_img.shape[:-1])
 
     # Similarly with perf
@@ -80,11 +80,9 @@ def test_coregistrator():
     m0_like_img.to_filename(m0_like_file)
     transformed_file = registrator.transform_modality_like(m0_like_file, 'perf')
     transformed_img = nibabel.load(transformed_file)
-    assert_true(_check_same_fov(nibabel.load(transformed_img), m0_img))
+    assert_true(_check_same_fov(transformed_img, m0_img))
 
 
-    np.testing.assert_array_almost_equal(nibabel.load(registrator.anat_in_perf_space_).affine,
-                                         m0_img.affine)
-    np.testing.assert_array_equal(nibabel.load(registrator.anat_in_perf_space_).shape,
-                                  m0_img.shape[:-1])
+    np.testing.assert_array_almost_equal(transformed_img.affine, m0_img.affine)
+    np.testing.assert_array_equal(transformed_img.shape, m0_img.shape)
 
