@@ -104,11 +104,13 @@ def test_fit_transform_modality():
         registrator.transform_modality_like, func_file, 'func')
 
     # test fit_modality with func
-    registrator.fit_modality(func_file, 'func', slice_timing=False, voxel_size=(.3, .3, .3))
-    func_img = nibabel.load(func_file)
-    assert_true(_check_same_fov(nibabel.load(registrator.registered_func_), template_img))
+    registrator.fit_modality(func_file, 'func', slice_timing=False)
+    registered_func_img = nibabel.load(registrator.registered_func_)
+    np.testing.assert_array_equal(registered_func_img.affine, template_img.affine)
+    np.testing.assert_array_equal(registered_func_img.shape[:-1], template_img.shape)
 
     # test transform_modality
+    func_img = nibabel.load(func_file)
     func_like_img = nibabel.Nifti1Image(np.zeros(func_img.get_data().shape[:-1]),
                                         func_img.affine)
     func_like_file = os.path.join(tst.tmpdir, 'func_like.nii.gz')
@@ -149,3 +151,5 @@ def test_fit_transform_modality():
     m0_like_img.to_filename(m0_like_file)
     transformed_file = registrator.transform_modality_like(m0_like_file, 'perf')
     _check_same_fov(nibabel.load(transformed_file), template_img)
+
+    # TODO: tests when resampling

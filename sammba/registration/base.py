@@ -923,9 +923,7 @@ def _apply_transforms(to_register_filename, target_filename,
                                                          suffix='_resampled',
                                                          newpath=write_dir),
                                 environ=environ)
-        resampled_template_filename = fix_obliquity(out_resample.outputs.out_file,
-                                                    target_filename)
-
+        resampled_template_filename = out_resample.outputs.out_file
     if transforms_kind is not 'nonlinear':
         affine_transform_filename = fname_presuffix(transformed_filename,
                                                     suffix='.aff12.1D',
