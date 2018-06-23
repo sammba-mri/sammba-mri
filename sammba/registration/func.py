@@ -17,7 +17,7 @@ def _realign(func_filename, write_dir, caching=False,
              terminal_output='allatonce', environ=None):
     if environ is None:
         environ = {}
-        if caching:
+        if not caching:
             environ['AFNI_DECONFLICT'] = 'OVERWRITE'
 
     if caching:
@@ -36,6 +36,7 @@ def _realign(func_filename, write_dir, caching=False,
         threshold = fsl.Threshold(terminal_output=terminal_output).run
         volreg = afni.Volreg(terminal_output=terminal_output).run
         allineate = afni.Allineate(terminal_output=terminal_output).run
+        copy = afni.Copy(terminal_output=terminal_output).run
         copy_geom = fsl.CopyGeom(terminal_output=terminal_output).run
         tstat = afni.TStat(terminal_output=terminal_output).run
 
@@ -74,18 +75,13 @@ def _realign(func_filename, write_dir, caching=False,
     # 3dAllineate removes the obliquity. This is not a good way to readd it as
     # removes motion correction info in the header if it were an AFNI file...as
     # it happens it's NIfTI which does not store that so irrelevant!
-    if caching:
-        out_copy = copy(
-            in_file=out_allineate.outputs.out_file,
-            out_file=fname_presuffix(out_allineate.outputs.out_file,
-                                     suffix='_oblique',
-                                     newpath=write_dir),
-            environ=environ)
-        oblique_allineated_filename = out_copy.outputs.out_file
-    else:
-        oblique_allineated_filename = out_allineate.outputs.out_file
-
-    out_copy_geom = copy_geom(dest_file=oblique_allineated_filename,
+    out_copy = copy(
+        in_file=out_allineate.outputs.out_file,
+        out_file=fname_presuffix(out_allineate.outputs.out_file,
+                                 suffix='_oblique',
+                                 newpath=write_dir),
+        environ=environ)
+    out_copy_geom = copy_geom(dest_file=out_copy.outputs.out_file,
                               in_file=out_volreg.outputs.out_file)
 
     oblique_allineated_filename = out_copy_geom.outputs.out_file
@@ -102,7 +98,8 @@ def _realign(func_filename, write_dir, caching=False,
         for output_file in [thresholded_filename,
                             out_volreg.outputs.oned_matrix_save,
                             out_volreg.outputs.out_file,
-                            out_volreg.outputs.md1d_file]:
+                            out_volreg.outputs.md1d_file,
+                            out_allineate.outputs.out_file]:
             os.remove(output_file)
     return (oblique_allineated_filename, out_tstat.outputs.out_file,
             out_volreg.outputs.oned_file)
@@ -112,7 +109,7 @@ def _slice_time(func_file, t_r, write_dir, caching=False,
                 terminal_output='allatonce', environ=None):
     if environ is None:
         environ = {}
-        if caching:
+        if not caching:
             environ['AFNI_DECONFLICT'] = 'OVERWRITE'
 
     if caching:

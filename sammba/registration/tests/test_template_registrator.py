@@ -28,11 +28,12 @@ def test_fit_transform_anat():
                              'anat.nii.gz')
     anat_img = nibabel.load(anat_file)
     template_file = os.path.join(tst.tmpdir, 'template.nii.gz')
-    affine = .2 * np.eye(4)
-    affine[0, 1] = .01
-    affine[1, 0] = .01
-    affine[3, 3] = 1
-    template_img = nibabel.Nifti1Image(anat_img.get_data(), affine)
+    template_affine = .2 * np.eye(4)
+    template_affine[0, 1] = .01
+    template_affine[1, 0] = .01
+    template_affine[3, 3] = 1
+    template_data = anat_img.get_data()[1:]
+    template_img = nibabel.Nifti1Image(template_data, template_affine)
     template_img.to_filename(template_file)
     registrator = TemplateRegistrator(template_file, 400, output_dir=tst.tmpdir,
                                       use_rats_tool=False, verbose=False,
@@ -44,13 +45,6 @@ def test_fit_transform_anat():
     registrator.fit_anat(anat_file)
     registered_anat_img = nibabel.load(registrator.registered_anat_)
     assert_true(_check_same_fov(registered_anat_img, template_img))
-
-
-    np.testing.assert_array_equal(registered_anat_img.get_data().shape,
-                                  template_img.get_data().shape)
-    np.testing.assert_array_almost_equal(registered_anat_img.affine,
-                                         template_img.affine)
-
 
     # test transform_anat_like on an image with same orientation as the template
     anat_like_img = nibabel.Nifti1Image(np.zeros(anat_img.get_data().shape), anat_img.affine)
@@ -87,16 +81,16 @@ def test_fit_transform_modality():
                              'func.nii.gz')
     anat_img = nibabel.load(anat_file)
     template_file = os.path.join(tst.tmpdir, 'template.nii.gz')
-    affine = .2 * np.eye(4)
-    affine[0, 1] = .01
-    affine[1, 0] = .01
-    affine[3, 3] = 1
-    template_img = nibabel.Nifti1Image(anat_img.get_data(), affine)
+    template_affine = .2 * np.eye(4)
+    template_affine[0, 1] = .01
+    template_affine[1, 0] = .01
+    template_affine[3, 3] = 1
+    template_data = anat_img.get_data()[1:]
+    template_img = nibabel.Nifti1Image(template_data, template_affine)
     template_img.to_filename(template_file)
 
     registrator = TemplateRegistrator(template_file, 400, output_dir=tst.tmpdir,
-                                      use_rats_tool=False, verbose=False,
-                                      registration_kind='affine')
+                                      use_rats_tool=False, verbose=False)
     registrator.fit_anat(anat_file)
 
     assert_raises_regex(
@@ -110,12 +104,9 @@ def test_fit_transform_modality():
         registrator.transform_modality_like, func_file, 'func')
 
     # test fit_modality with func
-    registrator.fit_modality(func_file, 'func', slice_timing=False)
+    registrator.fit_modality(func_file, 'func', slice_timing=False, voxel_size=(.3, .3, .3))
     func_img = nibabel.load(func_file)
     assert_true(_check_same_fov(nibabel.load(registrator.registered_func_), template_img))
-    assert_raises_regex(
-        ValueError, 'has not been perf fitted',
-        registrator.transform_modality_like, func_file, 'perf')
 
     # test transform_modality
     func_like_img = nibabel.Nifti1Image(np.zeros(func_img.get_data().shape[:-1]),
@@ -131,10 +122,6 @@ def test_fit_transform_modality():
         transformed_file, 'func')
     inverse_transformed_img = nibabel.load(inverse_transformed_file)
     assert_true(_check_same_fov(inverse_transformed_img, func_img))
-
-
-    np.testing.assert_array_almost_equal(inverse_transformed_img.affine,
-                                         func_like_img.affine, decimal=1)
     np.testing.assert_array_equal(inverse_transformed_img.get_data(),
                                   func_like_img.get_data())
 
@@ -143,10 +130,13 @@ def test_fit_transform_modality():
     transformed_img2 = nibabel.load(transformed_file2)
     np.testing.assert_array_equal(transformed_img2.affine,
                                   transformed_img.affine)
-    np.testing.assert_array_equal(transformed_img2.get_data().shape,
-                                  transformed_img.get_data().shape)
+    np.testing.assert_array_equal(transformed_img2.shape,
+                                  transformed_img.shape)
 
     # similar tests with perf
+    assert_raises_regex(
+        ValueError, 'has not been perf fitted',
+        registrator.transform_modality_like, func_file, 'perf')
     m0_img = nibabel.Nifti1Image(func_img.get_data()[..., :-1], func_img.affine)
     m0_file = os.path.join(tst.tmpdir, 'm0.nii.gz')
     m0_img.to_filename(m0_file)
@@ -154,7 +144,7 @@ def test_fit_transform_modality():
     _check_same_fov(nibabel.load(registrator.registered_perf_), template_img)
 
     # test transform_modality
-    m0_like_img = nibabel.Nifti1Image(np.zeros(m0_img.get_data().shape), m0_img.affine)
+    m0_like_img = nibabel.Nifti1Image(np.zeros(m0_img.shape), m0_img.affine)
     m0_like_file = os.path.join(tst.tmpdir, 'm0_like.nii.gz')
     m0_like_img.to_filename(m0_like_file)
     transformed_file = registrator.transform_modality_like(m0_like_file, 'perf')

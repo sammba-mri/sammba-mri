@@ -225,26 +225,36 @@ def _delete_orientation(in_file, write_dir, min_zoom=.1, caching=False,
 
 
 def _bias_correct(in_file, write_dir, caching=False,
-                  terminal_output='allatonce', verbose=True):
+                  terminal_output='allatonce', verbose=True, environ=None):
     if ants.base.Info().version is None:
         BiasCorrect = afni.Unifize
     else:
         BiasCorrect = ants.N4BiasFieldCorrection
 
+    if environ is None:
+        environ = {}
+        if not caching:
+            environ['AFNI_DECONFLICT'] = 'OVERWRITE'
+
     if caching:
         memory = Memory(write_dir)
         bias_correct = memory.cache(BiasCorrect)
+        copy = memory.cache(afni.Copy)
+        copy_geom = memory.cache(fsl.CopyGeom)
         bias_correct.interface().set_default_terminal_output(terminal_output)
+        copy.interface().set_default_terminal_output(terminal_output)
     else:
-        bias_correct = BiasCorrect(
-            terminal_output=terminal_output).run
+        bias_correct = BiasCorrect(terminal_output=terminal_output).run
+        copy = afni.Copy(terminal_output=terminal_output).run
+        copy_geom = fsl.CopyGeom(terminal_output=terminal_output).run
 
     if ants.base.Info().version is None:
         out_bias_correct = bias_correct(
             in_file=in_file,
             quiet=not(verbose),
             out_file=fname_presuffix(in_file, suffix='_unbiased',
-                                     newpath=write_dir))
+                                     newpath=write_dir),
+            environ=environ)
         return out_bias_correct.outputs.out_file
     else:
         out_bias_correct = bias_correct(
@@ -253,7 +263,19 @@ def _bias_correct(in_file, write_dir, caching=False,
             verbose=verbose,
             output_image=fname_presuffix(in_file, suffix='_unbiased',
                                          newpath=write_dir))
-        return out_bias_correct.outputs.output_image
+
+        out_copy = copy(
+            in_file=out_bias_correct.outputs.output_image,
+            out_file=fname_presuffix(out_bias_correct.outputs.output_image,
+                                     suffix='_oblique',
+                                     newpath=write_dir),
+            environ=environ,
+            verb=verbose)
+    
+        out_copy_geom = copy_geom(dest_file=out_copy.outputs.out_file,
+                                  in_file=in_file)
+    
+        return out_copy_geom.outputs.out_file
 
 
 def _afni_bias_correct(in_file, write_dir, caching=False,
@@ -481,7 +503,7 @@ def _per_slice_qwarp(to_qwarp_file, reference_file,
     warped_slices = []
     warp_files = []
     output_files = []
-    resampled_sliced_to_qwarp_files_to_remove = resampled_sliced_to_qwarp_files
+    resampled_sliced_to_qwarp_files_to_remove = []
     for (resampled_sliced_to_qwarp_file,
          resampled_sliced_reference_file) in zip(
             resampled_sliced_to_qwarp_files,
@@ -494,9 +516,9 @@ def _per_slice_qwarp(to_qwarp_file, reference_file,
         if to_qwarp_data.max() == 0 or ref_data.max() == 0:
             # deal with slices where there is no signal
             warped_slices.append(resampled_sliced_to_qwarp_file)
-            resampled_sliced_to_qwarp_files_to_remove.remove(resampled_sliced_to_qwarp_file)
             warp_files.append(None)
         else:
+            resampled_sliced_to_qwarp_files_to_remove.append(resampled_sliced_to_qwarp_file)
             out_qwarp = qwarp(
                 in_file=resampled_sliced_to_qwarp_file,
                 base_file=resampled_sliced_reference_file,
@@ -576,13 +598,13 @@ def _per_slice_qwarp(to_qwarp_file, reference_file,
                                                           use_ext=False))
         sliced_apply_to_files = out_slicer.outputs.out_files
         warped_apply_to_slices = []
-        sliced_apply_to_files_to_remove = sliced_apply_to_files
+        sliced_apply_to_files_to_remove = []
         for (sliced_apply_to_file, warp_file) in zip(
                 sliced_apply_to_files, warp_files):
             if warp_file is None:
                 warped_apply_to_slices.append(sliced_apply_to_file)
-                sliced_apply_to_files_to_remove.remove(sliced_apply_to_file)
             else:
+                sliced_apply_to_files_to_remove.append(sliced_apply_to_file)
                 out_warp_apply = warp_apply(in_file=sliced_apply_to_file,
                                             master=sliced_apply_to_file,
                                             warp=warp_file,
@@ -686,11 +708,13 @@ def _apply_perslice_warp(apply_to_file, warp_files,
     sliced_apply_to_files = out_slicer.outputs.out_files
 
     warped_apply_to_slices = []
+    sliced_apply_to_files_to_remove = []
     for (sliced_apply_to_file, warp_file) in zip(
             sliced_apply_to_files, warp_files):
         if warp_file is None:
             warped_apply_to_slices.append(sliced_apply_to_file)
         else:
+            sliced_apply_to_files_to_remove.append(sliced_apply_to_file)
             out_warp_apply = warp_apply(in_file=sliced_apply_to_file,
                                         master=sliced_apply_to_file,
                                         warp=warp_file,
@@ -727,7 +751,7 @@ def _apply_perslice_warp(apply_to_file, warp_files,
         caching_dir=per_slice_dir, environ=environ)
 
     # Update the outputs
-    output_files.extend(sliced_apply_to_files + oblique_warped_apply_to_slices)
+    output_files.extend(sliced_apply_to_files_to_remove + oblique_warped_apply_to_slices)
 
     if not caching:
         for out_file in output_files:
@@ -899,7 +923,8 @@ def _apply_transforms(to_register_filename, target_filename,
                                                          suffix='_resampled',
                                                          newpath=write_dir),
                                 environ=environ)
-        resampled_template_filename = out_resample.outputs.out_file
+        resampled_template_filename = fix_obliquity(out_resample.outputs.out_file,
+                                                    target_filename)
 
     if transforms_kind is not 'nonlinear':
         affine_transform_filename = fname_presuffix(transformed_filename,
@@ -925,7 +950,6 @@ def _apply_transforms(to_register_filename, target_filename,
             final_interpolation=interpolation,
             out_file=transformed_filename,
             environ=environ)
-        transformed_filename = fix_obliquity(transformed_filename, target_filename)
     else:
         warp = "'"
         warp += " ".join(transforms)
@@ -937,4 +961,5 @@ def _apply_transforms(to_register_filename, target_filename,
                        interp=interpolation,
                        out_file=transformed_filename,
                        environ=environ)
+    transformed_filename = fix_obliquity(transformed_filename, resampled_template_filename)
     return transformed_filename

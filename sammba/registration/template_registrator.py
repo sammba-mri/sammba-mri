@@ -12,7 +12,7 @@ from .base_registrator import BaseRegistrator
 class TemplateRegistrator(BaseRegistrator):
     """
     Class for registering anatomical and possibly other modality images from
-    one animal to a given template.
+    one animal to a given head template.
 
     Parameters
     ----------
@@ -61,6 +61,13 @@ class TemplateRegistrator(BaseRegistrator):
     registration_kind : one of {'rigid', 'affine', 'nonlinear'}, optional
         The allowed transform kind from the anatomical image to the template.
 
+    Attributes
+    ----------
+    `template_brain_` : str
+        Path to the brain extracted file from the template image
+
+    `anat_brain_` : str
+        Path to the brain extracted file from the anatomical image
     """
     def __init__(self, template, brain_volume,
                  template_brain_mask=None,
@@ -156,6 +163,21 @@ class TemplateRegistrator(BaseRegistrator):
     def transform_anat_like(self, in_file, interpolation='wsinc5'):
         """ Transforms the given in_file from anatomical space to template
             space.
+
+        Parameters
+        ----------
+        in_file: str
+            Path to the file in the same space as the anatomical image.
+
+                
+        interpolation: one of {'nearestneighbour', 'trilinear', 'tricubic', 'triquintic',
+                               'wsinc5'}, optional
+            The interpolation method used for the transformed file.
+
+        Retruns
+        -------
+        transformed_file: str
+            Path to the transformed file, in template space.s
         """
         self._check_anat_fitted()
 
@@ -181,6 +203,14 @@ class TemplateRegistrator(BaseRegistrator):
                      prior_rigid_body_registration=False, voxel_size=None):
         """ Estimates registration from the space of a given modality to
             the template space.
+
+        Parameters
+        ----------
+        in_file: str
+            Path to the modality image. M0 file is expected for perfusion.
+                 
+        modality: one of {'func', 'perf'}
+            Name of the modality.
         """
         self._check_anat_fitted()
         setattr(self, modality + '_', in_file)
@@ -284,7 +314,28 @@ class TemplateRegistrator(BaseRegistrator):
     def transform_modality_like(self, in_file, modality,
                                 interpolation='wsinc5', voxel_size=None):
         """Transforms the given file from the space of the given modality to
-            the template space then .
+            the template space. If the given modality has been corrected for EPI distorsions,
+            the same correction is applied.
+
+        Parameters
+        ----------
+        in_file: str
+            Path to the file in the same space as the modality image.
+                 
+        modality: one of {'func', 'perf'}
+            Name of the modality.
+
+        interpolation: one of {'nearestneighbour', 'trilinear', 'tricubic', 'triquintic',
+                               'wsinc5'}, optional
+            The interpolation method used for the transformed file.
+
+        voxel_size: 3-tuple or None, optional
+            The target voxels size. If None, the final voxels size will match the template.
+
+        Retruns
+        -------
+        transformed_file: str
+            Path to the transformed file, in template space.
         """
         self._check_anat_fitted()
         self._check_modality_fitted(modality)
@@ -308,6 +359,23 @@ class TemplateRegistrator(BaseRegistrator):
     def inverse_transform_towards_modality(self, in_file, modality,
                                            interpolation='wsinc5'):
         """ Trasnforms the given file from template space to modality space.
+
+        Parameters
+        ----------
+        in_file: str
+            Path to the file in the same space as the modality image.
+                 
+        interpolation: one of {'nearestneighbour', 'trilinear', 'tricubic', 'triquintic',
+                               'wsinc5'}, optional
+            The interpolation method used for the transformed file.
+
+        voxel_size: 3-tuple or None, optional
+            The target voxels size. If None, the final voxels size will match the template.
+
+        Retruns
+        -------
+        transformed_file: str
+            Path to the transformed file, in template space.
         """
         self._check_anat_fitted()
         self._check_modality_fitted(modality)

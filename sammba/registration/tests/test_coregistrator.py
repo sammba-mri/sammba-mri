@@ -34,7 +34,7 @@ def test_coregistrator():
 
     registrator.fit_anat(anat_file)
     assert_equal(registrator.anat_, anat_file)
-    assert_true(os.path.isfile(registrator.anat_brain_))
+    assert_true(registrator._anat_brain_mask is None)
 
     assert_raises_regex(
         ValueError, "Only 'func' and 'perf' ", registrator.fit_modality,
@@ -50,35 +50,41 @@ def test_coregistrator():
     # without slice timing
     registrator.fit_modality(func_file, 'func', slice_timing=False)
     func_img = nibabel.load(func_file)
-    assert_true(_check_same_fov(nibabel.load(registrator.undistorted_func_), func_file))
-    assert_true(_check_same_fov(nibabel.load(registrator.anat_in_func_space_), func_file))
-
-    # with slice timing
-    registrator.fit_modality(func_file, 'func', t_r=1.)
-    assert_raises_regex(
-        ValueError, 'has not been perf fitted',
-        registrator.transform_modality_like, func_file, 'perf')
-    func_img = nibabel.load(func_file)
-    _check_same_fov(nibabel.load(registrator.undistorted_func_), func_img)
-    _check_same_fov(nibabel.load(registrator.anat_in_func_space_), func_img)
+    assert_true(_check_same_fov(nibabel.load(registrator.undistorted_func_), func_img))
+    np.testing.assert_array_almost_equal(nibabel.load(registrator.anat_in_func_space_).affine,
+                                         func_img.affine)
+    np.testing.assert_array_equal(nibabel.load(registrator.anat_in_func_space_).shape,
+                                  func_img.shape[:-1])
 
 
-    m0_img = nibabel.Nifti1Image(func_img.get_data()[..., :-1], func_img.affine)
+    # test transform_modality_like on an image with same orientation as the functional
+    func_like_img = nibabel.Nifti1Image(np.zeros(func_img.shape[:-1]),
+                                        func_img.affine)
+    func_like_file = os.path.join(tst.tmpdir, 'func_like.nii.gz')
+    func_like_img.to_filename(func_like_file)
+    transformed_file = registrator.transform_modality_like(func_like_file, 'func')
+    transformed_img = nibabel.load(transformed_file)
+    np.testing.assert_array_equal(transformed_img.affine, func_img.affine)
+    np.testing.assert_array_equal(transformed_img.shape, func_img.shape[:-1])
+
+    # Similarly with perf
+    m0_img = nibabel.Nifti1Image(func_img.get_data()[..., 0], func_img.affine)
     m0_file = os.path.join(tst.tmpdir, 'm0.nii.gz')
     m0_img.to_filename(m0_file)
     registrator.fit_modality(m0_file, 'perf')
     assert_true(_check_same_fov(nibabel.load(registrator.undistorted_perf_), m0_img))
     assert_true(_check_same_fov(nibabel.load(registrator.anat_in_perf_space_), m0_img))
 
-    # test transform_modality_like on an image with same orientation as the functional
-    func_like_img = nibabel.Nifti1Image(np.zeros(func_img.get_data().shape[:-1]),
-                                        func_img.affine)
-    func_like_file = os.path.join(tst.tmpdir, 'func_like.nii.gz')
-    func_like_img.to_filename(func_like_file)
-    transformed_file = registrator.transform_modality_like(func_like_file, 'func')
-    registered_func_img = nibabel.load(registrator.undistorted_func_)
+    m0_like_img = nibabel.Nifti1Image(np.zeros(m0_img.shape), m0_img.affine)
+    m0_like_file = os.path.join(tst.tmpdir, 'm0_like.nii.gz')
+    m0_like_img.to_filename(m0_like_file)
+    transformed_file = registrator.transform_modality_like(m0_like_file, 'perf')
     transformed_img = nibabel.load(transformed_file)
-    np.testing.assert_array_equal(registered_func_img.affine,
-                                  transformed_img.affine)
-    np.testing.assert_array_equal(registered_func_img.get_data().shape[:-1],
-                                  transformed_img.get_data().shape)
+    assert_true(_check_same_fov(nibabel.load(transformed_img), m0_img))
+
+
+    np.testing.assert_array_almost_equal(nibabel.load(registrator.anat_in_perf_space_).affine,
+                                         m0_img.affine)
+    np.testing.assert_array_equal(nibabel.load(registrator.anat_in_perf_space_).shape,
+                                  m0_img.shape[:-1])
+
