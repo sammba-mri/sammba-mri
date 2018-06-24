@@ -92,7 +92,7 @@ class TemplateRegistrator(BaseRegistrator):
             raise IOError('`template` must be an existing '
                           'image file, you gave {0}'.format(self.template))
 
-        if not isinstance(self.brain_volume, (int, long)):
+        if not isinstance(self.brain_volume, int):
             raise ValueError('`brain_volume` must be an integer')
 
         if self.mask_clipping_fraction is not None:

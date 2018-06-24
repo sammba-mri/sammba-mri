@@ -134,7 +134,7 @@ class Coregistrator(BaseRegistrator):
 
         if prior_rigid_body_registration:
             if brain_mask_file is None or self._anat_brain_mask is None:
-                if not isinstance(self.brain_volume, (int, long)):
+                if not isinstance(self.brain_volume, int):
                     raise ValueError('`brain_volume` must be specified to '
                                      'perform rigid-body registration')
             if brain_mask_file is None:
