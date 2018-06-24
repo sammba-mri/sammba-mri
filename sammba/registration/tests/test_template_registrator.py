@@ -123,7 +123,8 @@ def test_fit_transform_modality():
     # test transform then inverse transform brings back to the original image
     inverse_transformed_file = registrator.inverse_transform_towards_modality(
         transformed_file, 'func')
-    assert_true(_check_same_fov(nibabel.load(inverse_transformed_file), func_img))
+    inverse_transformed_img = nibabel.load(inverse_transformed_file)
+    assert_true(_check_same_fov(inverse_transformed_img, func_img))
     np.testing.assert_array_equal(inverse_transformed_img.get_data(),
                                   func_like_img.get_data())
 

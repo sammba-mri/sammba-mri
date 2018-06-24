@@ -58,7 +58,7 @@ def coregister(unifized_anat_file,
     and has to be cited. For more information, see
     `RATS <http://www.iibi.uiowa.edu/content/rats-overview/>`_
     """
-    environ = {}
+    environ = {'AFNI_DECONFLICT': 'OVERWRITE'}
     for (key, value) in environ_kwargs.items():
         environ[key] = value
 
@@ -74,7 +74,6 @@ def coregister(unifized_anat_file,
     else:
         catmatvec = afni.CatMatvec().run
         overwrite = True
-        environ = {'AFNI_DECONFLICT': 'OVERWRITE'}
 
     output_files = []
 
@@ -129,7 +128,7 @@ def coregister(unifized_anat_file,
                          voxel_size_x, voxel_size_y,
                          apply_to_file=apply_to_file,
                          verbose=verbose,
-                         write_dir=write_dir, overwrite=overwrite,
+                         write_dir=write_dir,
                          caching=caching, terminal_output=terminal_output,
                          environ=environ)
 

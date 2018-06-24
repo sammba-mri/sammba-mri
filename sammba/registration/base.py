@@ -32,8 +32,6 @@ def mask_report(mask_file, expected_volume):
     voxels_coords = np.array(coord_transform(i, j, k, mask_img.affine)).T
     x_range, y_range, z_range = voxels_coords.max(axis=0) - \
         voxels_coords.min(axis=0)
-    print(voxels_coords.max(axis=0))
-    print(voxels_coords.min(axis=0))
     return "extracted volume is {0:0.1f}% of expected volume, sizes "\
            "x: {1:0.2f}, y: {2:0.2f}, z: {3:0.2f}".format(volume_accuracy,
                                                           x_range, y_range,
@@ -88,7 +86,8 @@ def compute_brain_mask(head_file, brain_volume, write_dir, bias_correct=True,
                              'dilation_size': dilation_size,
                              'opening': opening}
 
-    environ = {}
+    environ = {'AFNI_DECONFLICT': 'OVERWRITE'}
+
     if caching:
         memory = Memory(write_dir)
         clip_level = memory.cache(afni.ClipLevel)
@@ -100,19 +99,19 @@ def compute_brain_mask(head_file, brain_volume, write_dir, bias_correct=True,
         clip_level = afni.ClipLevel().run
         compute_mask = ComputeMask(terminal_output=terminal_output).run
         unifize = afni.Unifize(terminal_output=terminal_output).run
-        environ['AFNI_DECONFLICT'] = 'OVERWRITE'
 
     if bias_correct:
         if unifize_kwargs is None:
             unifize_kwargs = {}
-        out_unifize = unifize(
-            in_file=head_file,
+
+        file_to_mask = _afni_bias_correct(
+            head_file, write_dir,
             out_file=fname_presuffix(head_file,
                                      suffix='_unifized_for_extraction',
                                      newpath=write_dir),
-            environ=environ,
-            **unifize_kwargs)
-        file_to_mask = out_unifize.outputs.out_file
+            caching=caching,
+            terminal_output=terminal_output,
+            environ=environ, **unifize_kwargs)
     else:
         file_to_mask = head_file
 
@@ -127,7 +126,7 @@ def compute_brain_mask(head_file, brain_volume, write_dir, bias_correct=True,
         **compute_mask_args)
 
     if not caching and bias_correct:
-        os.remove(out_unifize.outputs.out_file)
+        os.remove(file_to_mask)
 
     return out_compute_mask.outputs.out_file
 
@@ -153,14 +152,13 @@ def _apply_mask(head_file, mask_file, write_dir,
     and has to be cited. For more information, see
     `RATS <http://www.iibi.uiowa.edu/content/rats-overview/>`_
     """
-    environ = {}
+    environ = {'AFNI_DECONFLICT': 'OVERWRITE'}
     if caching:
         memory = Memory(write_dir)
         apply_mask = memory.cache(fsl.ApplyMask)
         apply_mask.interface().set_default_terminal_output(terminal_output)
     else:
         apply_mask = fsl.ApplyMask(terminal_output=terminal_output).run
-        environ['AFNI_DECONFLICT'] = 'OVERWRITE'
 
     # Check mask is binary
     mask_img = nibabel.load(mask_file)
@@ -232,9 +230,7 @@ def _bias_correct(in_file, write_dir, caching=False,
         BiasCorrect = ants.N4BiasFieldCorrection
 
     if environ is None:
-        environ = {}
-        if not caching:
-            environ['AFNI_DECONFLICT'] = 'OVERWRITE'
+        environ = {'AFNI_DECONFLICT': 'OVERWRITE'}
 
     if caching:
         memory = Memory(write_dir)
@@ -278,31 +274,36 @@ def _bias_correct(in_file, write_dir, caching=False,
         return out_copy_geom.outputs.out_file
 
 
-def _afni_bias_correct(in_file, write_dir, caching=False,
+def _afni_bias_correct(in_file, write_dir, out_file=None, caching=False,
                        terminal_output='allatonce', verbose=True,
                        **unifize_kwargs):
-    environ = {}
+    environ = {'AFNI_DECONFLICT': 'OVERWRITE'}
     if caching:
         memory = Memory(write_dir)
+        copy_geom = memory.cache(fsl.CopyGeom)
         unifize = memory.cache(afni.Unifize)
         unifize.interface().set_default_terminal_output(terminal_output)
     else:
+        copy_geom = fsl.CopyGeom(terminal_output=terminal_output).run
         unifize = afni.Unifize(terminal_output=terminal_output).run
-        environ['AFNI_DECONFLICT'] = 'OVERWRITE'
 
+    if out_file is None:
+        out_file = fname_presuffix(in_file,
+                                   suffix='_unifized',
+                                   newpath=write_dir)
     out_unifize = unifize(in_file=in_file,
-                          out_file=fname_presuffix(in_file,
-                                                   suffix='_unifized',
-                                                   newpath=write_dir),
+                          out_file=out_file,
                           environ=environ,
                           quiet=not(verbose),
                           **unifize_kwargs)
+    out_copy_geom = copy_geom(dest_file=out_unifize.outputs.out_file,
+                              in_file=in_file)
 
-    return out_unifize.outputs.out_file
+    return out_copy_geom.outputs.out_file
 
 
 def _rigid_body_register(moving_head_file, reference_head_file,
-                         moving_brain_mask, reference_brain_mask,
+                         moving_brain_file, reference_brain_file,
                          write_dir=None,
                          caching=False, terminal_output='allatonce', environ=None):
     # XXX: add verbosity
@@ -310,9 +311,7 @@ def _rigid_body_register(moving_head_file, reference_head_file,
         write_dir = os.path.dirname(moving_head_file)
 
     if environ is None:
-        environ = {}
-        if caching:
-            environ['AFNI_DECONFLICT'] = 'OVERWRITE'
+        environ = {'AFNI_DECONFLICT': 'OVERWRITE'}
 
     if caching:
         memory = Memory(write_dir)
@@ -326,16 +325,6 @@ def _rigid_body_register(moving_head_file, reference_head_file,
         allineate2 = afni.Allineate(terminal_output=terminal_output).run
         catmatvec = afni.CatMatvec().run
 
-    moving_brain_file = _apply_mask(moving_head_file, moving_head_file,
-                                    write_dir=write_dir,
-                                    caching=caching,
-                                    terminal_output=terminal_output)
-
-    reference_brain_file = _apply_mask(reference_head_file,
-                                       reference_brain_mask,
-                                       write_dir=write_dir,
-                                       caching=caching,
-                                       terminal_output=terminal_output)
     output_files = [moving_brain_file, reference_brain_file]
 
     # Compute the transformation from functional to anatomical brain
@@ -386,9 +375,7 @@ def _warp(to_warp_file, reference_file, write_dir=None, caching=False,
         write_dir = os.path.dirname(to_warp_file)
 
     if environ is None:
-        environ = {}
-        if caching:
-            environ['AFNI_DECONFLICT'] = 'OVERWRITE'
+        environ = {'AFNI_DECONFLICT': 'OVERWRITE'}
 
     if caching:
         memory = Memory(write_dir)
@@ -427,15 +414,13 @@ def _warp(to_warp_file, reference_file, write_dir=None, caching=False,
 def _per_slice_qwarp(to_qwarp_file, reference_file,
                      voxel_size_x, voxel_size_y, apply_to_file=None,
                      write_dir=None,
-                     caching=False, overwrite=True,
+                     caching=False,
                      verbose=True, terminal_output='allatonce', environ=None):
     if write_dir is None:
         write_dir = os.path.dirname(to_qwarp_file),
 
     if environ is None:
-        environ = {}
-        if caching:
-            environ['AFNI_DECONFLICT'] = 'OVERWRITE'
+        environ = {'AFNI_DECONFLICT': 'OVERWRITE'}
 
     if caching:
         memory = Memory(write_dir)
@@ -656,7 +641,7 @@ def _per_slice_qwarp(to_qwarp_file, reference_file,
 def _apply_perslice_warp(apply_to_file, warp_files,
                          voxel_size_x, voxel_size_y,
                          write_dir=None,
-                         caching=False, overwrite=True,
+                         caching=False,
                          verbose=True, terminal_output='allatonce',
                          environ=None):
 
@@ -666,9 +651,7 @@ def _apply_perslice_warp(apply_to_file, warp_files,
         write_dir = os.path.dirname(apply_to_file),
 
     if environ is None:
-        environ = {}
-        if caching:
-            environ['AFNI_DECONFLICT'] = 'OVERWRITE'
+        environ = {'AFNI_DECONFLICT': 'OVERWRITE'}
 
     if caching:
         memory = Memory(write_dir)
@@ -685,7 +668,6 @@ def _apply_perslice_warp(apply_to_file, warp_files,
         warp_apply = afni.NwarpApply(terminal_output=terminal_output).run
         qwarp = afni.Qwarp(terminal_output=terminal_output).run
         merge = fsl.Merge(terminal_output=terminal_output).run
-        environ['AFNI_DECONFLICT'] = 'OVERWRITE'
 
     apply_to_img = nibabel.load(apply_to_file)
     n_slices = apply_to_img.header.get_data_shape()[2]
@@ -885,7 +867,7 @@ def _apply_transforms(to_register_filename, target_filename,
         If True, all steps are verbose. Note that caching implies some
         verbosity in any case.
     """
-    environ = {}
+    environ = {'AFNI_DECONFLICT': 'OVERWRITE'}
     if verbose:
         terminal_output = 'allatonce'
     else:
@@ -904,7 +886,6 @@ def _apply_transforms(to_register_filename, target_filename,
         catmatvec = afni.CatMatvec().run
         allineate = afni.Allineate(terminal_output=terminal_output).run
         warp_apply = afni.NwarpApply(terminal_output=terminal_output).run
-        environ['AFNI_DECONFLICT'] = 'OVERWRITE'
 
     if transformed_filename is None:
         target_basename = os.path.basename(target_filename)
