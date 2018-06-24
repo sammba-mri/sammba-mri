@@ -152,7 +152,6 @@ def _apply_mask(head_file, mask_file, write_dir,
     and has to be cited. For more information, see
     `RATS <http://www.iibi.uiowa.edu/content/rats-overview/>`_
     """
-    environ = {'AFNI_DECONFLICT': 'OVERWRITE'}
     if caching:
         memory = Memory(write_dir)
         apply_mask = memory.cache(fsl.ApplyMask)
@@ -276,8 +275,11 @@ def _bias_correct(in_file, write_dir, caching=False,
 
 def _afni_bias_correct(in_file, write_dir, out_file=None, caching=False,
                        terminal_output='allatonce', verbose=True,
+                       environ=None,
                        **unifize_kwargs):
-    environ = {'AFNI_DECONFLICT': 'OVERWRITE'}
+    if environ is None:
+        environ = {'AFNI_DECONFLICT': 'OVERWRITE'}
+
     if caching:
         memory = Memory(write_dir)
         copy_geom = memory.cache(fsl.CopyGeom)
