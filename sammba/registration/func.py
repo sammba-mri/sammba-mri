@@ -623,10 +623,10 @@ def coregister_fmri_session(session_data, t_r, write_dir, brain_volume,
                                 registered_anat_oblique_filename,
                                 suffix='Sl%d' % slice_n),
                             environ=environ)
-        _ = fix_obliquity(out_slicer.outputs.out_file,
-                          registered_anat_oblique_filename,
-                          overwrite=overwrite, verbose=verbose)
-        sliced_registered_anat_filenames.append(out_slicer.outputs.out_file)
+        oblique_slice = fix_obliquity(out_slicer.outputs.out_file,
+                                      registered_anat_oblique_filename,
+                                      overwrite=overwrite, verbose=verbose)
+        sliced_registered_anat_filenames.append(oblique_slice)
 
     # Slice mean functional
     sliced_bias_corrected_filenames = []
@@ -638,10 +638,10 @@ def coregister_fmri_session(session_data, t_r, write_dir, brain_volume,
                             out_file=fname_presuffix(unbiased_func_filename,
                                                      suffix='Sl%d' % slice_n),
                             environ=environ)
-        _ = fix_obliquity(out_slicer.outputs.out_file,
-                          unbiased_func_filename,
-                          overwrite=overwrite, verbose=verbose)
-        sliced_bias_corrected_filenames.append(out_slicer.outputs.out_file)
+        oblique_slice = fix_obliquity(out_slicer.outputs.out_file,
+                                      unbiased_func_filename,
+                                      overwrite=overwrite, verbose=verbose)
+        sliced_bias_corrected_filenames.append(oblique_slice)
 
     # Below line is to deal with slices where there is no signal (for example
     # rostral end of some anatomicals)
@@ -715,11 +715,13 @@ def coregister_fmri_session(session_data, t_r, write_dir, brain_volume,
         resampled_warped_slices.append(out_resample.outputs.out_file)
 
     # fix the obliquity
+    resampled_warped_slices_oblique = []
     for (sliced_registered_anat_filename, resampled_warped_slice) in zip(
             sliced_registered_anat_filenames, resampled_warped_slices):
-        _ = fix_obliquity(resampled_warped_slice,
-                          sliced_registered_anat_filename,
-                          overwrite=overwrite, verbose=verbose)
+        oblique_slice = fix_obliquity(resampled_warped_slice,
+                                      sliced_registered_anat_filename,
+                                      overwrite=overwrite, verbose=verbose)
+        resampled_warped_slices_oblique.append(oblique_slice)
 
     # slice functional
     sliced_func_filenames = []
@@ -729,10 +731,10 @@ def coregister_fmri_session(session_data, t_r, write_dir, brain_volume,
                             out_file=fname_presuffix(allineated_filename,
                                                      suffix='Sl%d' % slice_n),
                             environ=environ)
-        _ = fix_obliquity(out_slicer.outputs.out_file,
-                          allineated_filename,
-                          overwrite=overwrite, verbose=verbose)
-        sliced_func_filenames.append(out_slicer.outputs.out_file)
+        oblique_slice = fix_obliquity(out_slicer.outputs.out_file,
+                                      allineated_filename,
+                                      overwrite=overwrite, verbose=verbose)
+        sliced_func_filenames.append(oblique_slice)
 
     # Apply the precomputed warp slice by slice
     warped_func_slices = []
@@ -752,11 +754,11 @@ def coregister_fmri_session(session_data, t_r, write_dir, brain_volume,
                            environ=environ)
 
     # Fix the obliquity
-    _ = fix_obliquity(out_merge_func.outputs.out_file, allineated_filename,
-                      overwrite=overwrite, verbose=verbose)
+    merged_oblique = fix_obliquity(out_merge_func.outputs.out_file, allineated_filename,
+                                   overwrite=overwrite, verbose=verbose)
 
     # Update the fmri data
-    setattr(session_data, "coreg_func_", out_merge_func.outputs.out_file)
+    setattr(session_data, "coreg_func_", merged_oblique)
     setattr(session_data, "coreg_anat_", registered_anat_oblique_filename)
     setattr(session_data, "coreg_transform_", transform_filename)
     os.chdir(current_dir)
@@ -767,7 +769,7 @@ def coregister_fmri_session(session_data, t_r, write_dir, brain_volume,
                         resampled_registered_anat_filenames +
                         resampled_bias_corrected_filenames +
                         warped_slices + warp_filenames +
-                        resampled_warped_slices +
+                        resampled_warped_slices_oblique +
                         sliced_func_filenames +
                         warped_func_slices)
     if not caching:
