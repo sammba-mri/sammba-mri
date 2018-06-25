@@ -2796,7 +2796,7 @@ class Warp(AFNICommand):
     def _run_interface(self, runtime):
         runtime = super(Warp, self)._run_interface(runtime)
 
-        if self.save_matfile:
+        if self.inputs.save_matfile:
             import numpy as np
             matfile = fname_presuffix(self.inputs.in_file,
                                       suffix='_warp.mat', use_ext=False)
