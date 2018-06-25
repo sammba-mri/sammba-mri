@@ -2754,7 +2754,7 @@ class WarpInputSpec(AFNICommandInputSpec):
         argstr='-verb')
     save_matfile = traits.Bool(
         desc='save transform as .mat file',
-        requires=verbose)
+        requires=[verbose])
 
 
 class WarpOutputSpec(TraitedSpec):
