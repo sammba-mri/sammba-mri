@@ -2800,7 +2800,7 @@ class Warp(AFNICommand):
             import numpy as np
             matfile = fname_presuffix(self.inputs.in_file,
                                       suffix='_warp.mat', use_ext=False)
-            np.savetxt(matfile, [runtime.stdout], fmt='%s')
+            np.savetxt(matfile, [runtime.stdout], fmt=str('%s'))
         return runtime
 
     def _list_outputs(self):
