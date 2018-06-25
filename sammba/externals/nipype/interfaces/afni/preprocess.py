@@ -2716,7 +2716,8 @@ class WarpInputSpec(AFNICommandInputSpec):
         name_template='%s_warp',
         desc='output image file name',
         argstr='-prefix %s',
-        name_source='in_file')
+        name_source='in_file',
+        mandatory=True)
     tta2mni = traits.Bool(
         desc='transform dataset from Talairach to MNI152',
         argstr='-tta2mni')
@@ -2809,14 +2810,13 @@ class Warp(AFNICommand):
             outputs['mat_file'] = fname_presuffix(self.inputs.in_file,
                                                   suffix='_warp.mat',
                                                   use_ext=False)
-        if isdefined(self.inputs.in_file):
-            outputs['out_file'] = os.path.abspath(self.inputs.out_file)
+        outputs['out_file'] = os.path.abspath(self.inputs.out_file)
         return outputs
 
-    def _gen_filename(self, name):
-        if name == 'out_file':
-            return self._list_outputs()[name]
-        return None
+#    def _gen_filename(self, name):
+#        if name == 'out_file':
+#            return self._gen_fname(self.inputs.in_file, suffix='_QW')
+
 
 class QwarpPlusMinusInputSpec(CommandLineInputSpec):
     source_file = File(
