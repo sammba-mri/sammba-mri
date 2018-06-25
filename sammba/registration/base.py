@@ -258,7 +258,7 @@ def _bias_correct(in_file, write_dir, caching=False,
             verbose=verbose,
             output_image=fname_presuffix(in_file, suffix='_unbiased',
                                          newpath=write_dir))
-        if False:
+        if True:
             out_copy = copy(
                 in_file=out_bias_correct.outputs.output_image,
                 out_file=fname_presuffix(out_bias_correct.outputs.output_image,
@@ -270,7 +270,7 @@ def _bias_correct(in_file, write_dir, caching=False,
             out_copy_geom = copy_geom(dest_file=out_copy.outputs.out_file,
                                       in_file=in_file)
 
-        return out_bias_correct.outputs.output_image
+        return out_copy_geom.outputs.out_file
 
 
 def _afni_bias_correct(in_file, write_dir, out_file=None, caching=False,
@@ -298,10 +298,11 @@ def _afni_bias_correct(in_file, write_dir, out_file=None, caching=False,
                           environ=environ,
                           quiet=not(verbose),
                           **unifize_kwargs)
-    out_copy_geom = copy_geom(dest_file=out_unifize.outputs.out_file,
-                              in_file=in_file)
+    if False:
+        out_copy_geom = copy_geom(dest_file=out_unifize.outputs.out_file,
+                                  in_file=in_file)
 
-    return out_copy_geom.outputs.out_file
+    return out_unifize.outputs.out_file
 
 
 def _rigid_body_register(moving_head_file, reference_head_file,
