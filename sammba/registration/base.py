@@ -298,11 +298,10 @@ def _afni_bias_correct(in_file, write_dir, out_file=None, caching=False,
                           environ=environ,
                           quiet=not(verbose),
                           **unifize_kwargs)
-    if False:
-        out_copy_geom = copy_geom(dest_file=out_unifize.outputs.out_file,
-                                  in_file=in_file)
+    out_copy_geom = copy_geom(dest_file=out_unifize.outputs.out_file,
+                              in_file=in_file)
 
-    return out_unifize.outputs.out_file
+    return out_copy_geom.outputs.out_file
 
 
 def _rigid_body_register(moving_head_file, reference_head_file,
