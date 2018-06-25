@@ -2809,6 +2809,7 @@ class Warp(AFNICommand):
             outputs['mat_file'] = fname_presuffix(self.inputs.in_file,
                                                   suffix='_warp.mat',
                                                   use_ext=False)
+        outputs['out_file'] = os.path.abspath(self.inputs.out_file)
         return outputs
 
 
