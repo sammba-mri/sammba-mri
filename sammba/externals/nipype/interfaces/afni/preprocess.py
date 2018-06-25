@@ -2716,8 +2716,7 @@ class WarpInputSpec(AFNICommandInputSpec):
         name_template='%s_warp',
         desc='output image file name',
         argstr='-prefix %s',
-        name_source='in_file',
-        mandatory=True)
+        name_source='in_file')
     tta2mni = traits.Bool(
         desc='transform dataset from Talairach to MNI152',
         argstr='-tta2mni')
