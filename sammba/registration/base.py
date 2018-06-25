@@ -131,27 +131,38 @@ def compute_brain_mask(head_file, brain_volume, write_dir, bias_correct=True,
     return out_compute_mask.outputs.out_file
 
 
-def _apply_mask(head_file, mask_file, write_dir,
+def _apply_mask(head_file, mask_file, write_dir=None,
                 caching=False, terminal_output='allatonce'):
     """
     Parameters
     ----------
+    head_file : str
+        Path to the image to mask.
+
+    mask_file : str
+        Path to the image mask to apply.
+
+    write_dir : str or None, optional
+        Path to the folder to save the output file to. If None, the folder
+        of the head file is used.
+
     caching : bool, optional
         Wether or not to use caching.
 
-    unifize_kwargs : dict, optional
-        Is passed to sammba.externals.nipype.interfaces.afni.Unifize.
+    terminal_output : one of {'stream', 'allatonce', 'file', 'none'}
+        Control terminal output :
+            'stream' : displays to terminal immediately,
+            'allatonce' : waits till command is finished to display output,
+            'file' : writes output to file
+            'none' : output is ignored
 
     Returns
     -------
     path to brain extracted image.
-
-    Notes
-    -----
-    If `use_rats_tool` is turned on, RATS tool is used for brain extraction
-    and has to be cited. For more information, see
-    `RATS <http://www.iibi.uiowa.edu/content/rats-overview/>`_
     """
+    if write_dir is None:
+        write_dir = os.path.dirname(head_file)
+
     if caching:
         memory = Memory(write_dir)
         apply_mask = memory.cache(fsl.ApplyMask)
@@ -221,9 +232,12 @@ def _delete_orientation(in_file, write_dir, min_zoom=.1, caching=False,
     return out_center_mass.outputs.out_file
 
 
-def _ants_bias_correct(in_file, write_dir, caching=False,
+def _ants_bias_correct(in_file, write_dir=None, caching=False,
                        terminal_output='allatonce', verbose=True,
                        environ=None):
+    if write_dir is None:
+        write_dir = os.path.dirname(in_file)
+
     if environ is None:
         environ = {'AFNI_DECONFLICT': 'OVERWRITE'}
 
@@ -260,10 +274,13 @@ def _ants_bias_correct(in_file, write_dir, caching=False,
     return out_copy_geom.outputs.out_file
 
 
-def _afni_bias_correct(in_file, write_dir, out_file=None, caching=False,
+def _afni_bias_correct(in_file, write_dir=None, out_file=None, caching=False,
                        terminal_output='allatonce', verbose=True,
                        environ=None,
                        **unifize_kwargs):
+    if write_dir is None:
+        write_dir = os.path.dirname(in_file)
+
     if environ is None:
         environ = {'AFNI_DECONFLICT': 'OVERWRITE'}
 
@@ -294,7 +311,7 @@ def _afni_bias_correct(in_file, write_dir, out_file=None, caching=False,
 
 def _rigid_body_register(moving_head_file, reference_head_file,
                          moving_brain_file, reference_brain_file,
-                         write_dir=None,
+                         write_dir=None, verbose=True,
                          caching=False, terminal_output='allatonce',
                          environ=None):
     # XXX: add verbosity
@@ -330,22 +347,23 @@ def _rigid_body_register(moving_head_file, reference_head_file,
         center_of_mass='',
         warp_type='shift_rotate',
         out_file=fname_presuffix(reference_brain_file, suffix='_shr'),
-        environ=environ)
+        environ=environ,
+        verb=verbose)
     rigid_transform_file = out_allineate.outputs.out_matrix
     output_files.append(out_allineate.outputs.out_file)
 
     # apply the inverse transform to register the anatomical to the func
-    catmatvec_out_file = fname_presuffix(rigid_transform_file, suffix='INV',
-                                         newpath=write_dir)
-    _ = catmatvec(in_file=[(rigid_transform_file, 'I')],
-                  oneline=True,
-                  out_file=catmatvec_out_file,
-                  environ=environ)
-    output_files.append(catmatvec_out_file)
+    out_catmatvec = catmatvec(
+        in_file=[(rigid_transform_file, 'I')],
+        oneline=True,
+        out_file=fname_presuffix(rigid_transform_file, suffix='INV',
+                                 newpath=write_dir),
+        environ=environ)
+    output_files.append(out_catmatvec.outputs.out_file)
     out_allineate_apply = allineate(
         in_file=moving_head_file,
         master=reference_head_file,
-        in_matrix=catmatvec_out_file,
+        in_matrix=out_catmatvec.outputs.out_file,
         out_file=fname_presuffix(moving_head_file, suffix='_shr',
                                  newpath=write_dir),
         environ=environ)
