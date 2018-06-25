@@ -23,7 +23,7 @@ class TemplateRegistrator(BaseRegistrator):
         Volume of the brain used for brain extraction.
         Typically 400 for mouse and 1650 for rat.
 
-    brain_template_mask : str, optional
+    template_brain_mask : str, optional
         Path to the template brain mask image.
 
     dilated_template_mask : str, optional
