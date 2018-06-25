@@ -1,4 +1,4 @@
-from .base import (compute_brain_mask, _bias_correct, _afni_bias_correct,
+from .base import (compute_brain_mask, _ants_bias_correct, _afni_bias_correct,
                    _apply_mask, _apply_perslice_warp)
 from .perfusion import coregister as coregister_perf
 from .func import _realign, _slice_time
@@ -126,11 +126,12 @@ class Coregistrator(BaseRegistrator):
             raise ValueError("Only 'func' and 'perf' modalities are "
                              "implemented")
 
-        unbiased_file = _bias_correct(to_coregister_file,
-                                      write_dir=self.output_dir,
-                                      terminal_output=self.terminal_output,
-                                      caching=self.caching,
-                                      verbose=self.verbose)
+        unbiased_file = _ants_bias_correct(
+            to_coregister_file,
+            write_dir=self.output_dir,
+            terminal_output=self.terminal_output,
+            caching=self.caching,
+            verbose=self.verbose)
 
         if prior_rigid_body_registration:
             if brain_mask_file is None or self._anat_brain_mask is None:

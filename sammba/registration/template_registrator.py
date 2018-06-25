@@ -1,5 +1,5 @@
 import os
-from .base import (compute_brain_mask, _bias_correct,
+from .base import (compute_brain_mask, _ants_bias_correct,
                    _afni_bias_correct, _apply_mask,
                    _apply_perslice_warp, _apply_transforms)
 from .perfusion import coregister as coregister_perf
@@ -237,7 +237,7 @@ class TemplateRegistrator(BaseRegistrator):
             raise ValueError("Only 'func' and 'perf' modalities are "
                              "implemented")
 
-        unbiased_file = _bias_correct(to_coregister_file,
+        unbiased_file = _ants_bias_correct(to_coregister_file,
                                       write_dir=self.output_dir,
                                       terminal_output=self.terminal_output,
                                       caching=self.caching,

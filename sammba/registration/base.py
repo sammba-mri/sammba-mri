@@ -221,55 +221,43 @@ def _delete_orientation(in_file, write_dir, min_zoom=.1, caching=False,
     return out_center_mass.outputs.out_file
 
 
-def _bias_correct(in_file, write_dir, caching=False,
-                  terminal_output='allatonce', verbose=True, environ=None):
-    if ants.base.Info().version is None:
-        BiasCorrect = afni.Unifize
-    else:
-        BiasCorrect = ants.N4BiasFieldCorrection
-
+def _ants_bias_correct(in_file, write_dir, caching=False,
+                       terminal_output='allatonce', verbose=True,
+                       environ=None):
     if environ is None:
         environ = {'AFNI_DECONFLICT': 'OVERWRITE'}
 
     if caching:
         memory = Memory(write_dir)
-        bias_correct = memory.cache(BiasCorrect)
+        bias_correct = memory.cache(ants.N4BiasFieldCorrection)
         copy = memory.cache(afni.Copy)
         copy_geom = memory.cache(fsl.CopyGeom)
         bias_correct.interface().set_default_terminal_output(terminal_output)
         copy.interface().set_default_terminal_output(terminal_output)
     else:
-        bias_correct = BiasCorrect(terminal_output=terminal_output).run
+        bias_correct = ants.N4BiasFieldCorrection(
+            terminal_output=terminal_output).run
         copy = afni.Copy(terminal_output=terminal_output).run
         copy_geom = fsl.CopyGeom(terminal_output=terminal_output).run
 
-    if ants.base.Info().version is None:
-        out_bias_correct = bias_correct(
-            in_file=in_file,
-            quiet=not(verbose),
-            out_file=fname_presuffix(in_file, suffix='_unbiased',
-                                     newpath=write_dir),
-            environ=environ)
-        return out_bias_correct.outputs.out_file
-    else:
-        out_bias_correct = bias_correct(
-            input_image=in_file,
-            shrink_factor=compute_n4_max_shrink(in_file),
-            verbose=verbose,
-            output_image=fname_presuffix(in_file, suffix='_n4_deoblique',
-                                         newpath=write_dir))
-        out_copy = copy(
-            in_file=out_bias_correct.outputs.output_image,
-            out_file=fname_presuffix(in_file,
-                                     suffix='_n4',
-                                     newpath=write_dir),
-            environ=environ,
-            verb=verbose)
+    out_bias_correct = bias_correct(
+        input_image=in_file,
+        shrink_factor=compute_n4_max_shrink(in_file),
+        verbose=verbose,
+        output_image=fname_presuffix(in_file, suffix='_n4_deoblique',
+                                     newpath=write_dir))
+    out_copy = copy(
+        in_file=out_bias_correct.outputs.output_image,
+        out_file=fname_presuffix(in_file,
+                                 suffix='_n4',
+                                 newpath=write_dir),
+        environ=environ,
+        verb=verbose)
 
-        out_copy_geom = copy_geom(dest_file=out_copy.outputs.out_file,
-                                  in_file=in_file)
+    out_copy_geom = copy_geom(dest_file=out_copy.outputs.out_file,
+                              in_file=in_file)
 
-        return out_copy_geom.outputs.out_file
+    return out_copy_geom.outputs.out_file
 
 
 def _afni_bias_correct(in_file, write_dir, out_file=None, caching=False,
@@ -400,7 +388,7 @@ def _warp(to_warp_file, reference_file, write_dir=None, caching=False,
         verbose=verbose, caching=caching,
         caching_dir=write_dir, environ=environ)
 
-    return warped_oblique_file, out_warp.outputs.out_file
+    return warped_oblique_file, out_warp.outputs.mat_file
 
 
 def _per_slice_qwarp(to_qwarp_file, reference_file,
