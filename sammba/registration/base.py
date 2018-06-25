@@ -256,19 +256,18 @@ def _bias_correct(in_file, write_dir, caching=False,
             input_image=in_file,
             shrink_factor=compute_n4_max_shrink(in_file),
             verbose=verbose,
-            output_image=fname_presuffix(in_file, suffix='_unbiased',
+            output_image=fname_presuffix(in_file, suffix='_n4_deoblique',
                                          newpath=write_dir))
-        if True:
-            out_copy = copy(
-                in_file=out_bias_correct.outputs.output_image,
-                out_file=fname_presuffix(out_bias_correct.outputs.output_image,
-                                         suffix='_oblique',
-                                         newpath=write_dir),
-                environ=environ,
-                verb=verbose)
-    
-            out_copy_geom = copy_geom(dest_file=out_copy.outputs.out_file,
-                                      in_file=in_file)
+        out_copy = copy(
+            in_file=out_bias_correct.outputs.output_image,
+            out_file=fname_presuffix(in_file,
+                                     suffix='_n4',
+                                     newpath=write_dir),
+            environ=environ,
+            verb=verbose)
+
+        out_copy_geom = copy_geom(dest_file=out_copy.outputs.out_file,
+                                  in_file=in_file)
 
         return out_copy_geom.outputs.out_file
 

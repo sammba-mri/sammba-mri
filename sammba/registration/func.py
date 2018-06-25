@@ -226,7 +226,7 @@ def coregister(unifized_anat_file, unbiased_mean_func_file, write_dir,
     registered_anat_oblique_file, mat_file =\
         _warp(allineated_anat_file, unbiased_mean_func_file, write_dir,
               caching=caching, verbose=verbose,
-              terminal_output=terminal_output, overwrite=overwrite,
+              terminal_output=terminal_output,
               environ=environ)
 
     output_files.append(mat_file)

@@ -106,7 +106,7 @@ def coregister(unifized_anat_file,
     registered_anat_oblique_file, mat_file =\
         _warp(allineated_anat_file, unbiased_m0_file, write_dir,
               caching=caching, verbose=verbose,
-              terminal_output=terminal_output, overwrite=overwrite,
+              terminal_output=terminal_output,
               environ=environ)
 
     # Concatenate all the anat to func tranforms
