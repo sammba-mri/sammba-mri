@@ -6,7 +6,7 @@ from ..externals.nipype.caching import Memory
 from ..externals.nipype.interfaces import afni, ants, fsl
 from ..externals.nipype.utils.filemanip import fname_presuffix
 from ..interfaces import segmentation
-from .utils import fix_obliquity, _get_afni_output_type, compute_n4_max_shrink
+from .utils import fix_obliquity, compute_n4_max_shrink
 
 
 def mask_report(mask_file, expected_volume):
@@ -19,7 +19,6 @@ def mask_report(mask_file, expected_volume):
 
     expected_volume : float
         Expected volume in the mask.
-    
     """
 
     # TODO: symmetry, length and width
@@ -370,9 +369,7 @@ def _rigid_body_register(moving_head_file, reference_head_file,
 
 
 def _warp(to_warp_file, reference_file, write_dir=None, caching=False,
-          terminal_output='allatonce', verbose=True,
-          overwrite=True, environ=None):
-    # XXX: add verbosity
+          terminal_output='allatonce', verbose=True, environ=None):
     if write_dir is None:
         write_dir = os.path.dirname(to_warp_file)
 
@@ -385,32 +382,22 @@ def _warp(to_warp_file, reference_file, write_dir=None, caching=False,
     else:
         warp = afni.Warp().run
 
-
-    # 3dWarp doesn't put the obliquity in the header, so do it manually
-    # This step generates one file per slice and per time point, so we are
-    # making sure they are removed at the end
     out_warp = warp(in_file=to_warp_file,
                     oblique_parent=reference_file,
                     interp='quintic',
                     gridset=reference_file,
                     out_file=fname_presuffix(to_warp_file, suffix='_warped',
                                              newpath=write_dir),
-                    verbose=True,  # mandatory to get the runtime.stdout
+                    save_matfile=True,
                     environ=environ)
-    warped_file = out_warp.outputs.out_file
+
+    # 3dWarp doesn't put the obliquity in the header, so do it manually
     warped_oblique_file = fix_obliquity(
-        warped_file, reference_file,
+        out_warp.outputs.out_file, reference_file,
         verbose=verbose, caching=caching,
         caching_dir=write_dir, environ=environ)
 
-    # Concatenate all the anat to func tranforms
-    mat_file = fname_presuffix(warped_oblique_file, suffix='_warp.mat',
-                               use_ext=False,
-                               newpath=write_dir)
-    # XXX Handle this correctly according to caching
-    if not os.path.isfile(mat_file) or overwrite:
-        np.savetxt(mat_file, [out_warp.runtime.stdout], fmt='%s')
-    return warped_oblique_file, mat_file
+    return warped_oblique_file, out_warp.outputs.out_file
 
 
 def _per_slice_qwarp(to_qwarp_file, reference_file,
@@ -628,7 +615,8 @@ def _per_slice_qwarp(to_qwarp_file, reference_file,
             caching_dir=per_slice_dir, environ=environ)
 
         # Update the outputs
-        output_files.extend(sliced_apply_to_files_to_remove + oblique_warped_apply_to_slices)
+        output_files.extend(sliced_apply_to_files_to_remove +
+                            oblique_warped_apply_to_slices)
     else:
         merged_apply_to_file = None
 
@@ -648,7 +636,6 @@ def _apply_perslice_warp(apply_to_file, warp_files,
                          environ=None):
 
     # Apply the precomputed warp slice by slice
-
     if write_dir is None:
         write_dir = os.path.dirname(apply_to_file),
 
@@ -735,7 +722,8 @@ def _apply_perslice_warp(apply_to_file, warp_files,
         caching_dir=per_slice_dir, environ=environ)
 
     # Update the outputs
-    output_files.extend(sliced_apply_to_files_to_remove + oblique_warped_apply_to_slices)
+    output_files.extend(sliced_apply_to_files_to_remove +
+                        oblique_warped_apply_to_slices)
 
     if not caching:
         for out_file in output_files:
@@ -828,11 +816,11 @@ def _transform_to_template(to_register_filename, template_filename, write_dir,
 def _apply_transforms(to_register_filename, target_filename,
                       write_dir,
                       transforms,
+                      transformed_filename=None,
                       transforms_kind='nonlinear',
                       interpolation='wsinc5',
-                      transformed_filename=None,
-                      voxel_size=None,
-                      caching=False, verbose=True, inverse=False):
+                      voxel_size=None, inverse=False,
+                      caching=False, verbose=True):
     """ Applies successive transforms to a given image to put it in
     template space.
 
@@ -942,5 +930,7 @@ def _apply_transforms(to_register_filename, target_filename,
                        interp=interpolation,
                        out_file=transformed_filename,
                        environ=environ)
-    transformed_filename = fix_obliquity(transformed_filename, resampled_template_filename)
+    # XXX obliquity information is lost if resampling is done
+    transformed_filename = fix_obliquity(transformed_filename,
+                                         resampled_template_filename)
     return transformed_filename

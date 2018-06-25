@@ -2752,6 +2752,14 @@ class WarpInputSpec(AFNICommandInputSpec):
     verbose = traits.Bool(
         desc='Print out some information along the way.',
         argstr='-verb')
+    save_matfile = traits.Bool(
+        desc='save transform as .mat file',
+        requires=verbose)
+
+
+class WarpOutputSpec(TraitedSpec):
+    out_file = File(desc='Warped file.', exists=True)
+    mat_file = File(desc='warp transfrom mat file')
 
 
 class Warp(AFNICommand):
@@ -2783,7 +2791,25 @@ class Warp(AFNICommand):
     """
     _cmd = '3dWarp'
     input_spec = WarpInputSpec
-    output_spec = AFNICommandOutputSpec
+    output_spec = WarpOutputSpec
+
+    def _run_interface(self, runtime):
+        runtime = super(Warp, self)._run_interface(runtime)
+
+        if self.save_matfile:
+            import numpy as np
+            matfile = fname_presuffix(self.inputs.in_file,
+                                      suffix='_warp.mat', use_ext=False)
+            np.savetxt(matfile, [runtime.stdout], fmt='%s')
+        return runtime
+
+    def _list_outputs(self):
+        outputs = self.output_spec().get()
+        if self.save_matfile:
+            outputs['mat_file'] = fname_presuffix(self.inputs.in_file,
+                                                  suffix='_warp.mat',
+                                                  use_ext=False)
+        return outputs
 
 
 class QwarpPlusMinusInputSpec(CommandLineInputSpec):
