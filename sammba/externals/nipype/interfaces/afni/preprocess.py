@@ -2805,7 +2805,7 @@ class Warp(AFNICommand):
 
     def _list_outputs(self):
         outputs = self.output_spec().get()
-        if self.save_matfile:
+        if self.inputs.save_matfile:
             outputs['mat_file'] = fname_presuffix(self.inputs.in_file,
                                                   suffix='_warp.mat',
                                                   use_ext=False)
