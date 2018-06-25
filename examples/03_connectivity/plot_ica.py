@@ -24,9 +24,8 @@ template = dorr.t2
 import os
 
 dorr_masks = data_fetchers.fetch_masks_dorr_2008(downsample='100')
-template_brain_mask = os.path.join('ica', 'dorr_100_mask.nii.gz')
-if not os.path.isfile(template_brain_mask):
-    dorr_masks.brain.to_filename(template_brain_mask)
+template_brain_mask = os.path.join('dorr_100_mask.nii.gz')
+dorr_masks.brain.to_filename(template_brain_mask)
 
 ##############################################################################
 # Register to the template
