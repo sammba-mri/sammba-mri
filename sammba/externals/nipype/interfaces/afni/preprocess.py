@@ -2714,6 +2714,7 @@ class WarpInputSpec(AFNICommandInputSpec):
         copyfile=False)
     out_file = File(
         name_template='%s_warp',
+        keep_extension=True,
         desc='output image file name',
         argstr='-prefix %s',
         name_source='in_file')
@@ -2809,12 +2810,12 @@ class Warp(AFNICommand):
             outputs['mat_file'] = fname_presuffix(self.inputs.in_file,
                                                   suffix='_warp.mat',
                                                   use_ext=False)
-        outputs['out_file'] = os.path.abspath(self.inputs.out_file)
+        if not self.inputs.out_file:
+            out_file = self._gen_fname(self.inputs.in_file, suffix='_warp')
+            outputs['out_file'] = os.path.abspath(out_file)
+        else:
+            outputs['out_file'] = os.path.abspath(self.inputs.out_file)
         return outputs
-
-#    def _gen_filename(self, name):
-#        if name == 'out_file':
-#            return self._gen_fname(self.inputs.in_file, suffix='_QW')
 
 
 class QwarpPlusMinusInputSpec(CommandLineInputSpec):
