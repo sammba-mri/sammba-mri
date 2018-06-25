@@ -124,6 +124,7 @@ def compute_brain_mask(head_file, brain_volume, write_dir, bias_correct=True,
         intensity_threshold=int(out_clip_level.outputs.clip_val),
         **compute_mask_args)
 
+    # Remove intermediate output
     if not caching and bias_correct:
         os.remove(file_to_mask)
 
@@ -257,19 +258,19 @@ def _bias_correct(in_file, write_dir, caching=False,
             verbose=verbose,
             output_image=fname_presuffix(in_file, suffix='_unbiased',
                                          newpath=write_dir))
+        if False:
+            out_copy = copy(
+                in_file=out_bias_correct.outputs.output_image,
+                out_file=fname_presuffix(out_bias_correct.outputs.output_image,
+                                         suffix='_oblique',
+                                         newpath=write_dir),
+                environ=environ,
+                verb=verbose)
+    
+            out_copy_geom = copy_geom(dest_file=out_copy.outputs.out_file,
+                                      in_file=in_file)
 
-        out_copy = copy(
-            in_file=out_bias_correct.outputs.output_image,
-            out_file=fname_presuffix(out_bias_correct.outputs.output_image,
-                                     suffix='_oblique',
-                                     newpath=write_dir),
-            environ=environ,
-            verb=verbose)
-    
-        out_copy_geom = copy_geom(dest_file=out_copy.outputs.out_file,
-                                  in_file=in_file)
-    
-        return out_copy_geom.outputs.out_file
+        return out_bias_correct.outputs.out_file
 
 
 def _afni_bias_correct(in_file, write_dir, out_file=None, caching=False,
@@ -297,16 +298,18 @@ def _afni_bias_correct(in_file, write_dir, out_file=None, caching=False,
                           environ=environ,
                           quiet=not(verbose),
                           **unifize_kwargs)
-    out_copy_geom = copy_geom(dest_file=out_unifize.outputs.out_file,
-                              in_file=in_file)
+    if False:
+        out_copy_geom = copy_geom(dest_file=out_unifize.outputs.out_file,
+                                  in_file=in_file)
 
-    return out_copy_geom.outputs.out_file
+    return out_unifize.outputs.out_file
 
 
 def _rigid_body_register(moving_head_file, reference_head_file,
                          moving_brain_file, reference_brain_file,
                          write_dir=None,
-                         caching=False, terminal_output='allatonce', environ=None):
+                         caching=False, terminal_output='allatonce',
+                         environ=None):
     # XXX: add verbosity
     if write_dir is None:
         write_dir = os.path.dirname(moving_head_file)
@@ -388,6 +391,7 @@ def _warp(to_warp_file, reference_file, write_dir=None, caching=False,
                     gridset=reference_file,
                     out_file=fname_presuffix(to_warp_file, suffix='_warped',
                                              newpath=write_dir),
+                    verbose=True,
                     save_matfile=True,
                     environ=environ)
 
