@@ -49,7 +49,7 @@ coregistrator.fit_modality(func_filename, 'func',
 # ---------------------
 from nilearn import plotting, image
 
-display = plotting.plot_epi(image.mean_img(coregistrator.undistorted_func),
+display = plotting.plot_epi(image.mean_img(coregistrator.undistorted_func_),
                             title='coreg anat edges on top of mean coreg EPI')
-display.add_edges(coregistrator.anat_in_func_space)
+display.add_edges(coregistrator.anat_in_func_space_)
 plotting.show()
