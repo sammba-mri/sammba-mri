@@ -270,7 +270,7 @@ def _bias_correct(in_file, write_dir, caching=False,
             out_copy_geom = copy_geom(dest_file=out_copy.outputs.out_file,
                                       in_file=in_file)
 
-        return out_bias_correct.outputs.out_file
+        return out_bias_correct.outputs.output_image
 
 
 def _afni_bias_correct(in_file, write_dir, out_file=None, caching=False,
