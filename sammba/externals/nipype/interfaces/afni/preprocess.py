@@ -2811,7 +2811,12 @@ class Warp(AFNICommand):
                                                   suffix='_warp.mat',
                                                   use_ext=False)
         if not self.inputs.out_file:
-            out_file = self._gen_fname(self.inputs.in_file, suffix='_warp')
+            fname, ext = os.path.splitext(self.inputs.in_file)
+            if '.gz' in ext:
+                _, ext2 = os.path.splitext(fname)
+                ext = ext2 + ext
+            out_file = self._gen_fname(self.inputs.in_file, suffix='_warp',
+                                       ext=ext)
             outputs['out_file'] = os.path.abspath(out_file)
         else:
             outputs['out_file'] = os.path.abspath(self.inputs.out_file)
