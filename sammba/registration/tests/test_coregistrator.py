@@ -72,6 +72,8 @@ def test_coregistrator():
     np.testing.assert_array_equal(transformed_img.shape, func_img.shape[:-1])
 
     # Similarly with rigid body registration
+    registrator = Coregistrator(output_dir=tst.tmpdir, use_rats_tool=False,
+                                verbose=False, brain_volume=400)
     registrator.fit_modality(func_file, 'func', slice_timing=False,
                              prior_rigid_body_registration=True)
     func_img = nibabel.load(func_file)
