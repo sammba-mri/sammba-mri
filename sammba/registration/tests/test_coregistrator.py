@@ -27,7 +27,8 @@ def test_coregistrator():
     func_file = os.path.join(os.path.dirname(testing_data.__file__),
                              'func.nii.gz')
 
-    registrator = Coregistrator(output_dir=tst.tmpdir, use_rats_tool=False, verbose=False)
+    registrator = Coregistrator(output_dir=tst.tmpdir, use_rats_tool=False,
+                                verbose=False)
     assert_raises_regex(
         ValueError, 'has not been fitted. ', registrator.fit_modality,
         func_file, 'func')
@@ -47,24 +48,50 @@ def test_coregistrator():
         func_file, 'func', slice_timing=False,
         prior_rigid_body_registration=True)
 
-    # without slice timing
+    # without rigid body registration
     registrator.fit_modality(func_file, 'func', slice_timing=False)
     func_img = nibabel.load(func_file)
-    assert_true(_check_same_fov(nibabel.load(registrator.undistorted_func_), func_img))
-    np.testing.assert_array_almost_equal(nibabel.load(registrator.anat_in_func_space_).affine,
-                                         func_img.affine)
-    np.testing.assert_array_equal(nibabel.load(registrator.anat_in_func_space_).shape,
-                                  func_img.shape[:-1])
+    assert_true(_check_same_fov(nibabel.load(registrator.undistorted_func_),
+                                func_img))
+    np.testing.assert_array_almost_equal(
+        nibabel.load(registrator.anat_in_func_space_).affine, func_img.affine)
+    np.testing.assert_array_equal(
+        nibabel.load(registrator.anat_in_func_space_).shape,
+        func_img.shape[:-1])
 
-
-    # test transform_modality_like on an image with same orientation as the functional
+    # test transform_modality_like on an image with oriented as the functional
     func_like_img = nibabel.Nifti1Image(np.zeros(func_img.shape[:-1]),
                                         func_img.affine)
     func_like_file = os.path.join(tst.tmpdir, 'func_like.nii.gz')
     func_like_img.to_filename(func_like_file)
-    transformed_file = registrator.transform_modality_like(func_like_file, 'func')
+    transformed_file = registrator.transform_modality_like(func_like_file,
+                                                           'func')
     transformed_img = nibabel.load(transformed_file)
-    np.testing.assert_array_almost_equal(transformed_img.affine, func_img.affine)
+    np.testing.assert_array_almost_equal(transformed_img.affine,
+                                         func_img.affine)
+    np.testing.assert_array_equal(transformed_img.shape, func_img.shape[:-1])
+
+    # Similarly with rigid body registration
+    registrator.fit_modality(func_file, 'func', slice_timing=False,
+                             prior_rigid_body_registration=True)
+    func_img = nibabel.load(func_file)
+    assert_true(_check_same_fov(nibabel.load(registrator.undistorted_func_),
+                                func_img))
+    np.testing.assert_array_almost_equal(
+        nibabel.load(registrator.anat_in_func_space_).affine, func_img.affine)
+    np.testing.assert_array_equal(
+        nibabel.load(registrator.anat_in_func_space_).shape,
+        func_img.shape[:-1])
+
+    func_like_img = nibabel.Nifti1Image(np.zeros(func_img.shape[:-1]),
+                                        func_img.affine)
+    func_like_file = os.path.join(tst.tmpdir, 'func_like.nii.gz')
+    func_like_img.to_filename(func_like_file)
+    transformed_file = registrator.transform_modality_like(func_like_file,
+                                                           'func')
+    transformed_img = nibabel.load(transformed_file)
+    np.testing.assert_array_almost_equal(transformed_img.affine,
+                                         func_img.affine)
     np.testing.assert_array_equal(transformed_img.shape, func_img.shape[:-1])
 
     # Similarly with perf
@@ -72,12 +99,15 @@ def test_coregistrator():
     m0_file = os.path.join(tst.tmpdir, 'm0.nii.gz')
     m0_img.to_filename(m0_file)
     registrator.fit_modality(m0_file, 'perf')
-    assert_true(_check_same_fov(nibabel.load(registrator.undistorted_perf_), m0_img))
-    assert_true(_check_same_fov(nibabel.load(registrator.anat_in_perf_space_), m0_img))
+    assert_true(_check_same_fov(nibabel.load(registrator.undistorted_perf_),
+                                m0_img))
+    assert_true(_check_same_fov(nibabel.load(registrator.anat_in_perf_space_),
+                                m0_img))
 
     m0_like_img = nibabel.Nifti1Image(np.zeros(m0_img.shape), m0_img.affine)
     m0_like_file = os.path.join(tst.tmpdir, 'm0_like.nii.gz')
     m0_like_img.to_filename(m0_like_file)
-    transformed_file = registrator.transform_modality_like(m0_like_file, 'perf')
+    transformed_file = registrator.transform_modality_like(m0_like_file,
+                                                           'perf')
     transformed_img = nibabel.load(transformed_file)
     assert_true(_check_same_fov(transformed_img, m0_img))
