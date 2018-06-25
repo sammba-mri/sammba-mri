@@ -30,7 +30,7 @@ def test_coregistrator():
     registrator = Coregistrator(output_dir=tst.tmpdir, use_rats_tool=False,
                                 verbose=False)
     assert_raises_regex(
-        ValueError, 'has not been fitted. ', registrator.fit_modality,
+        ValueError, 'has not been anat fitted. ', registrator.fit_modality,
         func_file, 'func')
 
     registrator.fit_anat(anat_file)

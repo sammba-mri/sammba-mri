@@ -39,7 +39,7 @@ def test_fit_transform_anat():
                                       use_rats_tool=False, verbose=False,
                                       registration_kind='affine')
     assert_raises_regex(
-        ValueError, 'has not been fitted',
+        ValueError, 'has not been anat fitted',
         registrator.transform_anat_like, anat_file)
 
     registrator.fit_anat(anat_file)
@@ -58,7 +58,7 @@ def test_fit_transform_anat():
     registrator = TemplateRegistrator(template_file, 400, output_dir=tst.tmpdir,
                                       use_rats_tool=False, verbose=False)
     assert_raises_regex(
-        ValueError, 'has not been fitted',
+        ValueError, 'has not been anat fitted',
         registrator.transform_anat_like, anat_file)
 
     registrator.fit_anat(anat_file)
