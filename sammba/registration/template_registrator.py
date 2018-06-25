@@ -23,13 +23,14 @@ class TemplateRegistrator(BaseRegistrator):
         Volume of the brain used for brain extraction.
         Typically 400 for mouse and 1650 for rat.
 
-    template_brain_mask : str, optional
-        Path to the template brain mask image.
+    template_brain_mask : str or None, optional
+        Path to the template brain mask image, compliant with the given head
+        template.
 
-    dilated_template_mask : str, optional
-        Path to a dilated head mask. Note that this must be compliant with the
-        the given head template. If None, the mask is set to the non-background
-        voxels of the head template after one dilation.
+    dilated_template_mask : str or None, optional
+        Path to a dilated head mask, compliant with the given head template.
+        If None, the mask is set to the non-background voxels of the head
+        template after one dilation.
 
     output_dir : str, optional
         Path to the output directory. If not specified, current directory is
@@ -104,7 +105,7 @@ class TemplateRegistrator(BaseRegistrator):
 
     def _check_anat_fitted(self):
         if not hasattr(self, '_normalization_transforms'):
-            raise ValueError('It seems that %s has not been fitted. '
+            raise ValueError('It seems that %s has not been anat fitted. '
                              'You must call fit_anat() before calling '
                              'transform_anat() or fit_modality().'
                              % self.__class__.__name__)
@@ -136,7 +137,8 @@ class TemplateRegistrator(BaseRegistrator):
         else:
             self._unifized_anat = _afni_bias_correct(
                 self.anat_, write_dir=self.output_dir,
-                terminal_output=self.terminal_output, caching=self.caching, verbose=self.verbose)
+                terminal_output=self.terminal_output, caching=self.caching,
+                verbose=self.verbose)
             self.anat_brain_ = _apply_mask(
                 self._unifized_anat, brain_mask_file,
                 write_dir=self.output_dir,
@@ -169,15 +171,14 @@ class TemplateRegistrator(BaseRegistrator):
         in_file: str
             Path to the file in the same space as the anatomical image.
 
-                
-        interpolation: one of {'nearestneighbour', 'trilinear', 'tricubic', 'triquintic',
-                               'wsinc5'}, optional
+        interpolation: one of {'nearestneighbour', 'trilinear', 'tricubic',
+                               'triquintic', 'wsinc5'}, optional
             The interpolation method used for the transformed file.
 
         Retruns
         -------
         transformed_file: str
-            Path to the transformed file, in template space.s
+            Path to the transformed file, in template space.
         """
         self._check_anat_fitted()
 
@@ -206,10 +207,10 @@ class TemplateRegistrator(BaseRegistrator):
 
         Parameters
         ----------
-        in_file: str
+        in_file : str
             Path to the modality image. M0 file is expected for perfusion.
-                 
-        modality: one of {'func', 'perf'}
+
+        modality : one of {'func', 'perf'}
             Name of the modality.
         """
         self._check_anat_fitted()
@@ -314,27 +315,28 @@ class TemplateRegistrator(BaseRegistrator):
     def transform_modality_like(self, in_file, modality,
                                 interpolation='wsinc5', voxel_size=None):
         """Transforms the given file from the space of the given modality to
-            the template space. If the given modality has been corrected for EPI distorsions,
-            the same correction is applied.
+            the template space. If the given modality has been corrected for
+            EPI distorsions, the same correction is applied.
 
         Parameters
         ----------
-        in_file: str
+        in_file : str
             Path to the file in the same space as the modality image.
-                 
-        modality: one of {'func', 'perf'}
+
+        modality : one of {'func', 'perf'}
             Name of the modality.
 
-        interpolation: one of {'nearestneighbour', 'trilinear', 'tricubic', 'triquintic',
-                               'wsinc5'}, optional
+        interpolation : one of {'nearestneighbour', 'trilinear', 'tricubic',
+                               'triquintic', 'wsinc5'}, optional
             The interpolation method used for the transformed file.
 
-        voxel_size: 3-tuple or None, optional
-            The target voxels size. If None, the final voxels size will match the template.
+        voxel_size : 3-tuple or None, optional
+            The target voxels size. If None, the final voxels size will match
+            the template.
 
         Retruns
         -------
-        transformed_file: str
+        transformed_file : str
             Path to the transformed file, in template space.
         """
         self._check_anat_fitted()
@@ -362,15 +364,16 @@ class TemplateRegistrator(BaseRegistrator):
 
         Parameters
         ----------
-        in_file: str
+        in_file : str
             Path to the file in the same space as the modality image.
-                 
-        interpolation: one of {'nearestneighbour', 'trilinear', 'tricubic', 'triquintic',
-                               'wsinc5'}, optional
+
+        interpolation: one of {'nearestneighbour', 'trilinear', 'tricubic',
+                               'triquintic', 'wsinc5'}, optional
             The interpolation method used for the transformed file.
 
         voxel_size: 3-tuple or None, optional
-            The target voxels size. If None, the final voxels size will match the template.
+            The target voxels size. If None, the final voxels size will match
+            the template.
 
         Retruns
         -------

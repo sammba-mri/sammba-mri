@@ -20,7 +20,6 @@ def mask_report(mask_file, expected_volume):
     expected_volume : float
         Expected volume in the mask.
     """
-
     # TODO: symmetry, length and width
     mask_img = nibabel.load(mask_file)
     volume = segmentation.compute_volume(mask_img)

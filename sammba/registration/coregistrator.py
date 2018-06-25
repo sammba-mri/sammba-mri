@@ -13,32 +13,30 @@ class Coregistrator(BaseRegistrator):
 
     Parameters
     ----------
-    brain_volume : int, optional
+    brain_volume : int or None, optional
         Volume of the brain used for brain extraction. Typically 400 for mouse
-        and 1650 for rat. Used only if prior rigid body registration
-        is needed.
+        and 1650 for rat. Used only if prior rigid body registration is needed.
 
-    output_dir : str, optional
-        Path to the output directory. If not specified, current directory is
-        used.
+    output_dir : str or None, optional
+        Path to the output directory. If None, current directory is used.
 
     caching : bool, optional
         If True, caching is used for all the registration steps.
 
     verbose : int, optional
-        Verbosity level. Note that caching implies some
-        verbosity in any case.
+        Verbosity level. Note that caching implies some verbosity in any case.
 
     use_rats_tool : bool, optional
         If True, brain mask is computed using RATS Mathematical Morphology.
         Otherwise, a histogram-based brain segmentation is used.
 
-    mask_clipping_fraction : float, optional
+    mask_clipping_fraction : float or None, optional
         Clip level fraction is passed to
         sammba.externals.nipype.interfaces.afni.Unifize, to tune
         the bias correction step done prior to brain mask segementation.
         Only values between 0.1 and 0.9 are accepted. Smaller fractions tend to
-        make the mask larger.
+        make the mask larger. If None, no unifization is done for brain mask
+        computation.
     """
     def __init__(self, brain_volume=None,
                  output_dir=None, caching=False,
@@ -68,7 +66,7 @@ class Coregistrator(BaseRegistrator):
     def _check_anat_fitted(self):
         if not hasattr(self, '_anat_brain_mask'):
             raise ValueError(
-                'It seems that %s has not been fitted. You must call '
+                'It seems that %s has not been anat fitted. You must call '
                 'fit_anat() before calling fit_modality().'
                 % self.__class__.__name__)
 
@@ -98,8 +96,7 @@ class Coregistrator(BaseRegistrator):
 
         Returns
         -------
-        out_file : str
-            Path to the modality image after coregistration.
+        the coregistrator itself
         """
         self._check_anat_fitted()
 
@@ -215,7 +212,7 @@ class Coregistrator(BaseRegistrator):
         """
         if modality not in ['perf', 'func']:
             raise ValueError("Only 'func' and 'perf' modalities are "
-                 "implemented")
+                             "implemented")
 
         self._check_anat_fitted()
         modality_undistort_warps = '_{}_undistort_warps'.format(modality)
@@ -226,6 +223,6 @@ class Coregistrator(BaseRegistrator):
                                      self.__class__.__name__, modality))
 
         coreg_apply_to_file = _apply_perslice_warp(
-            apply_to_file, self.__getattribute__(modality_undistort_warps), .1, .1,
-            write_dir=self.output_dir, caching=self.caching)
+            apply_to_file, self.__getattribute__(modality_undistort_warps),
+            .1, .1, write_dir=self.output_dir, caching=self.caching)
         return coreg_apply_to_file

@@ -1,15 +1,14 @@
 import os
 from nose.tools import assert_true, assert_equal, assert_less
 from nose import with_setup
+import nibabel
 from nilearn.datasets.tests import test_utils as tst
 from nilearn._utils.testing import assert_raises_regex
 from nilearn._utils.niimg_conversions import _check_same_fov
 from nilearn.image import mean_img
 from sammba.registration import FMRISession, func
-from sammba.externals.nipype.utils.filemanip import fname_presuffix
 from sammba.registration.utils import _check_same_obliquity
 from sammba import testing_data
-import nibabel
 
 
 @with_setup(tst.setup_tmpdata, tst.teardown_tmpdata)
@@ -29,7 +28,8 @@ def test_coregister():
                                       bunch.coreg_func_))
     assert_true(os.path.isfile(bunch.coreg_transform_))
     assert_less(0, len(bunch.coreg_warps_))
-    assert_true(bunch.coreg_warps_[-1] is None)  # Last slice in functional is without signal
+    assert_true(bunch.coreg_warps_[-1] is None)  # Last slice in functional
+                                                 # is without signal
     for warp_file in bunch.coreg_warps_[:-1]:
         assert_true(os.path.isfile(warp_file))
 
@@ -37,7 +37,8 @@ def test_coregister():
     assert_raises_regex(RuntimeError,
                         "3dcopy",
                         func.coregister, anat_file, mean_func_file, tst.tmpdir,
-                        slice_timing=False, verbose=False,  AFNI_DECONFLICT='NO')
+                        slice_timing=False, verbose=False,
+                        AFNI_DECONFLICT='NO')
 
     # Check caching does not change the paths
     bunch2 = func.coregister(anat_file, mean_func_file, tst.tmpdir,
