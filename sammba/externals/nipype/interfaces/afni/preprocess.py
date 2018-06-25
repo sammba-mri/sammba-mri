@@ -2812,6 +2812,10 @@ class Warp(AFNICommand):
         outputs['out_file'] = os.path.abspath(self.inputs.out_file)
         return outputs
 
+    def _gen_filename(self, name):
+        if name == 'out_file':
+            return self._list_outputs()[name]
+        return None
 
 class QwarpPlusMinusInputSpec(CommandLineInputSpec):
     source_file = File(
