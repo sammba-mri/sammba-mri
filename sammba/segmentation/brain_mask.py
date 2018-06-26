@@ -6,16 +6,17 @@ from ..externals.nipype.caching import Memory
 from ..externals.nipype.interfaces import afni, fsl
 from ..externals.nipype.utils.filemanip import fname_presuffix
 from . import interfaces
+from ..preprocessing import _afni_unifize
 
 
-def _compute_volume(mask_img):
+def _get_volume(mask_img):
     affine_det = np.abs(np.linalg.det(mask_img.affine[:3, :3]))
     mask_data = mask_img.get_data()
     n_voxels_mask = np.sum(mask_data > 0).astype(float)
     return n_voxels_mask * affine_det
 
 
-def _compute_mask_measures(mask_file):
+def _get_mask_measures(mask_file):
     """ Outputs the mask
 
     Parameters
@@ -25,7 +26,7 @@ def _compute_mask_measures(mask_file):
     """
     # TODO: symmetry, length and width
     mask_img = nibabel.load(mask_file)
-    volume = _compute_volume(mask_img)
+    volume = _get_volume(mask_img)
 
     mask_data = mask_img.get_data()
     i, j, k = np.where(mask_data != 0)
@@ -60,7 +61,7 @@ def brain_extraction_report(head_file, brain_volume, write_dir=None,
                                              terminal_output=terminal_output,
                                              **unifize_kwargs)
 
-    masks_measures.append(_compute_mask_measures(brain_mask_file))
+    masks_measures.append(_get_mask_measures(brain_mask_file))
 
     target_names = ['{0:0.2f}'.format(cl_frac) if cl_frac is not None
                     else 'None' for cl_frac in clipping_fractions]
@@ -140,7 +141,7 @@ def compute_morpho_brain_mask(head_file, brain_volume, write_dir=None,
         if unifize_kwargs is None:
             unifize_kwargs = {}
 
-        file_to_mask = _afni_bias_correct(
+        file_to_mask = _afni_unifize(
             head_file, write_dir,
             out_file=fname_presuffix(head_file,
                                      suffix='_unifized_for_extraction',
@@ -167,12 +168,14 @@ def compute_morpho_brain_mask(head_file, brain_volume, write_dir=None,
     return out_compute_mask.outputs.out_file
 
 
-def compute_histo_brain_mask(head_file, brain_volume, write_dir=None, unifize=True,
-                       caching=False,
-                       terminal_output='allatonce',
-                       lower_cutoff=.2, upper_cutoff=.85, closing=0,
-                       connected=True, dilation_size=(1, 1, 2), opening=5,
-                       **unifize_kwargs):
+def compute_histo_brain_mask(head_file, brain_volume, write_dir=None,
+                             unifize=True,
+                             caching=False,
+                             terminal_output='allatonce',
+                             lower_cutoff=.2, upper_cutoff=.85, closing=0,
+                             connected=True, dilation_size=(1, 1, 2),
+                             opening=5,
+                             **unifize_kwargs):
     """
     Parameters
     ----------
@@ -212,7 +215,7 @@ def compute_histo_brain_mask(head_file, brain_volume, write_dir=None, unifize=Tr
         if unifize_kwargs is None:
             unifize_kwargs = {}
 
-        file_to_mask = _afni_bias_correct(
+        file_to_mask = _afni_unifize(
             head_file, write_dir,
             out_file=fname_presuffix(head_file,
                                      suffix='_unifized_for_extraction',
