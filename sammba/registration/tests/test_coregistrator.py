@@ -3,10 +3,12 @@ from nose import with_setup
 from nose.tools import assert_true, assert_equal
 import numpy as np
 import nibabel
+from nilearn import image
 from nilearn.datasets.tests import test_utils as tst
 from nilearn._utils.testing import assert_raises_regex
 from nilearn._utils.niimg_conversions import _check_same_fov
 from sammba import testing_data
+from sammba.registration.base import compute_brain_mask
 from sammba.registration.coregistrator import Coregistrator
 
 
@@ -75,9 +77,16 @@ def test_coregistrator():
     registrator = Coregistrator(output_dir=tst.tmpdir, use_rats_tool=False,
                                 verbose=False, brain_volume=400)
     registrator.fit_anat(anat_file)
+
+    # Provide manual brain mask
+    mean_func_file = os.path.join(tst.tmpdir, 'mean_func.nii.gz')
+    image.mean_img(func_img).to_filename(mean_func_file)
+    func_brain_mask = compute_brain_mask('/tmp/mean_func.nii.gz', 400, '/tmp',
+                                         use_rats_tool=False, opening=2)
+    
     registrator.fit_modality(func_file, 'func', slice_timing=False,
-                             prior_rigid_body_registration=True)
-    func_img = nibabel.load(func_file)
+                             prior_rigid_body_registration=True,
+                             brain_mask_file=func_brain_mask)
     assert_true(_check_same_fov(nibabel.load(registrator.undistorted_func_),
                                 func_img))
     np.testing.assert_array_almost_equal(

@@ -20,7 +20,7 @@ func_filename = retest.func[0]
 print(func_filename)
 
 ##############################################################################
-# We call the `AnatCoregistrator`, which coregisters the anatomical to
+# We use the `Coregistrator`, which coregisters the anatomical to
 # a given modality
 from sammba.registration import Coregistrator
 
@@ -30,11 +30,12 @@ print(coregistrator)
 
 ##############################################################################
 # `Coregistrator` comes with a parameter `mask_clipping_fraction=.2` which
-# sometimes needs to be changed to get a good brain mask. This can be done
-# with `check_segmentation` method
-print(coregistrator.check_segmentation(anat_filename))
+# sometimes needs to be changed to get a good brain mask. You can check how
+# this parameter impacts the brain segmentation
+from sammba.segmentation import brain_mask_report
 
-coregistrator.mask_clipping_fraction = .1
+print(brain_extraction_report(anat_filename,
+                              clipping_fractions=[.1, .2, .9, None]))
 
 ##############################################################################
 # Anatomical to functional registration
