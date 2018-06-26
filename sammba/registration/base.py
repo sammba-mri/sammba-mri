@@ -1,12 +1,9 @@
 import os
-import numpy as np
 import nibabel
-from nilearn.image.resampling import coord_transform
 from ..externals.nipype.caching import Memory
-from ..externals.nipype.interfaces import afni, ants, fsl
+from ..externals.nipype.interfaces import afni, fsl
 from ..externals.nipype.utils.filemanip import fname_presuffix
-from ..interfaces import segmentation
-from .utils import fix_obliquity, compute_n4_max_shrink
+from .utils import fix_obliquity
 
 
 def _delete_orientation(in_file, write_dir=None, min_zoom=.1, caching=False,

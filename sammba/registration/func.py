@@ -6,7 +6,7 @@ from sklearn.utils import deprecated
 from sammba.externals.nipype.caching import Memory
 from sammba.externals.nipype.interfaces import afni, ants, fsl
 from sammba.externals.nipype.utils.filemanip import fname_presuffix
-from sammba.interfaces import segmentation
+from sammba import segmentation
 from .utils import fix_obliquity
 from .fmri_session import FMRISession
 from .struct import anats_to_template
@@ -355,7 +355,7 @@ def coregister_fmri_session(session_data, t_r, write_dir, brain_volume,
         terminal_output = 'none'
 
     if use_rats_tool:
-        if segmentation.Info().version() is None:
+        if segmentation.interfaces.Info().version() is None:
             raise ValueError('Can not locate RATS')
         else:
             ComputeMask = segmentation.MathMorphoMask

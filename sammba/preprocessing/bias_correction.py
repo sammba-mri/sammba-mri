@@ -1,12 +1,31 @@
 import os
+import nibabel
 from ..externals.nipype.caching import Memory
 from ..externals.nipype.interfaces import afni, ants, fsl
 from ..externals.nipype.utils.filemanip import fname_presuffix
-from .utils import compute_n4_max_shrink
+
+def _compute_n4_max_shrink(in_file):
+    """ Computes the maximal allowed shrink factor for ANTS
+    N4BiasFieldCorrection.
+
+    Note
+    -----
+    To lessen computation time, N4BiasFieldCorrection can resample the input
+    image. The shrink factor, specified as a single integer, describes this
+    resampling. The default shrink factor is 4 which is only applied to the
+    first two or three dimensions assumed spatial. The spacing for each
+    dimension is computed as
+    dimension - shrink - dimension % shrink
+    N4BiasFieldCorrection raises and error when one obtained spacing is not
+    positive.
+    """
+    img = nibabel.load(in_file)
+    spatial_shapes = img.shape[:3]
+    return min(4, min(spatial_shapes) / 2)
 
 
-def _ants_n4(in_file, write_dir=None, caching=False,
-             terminal_output='allatonce', verbose=True, environ=None):
+def ants_n4(in_file, write_dir=None, caching=False,
+            terminal_output='allatonce', verbose=True, environ=None):
     if write_dir is None:
         write_dir = os.path.dirname(in_file)
 
@@ -28,20 +47,10 @@ def _ants_n4(in_file, write_dir=None, caching=False,
 
     out_bias_correct = bias_correct(
         input_image=in_file,
-        shrink_factor=compute_n4_max_shrink(in_file),
+        shrink_factor=_compute_n4_max_shrink(in_file),
         verbose=verbose,
-        output_image=fname_presuffix(in_file, suffix='_n4_deoblique',
+        output_image=fname_presuffix(in_file, suffix='_n4',
                                      newpath=write_dir))
-    if False:
-        out_copy = copy(
-            in_file=out_bias_correct.outputs.output_image,
-            out_file=fname_presuffix(in_file,
-                                     suffix='_n4',
-                                     newpath=write_dir),
-            environ=environ,
-            verb=verbose)
-        out_copy_geom = copy_geom(dest_file=out_copy.outputs.out_file,
-                                  in_file=in_file)
 
     out_copy_geom = copy_geom(dest_file=out_bias_correct.outputs.output_image,
                               in_file=in_file)
@@ -49,9 +58,9 @@ def _ants_n4(in_file, write_dir=None, caching=False,
     return out_copy_geom.outputs.out_file
 
 
-def _afni_unifize(in_file, write_dir=None, out_file=None, caching=False,
-                  terminal_output='allatonce', verbose=True, environ=None,
-                  **unifize_kwargs):
+def afni_unifize(in_file, write_dir=None, out_file=None, caching=False,
+                 terminal_output='allatonce', verbose=True, environ=None,
+                **unifize_kwargs):
     if write_dir is None:
         write_dir = os.path.dirname(in_file)
 
@@ -79,17 +88,6 @@ def _afni_unifize(in_file, write_dir=None, out_file=None, caching=False,
                           environ=environ,
                           quiet=not(verbose),
                           **unifize_kwargs)
-    if False:
-        out_copy = copy(
-            in_file=out_unifize.outputs.output_image,
-            out_file=fname_presuffix(in_file,
-                                     suffix='_n4',
-                                     newpath=write_dir),
-            environ=environ,
-            verb=verbose)
-        out_copy_geom = copy_geom(dest_file=out_copy.outputs.out_file,
-                                  in_file=in_file)
-
     out_copy_geom = copy_geom(dest_file=out_unifize.outputs.out_file,
                               in_file=in_file)
     return out_copy_geom.outputs.out_file

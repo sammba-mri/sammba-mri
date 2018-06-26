@@ -1,7 +1,7 @@
 import os
 from sklearn.datasets.base import Bunch
 from sammba.externals.nipype.caching import Memory
-from sammba.externals.nipype.interfaces import afni, ants
+from sammba.externals.nipype.interfaces import afni
 from sammba.externals.nipype.utils.filemanip import fname_presuffix
 from .base import (_rigid_body_register, _warp, _per_slice_qwarp)
 

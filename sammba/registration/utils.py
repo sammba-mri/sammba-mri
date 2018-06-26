@@ -28,25 +28,6 @@ def _get_afni_output_type(in_file):
     return output_type
 
 
-def compute_n4_max_shrink(in_file):
-    """ Computes the maximal allowed shrink factor for ANTS
-    N4BiasFieldCorrection.
-    Note
-    -----
-    To lessen computation time, N4BiasFieldCorrection can resample the input
-    image. The shrink factor, specified as a single integer, describes this
-    resampling. The default shrink factor is 4 which is only applied to the
-    first two or three dimensions assumed spatial. The spacing for each
-    dimension is computed as
-    dimension - shrink - dimension % shrink
-    N4BiasFieldCorrection raises and error when one obtained spacing is not
-    positive.
-    """
-    img = nibabel.load(in_file)
-    spatial_shapes = img.shape[:3]
-    return min(4, min(spatial_shapes) / 2)
-
-
 def _reset_affines(in_file, out_file, overwrite=False, axes_to_permute=None,
                    axes_to_flip=None, xyzscale=None, center_mass=None,
                    verbose=1):

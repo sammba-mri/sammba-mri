@@ -1,7 +1,9 @@
 import os
-from .base import (compute_brain_mask, _ants_bias_correct,
-                   _afni_bias_correct, _apply_mask,
-                   _apply_perslice_warp, _apply_transforms)
+from ..segmentation.brain_mask import (compute_histo_brain_mask,
+                                       compute_morpho_brain_mask,
+                                       _apply_mask)
+from ..preprocessing.bias_correction import ants_n4, afni_unifize
+from .base import _apply_perslice_warp
 from .perfusion import coregister as coregister_perf
 from .func import _realign, _slice_time
 from .func import coregister as coregister_func
@@ -114,14 +116,18 @@ class TemplateRegistrator(BaseRegistrator):
         """ Estimates registration from anatomical to template space.
         """
         self._fit()
+        if self.use_rats_tool:
+            compute_brain_mask = compute_morpho_brain_mask
+        else:
+            compute_brain_mask = compute_histo_brain_mask               
+
         if not self.template_brain_mask:
             template_brain_mask_file = compute_brain_mask(
                 self.template, self.brain_volume,
                 write_dir=self.output_dir,
                 caching=self.caching,
                 terminal_output=self.terminal_output,
-                use_rats_tool=self.use_rats_tool,
-                bias_correct=False)
+                unifize=False)
         else:
             template_brain_mask_file = self.template_brain_mask
 
@@ -135,7 +141,7 @@ class TemplateRegistrator(BaseRegistrator):
         if brain_mask_file is None:
             self._unifized_anat, self.anat_brain_ = self.segment(self.anat_)
         else:
-            self._unifized_anat = _afni_bias_correct(
+            self._unifized_anat = afni_unifize(
                 self.anat_, write_dir=self.output_dir,
                 terminal_output=self.terminal_output, caching=self.caching,
                 verbose=self.verbose)
@@ -238,20 +244,24 @@ class TemplateRegistrator(BaseRegistrator):
             raise ValueError("Only 'func' and 'perf' modalities are "
                              "implemented")
 
-        unbiased_file = _ants_bias_correct(to_coregister_file,
+        unbiased_file = ants_n4(to_coregister_file,
                                       write_dir=self.output_dir,
                                       terminal_output=self.terminal_output,
                                       caching=self.caching,
                                       verbose=self.verbose)
 
         if prior_rigid_body_registration:
+            if self.use_rats_tool:
+                compute_brain_mask = compute_morpho_brain_mask
+            else:
+                compute_brain_mask = compute_histo_brain_mask               
+
             if self.mask_clipping_fraction:
                 brain_mask_file = compute_brain_mask(
                     to_coregister_file, self.brain_volume,
                     write_dir=self.output_dir,
                     caching=self.caching,
                     terminal_output=self.terminal_output,
-                    use_rats_tool=self.use_rats_tool,
                     cl_frac=self.mask_clipping_fraction)
             else:
                 brain_mask_file = compute_brain_mask(
@@ -259,8 +269,7 @@ class TemplateRegistrator(BaseRegistrator):
                     write_dir=self.output_dir,
                     caching=self.caching,
                     terminal_output=self.terminal_output,
-                    use_rats_tool=self.use_rats_tool,
-                    bias_correct=False)
+                    unifize=False)
 
             brain_file = _apply_mask(unbiased_file, brain_mask_file,
                                      write_dir=self.output_dir,

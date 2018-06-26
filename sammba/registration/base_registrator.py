@@ -1,8 +1,9 @@
 import os
 import abc
-from .base import (compute_brain_mask,
-                   _afni_bias_correct, _apply_mask,
-                   mask_report)
+from ..segmentation.brain_mask import (compute_histo_brain_mask,
+                                       compute_morpho_brain_mask,
+                                       _apply_mask)
+from ..preprocessing.bias_correction import afni_unifize
 from sklearn.base import BaseEstimator, TransformerMixin
 
 
@@ -27,9 +28,14 @@ class BaseRegistrator(BaseEstimator, TransformerMixin):
         """ Bias field correction and brain extraction
         """
         self._fit()
-        unifized_file = _afni_bias_correct(
+        unifized_file = afni_unifize(
             in_file, write_dir=self.output_dir,
             terminal_output=self.terminal_output, caching=self.caching)
+
+        if self.use_rats_tool:
+            compute_brain_mask = compute_morpho_brain_mask
+        else:
+            compute_brain_mask = compute_histo_brain_mask               
 
         if self.mask_clipping_fraction == .2:
             brain_mask_file = compute_brain_mask(
@@ -58,28 +64,6 @@ class BaseRegistrator(BaseEstimator, TransformerMixin):
                                  caching=self.caching,
                                  terminal_output=self.terminal_output)
         return unifized_file, brain_file
-
-    def check_segmentation(self, in_file):
-        """ Quality check mask computation for the chosen
-            `mask_clipping_fraction` parameter.
-        """
-        self._fit()
-        if self.mask_clipping_fraction is None:
-            brain_mask_file = compute_brain_mask(
-                in_file, self.brain_volume, write_dir=self.output_dir,
-                caching=self.caching,
-                terminal_output=self.terminal_output,
-                use_rats_tool=self.use_rats_tool,
-                bias_correct=False)
-        else:
-            brain_mask_file = compute_brain_mask(
-                in_file, self.brain_volume, write_dir=self.output_dir,
-                caching=self.caching,
-                terminal_output=self.terminal_output,
-                use_rats_tool=self.use_rats_tool,
-                cl_frac=self.mask_clipping_fraction)
-
-        return mask_report(brain_mask_file, self.brain_volume)
 
     def _fit(self, y=None):
         self._check_inputs()

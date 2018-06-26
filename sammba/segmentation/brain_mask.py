@@ -6,7 +6,7 @@ from ..externals.nipype.caching import Memory
 from ..externals.nipype.interfaces import afni, fsl
 from ..externals.nipype.utils.filemanip import fname_presuffix
 from . import interfaces
-from ..preprocessing import _afni_unifize
+from ..preprocessing import afni_unifize
 
 
 def _get_volume(mask_img):
@@ -38,7 +38,7 @@ def _get_mask_measures(mask_file):
 
 def brain_extraction_report(head_file, brain_volume, write_dir=None,
                             clipping_fractions=[.2, None], use_rats_tool=True,
-                            caching=False,
+                            caching=False, verbose=False,
                             terminal_output='allatonce', digits=2):
     if use_rats_tool:
         compute_brain_mask = compute_morpho_brain_mask
@@ -58,13 +58,14 @@ def brain_extraction_report(head_file, brain_volume, write_dir=None,
                                              unifize=unifize,
                                              write_dir=write_dir,
                                              caching=caching,
+                                             verbose=verbose,
                                              terminal_output=terminal_output,
                                              **unifize_kwargs)
 
-    masks_measures.append(_get_mask_measures(brain_mask_file))
+        masks_measures.append(_get_mask_measures(brain_mask_file))
 
-    target_names = ['{0:0.2f}'.format(cl_frac) if cl_frac is not None
-                    else 'None' for cl_frac in clipping_fractions]
+    target_names = ['fraction {0:0.2f}'.format(cl_frac) if cl_frac is not None
+                    else 'no fraction' for cl_frac in clipping_fractions]
     name_width = max(len(cn) for cn in target_names)
     width = max(name_width, digits)
 
@@ -73,8 +74,8 @@ def brain_extraction_report(head_file, brain_volume, write_dir=None,
     report = head_fmt.format(u'', *headers, width=width)
     report += u'\n\n'
 
-    row_fmt = u'{:>{width}s} ' + u' {:>9.{digits}f}' * 3 + u' {:>9}\n'
-    x_extent, y_extent, z_extent, volume = zip*(masks_measures)
+    row_fmt = u'{:>{width}s} ' + u' {:>9.{digits}f}' * 4 + u'\n'
+    x_extent, y_extent, z_extent, volume = zip(*masks_measures)
     rows = zip(target_names, x_extent, y_extent, z_extent, volume)
     for row in rows:
         report += row_fmt.format(*row, width=width, digits=digits)
@@ -83,12 +84,10 @@ def brain_extraction_report(head_file, brain_volume, write_dir=None,
 
     return report
 
-    return report
-
 
 def compute_morpho_brain_mask(head_file, brain_volume, write_dir=None,
                               unifize=True,
-                              caching=False,
+                              caching=False, verbose=True,
                               terminal_output='allatonce', **unifize_kwargs):
     """
     Parameters
@@ -122,6 +121,7 @@ def compute_morpho_brain_mask(head_file, brain_volume, write_dir=None,
 
     if interfaces.Info().version() is None:
         raise ValueError('Can not locate Rats')
+
     environ = {'AFNI_DECONFLICT': 'OVERWRITE'}
 
     if caching:
@@ -141,13 +141,14 @@ def compute_morpho_brain_mask(head_file, brain_volume, write_dir=None,
         if unifize_kwargs is None:
             unifize_kwargs = {}
 
-        file_to_mask = _afni_unifize(
+        file_to_mask = afni_unifize(
             head_file, write_dir,
             out_file=fname_presuffix(head_file,
                                      suffix='_unifized_for_extraction',
                                      newpath=write_dir),
             caching=caching,
             terminal_output=terminal_output,
+            verbose=verbose,
             environ=environ, **unifize_kwargs)
     else:
         file_to_mask = head_file
@@ -155,7 +156,7 @@ def compute_morpho_brain_mask(head_file, brain_volume, write_dir=None,
     out_clip_level = clip_level(in_file=file_to_mask)
     out_compute_mask = compute_mask(
         in_file=file_to_mask,
-        out_file=fname_presuffix(file_to_mask,
+        out_file=fname_presuffix(head_file,
                                  suffix='_rats_brain_mask',
                                  newpath=write_dir),
         volume_threshold=brain_volume,
@@ -172,6 +173,7 @@ def compute_histo_brain_mask(head_file, brain_volume, write_dir=None,
                              unifize=True,
                              caching=False,
                              terminal_output='allatonce',
+                              verbose=True,
                              lower_cutoff=.2, upper_cutoff=.85, closing=0,
                              connected=True, dilation_size=(1, 1, 2),
                              opening=5,
@@ -215,12 +217,13 @@ def compute_histo_brain_mask(head_file, brain_volume, write_dir=None,
         if unifize_kwargs is None:
             unifize_kwargs = {}
 
-        file_to_mask = _afni_unifize(
+        file_to_mask = afni_unifize(
             head_file, write_dir,
             out_file=fname_presuffix(head_file,
                                      suffix='_unifized_for_extraction',
                                      newpath=write_dir),
             caching=caching,
+            verbose=verbose,
             terminal_output=terminal_output,
             environ=environ, **unifize_kwargs)
     else:
@@ -229,7 +232,7 @@ def compute_histo_brain_mask(head_file, brain_volume, write_dir=None,
     out_clip_level = clip_level(in_file=file_to_mask)
     out_compute_mask = compute_mask(
         in_file=file_to_mask,
-        out_file=fname_presuffix(file_to_mask,
+        out_file=fname_presuffix(head_file,
                                  suffix='_histo_brain_mask',
                                  newpath=write_dir),
         volume_threshold=brain_volume,

@@ -8,7 +8,7 @@ from nilearn.datasets.tests import test_utils as tst
 from nilearn._utils.testing import assert_raises_regex
 from nilearn._utils.niimg_conversions import _check_same_fov
 from sammba import testing_data
-from sammba.registration.base import compute_brain_mask
+from sammba.segmentation.brain_mask import compute_histo_brain_mask
 from sammba.registration.coregistrator import Coregistrator
 
 
@@ -81,8 +81,9 @@ def test_coregistrator():
     # Provide manual brain mask
     mean_func_file = os.path.join(tst.tmpdir, 'mean_func.nii.gz')
     image.mean_img(func_img).to_filename(mean_func_file)
-    func_brain_mask = compute_brain_mask('/tmp/mean_func.nii.gz', 400, '/tmp',
-                                         use_rats_tool=False, opening=2)
+    func_brain_mask = compute_histo_brain_mask('/tmp/mean_func.nii.gz', 400,
+                                               '/tmp',
+                                               use_rats_tool=False, opening=2)
     
     registrator.fit_modality(func_file, 'func', slice_timing=False,
                              prior_rigid_body_registration=True,

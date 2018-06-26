@@ -4,7 +4,7 @@ from sammba.externals.nipype.utils.filemanip import fname_presuffix
 from sammba.externals.nipype.caching import Memory
 from sklearn.datasets.base import Bunch
 from sklearn.utils import deprecated
-from sammba.interfaces import segmentation
+from sammba import segmentation
 from .utils import fix_obliquity
 
 
@@ -115,7 +115,7 @@ def anats_to_common(anat_filenames, write_dir, brain_volume,
                          '{0} have been provided.'.format(len(anat_filenames)))
 
     if use_rats_tool:
-        if segmentation.Info().version() is None:
+        if segmentation.interfaces.Info().version() is None:
             raise ValueError('Can not locate RATS')
         else:
             ComputeMask = segmentation.MathMorphoMask

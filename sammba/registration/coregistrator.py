@@ -1,5 +1,8 @@
-from .base import (compute_brain_mask, _ants_bias_correct, _afni_bias_correct,
-                   _apply_mask, _apply_perslice_warp)
+from ..segmentation.brain_mask import (compute_histo_brain_mask,
+                                       compute_morpho_brain_mask,
+                                       _apply_mask)
+from ..preprocessing.bias_correction import ants_n4, afni_unifize
+from .base import _apply_perslice_warp
 from .perfusion import coregister as coregister_perf
 from .func import _realign, _slice_time
 from .func import coregister as coregister_func
@@ -123,7 +126,7 @@ class Coregistrator(BaseRegistrator):
             raise ValueError("Only 'func' and 'perf' modalities are "
                              "implemented")
 
-        unbiased_file = _ants_bias_correct(
+        unbiased_file = ants_n4(
             to_coregister_file,
             write_dir=self.output_dir,
             terminal_output=self.terminal_output,
@@ -135,6 +138,11 @@ class Coregistrator(BaseRegistrator):
                 if not isinstance(self.brain_volume, int):
                     raise ValueError('`brain_volume` must be specified to '
                                      'perform rigid-body registration')
+            if self.use_rats_tool:
+                compute_brain_mask = compute_morpho_brain_mask
+            else:
+                compute_brain_mask = compute_histo_brain_mask               
+
             if brain_mask_file is None:
                 if self.mask_clipping_fraction:
                     brain_mask_file = compute_brain_mask(
@@ -142,7 +150,6 @@ class Coregistrator(BaseRegistrator):
                         write_dir=self.output_dir,
                         caching=self.caching,
                         terminal_output=self.terminal_output,
-                        use_rats_tool=self.use_rats_tool,
                         cl_frac=self.mask_clipping_fraction)
                 else:
                     brain_mask_file = compute_brain_mask(
@@ -150,8 +157,7 @@ class Coregistrator(BaseRegistrator):
                         write_dir=self.output_dir,
                         caching=self.caching,
                         terminal_output=self.terminal_output,
-                        use_rats_tool=self.use_rats_tool,
-                        bias_correct=False)
+                        unifize=False)
 
             modality_brain_file = _apply_mask(
                 unbiased_file, brain_mask_file, write_dir=self.output_dir,
@@ -160,7 +166,7 @@ class Coregistrator(BaseRegistrator):
                 unifized_anat_file, self.anat_brain_ = self.segment(
                     self.anat_)
             else:
-                unifized_anat_file = _afni_bias_correct(
+                unifized_anat_file = afni_unifize(
                     self.anat_, write_dir=self.output_dir,
                     terminal_output=self.terminal_output, caching=self.caching,
                     verbose=self.verbose)
@@ -170,7 +176,7 @@ class Coregistrator(BaseRegistrator):
                     caching=self.caching,
                     terminal_output=self.terminal_output)
         else:
-            unifized_anat_file = _afni_bias_correct(
+            unifized_anat_file = afni_unifize(
                 self.anat_, write_dir=self.output_dir,
                 terminal_output=self.terminal_output, caching=self.caching, verbose=self.verbose)
             self.anat_brain_ = None
