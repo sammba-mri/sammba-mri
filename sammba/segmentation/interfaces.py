@@ -12,7 +12,6 @@ import copy
 import numpy as np
 import nibabel
 from nilearn import image, masking
-from scipy import ndimage
 from scipy.ndimage.morphology import (generate_binary_structure,
                                       binary_closing,
                                       binary_fill_holes,
@@ -27,16 +26,10 @@ from sammba.externals.nipype.interfaces.base import (TraitedSpec,
 from sammba.externals.nipype.utils.filemanip import fname_presuffix
 from sammba.externals.nipype import logging
 
+
 LOGGER = logging.getLogger('interface')
 VALID_TERMINAL_OUTPUT = ['stream', 'allatonce', 'file', 'file_split',
                          'file_stdout', 'file_stderr', 'none']
-
-
-def compute_volume(mask_img):
-    affine_det = np.abs(np.linalg.det(mask_img.affine[:3, :3]))
-    mask_data = mask_img.get_data()
-    n_voxels_mask = np.sum(mask_data > 0).astype(float)
-    return n_voxels_mask * affine_det
 
 
 class Info(object):
@@ -314,9 +307,10 @@ class HistogramMask(BaseInterface):
                 if n_voxels_mask > n_voxels_min:
                     break
 
-        print('volume {0}, lower_cutoff {1}, opening {2}, closing '
-              '{3}'.format(n_voxels_mask * affine_det, lower_cutoff,
-                           opening, iterations))
+        if self.inputs.verbose:
+            print('volume {0}, lower_cutoff {1}, opening {2}, closing '
+                  '{3}'.format(n_voxels_mask * affine_det, lower_cutoff,
+                               opening, iterations))
 
         # Fill holes
         n_voxels_min = int(self.inputs.volume_threshold / affine_det)
