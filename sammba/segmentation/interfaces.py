@@ -151,7 +151,7 @@ class HistogramMask(BaseInterface):
     Examples
     ========
 
-    >>> from sammba.interfaces import HistogramMask
+    >>> from sammba.segmentation import HistogramMask
     >>> nichols_masker = HistogramMask()
     >>> nichols_masker.inputs.in_file = 'structural.nii'
     >>> nichols_masker.inputs.volume_threshold = 1650
@@ -412,7 +412,7 @@ class MathMorphoMask(CommandLine):
     Examples
     ========
 
-    >>> from sammba.interfaces import MathMorphoMask
+    >>> from sammba.segmentation import MathMorphoMask
     >>> rats_masker = MathMorphoMask()
     >>> rats_masker.inputs.in_file = 'structural.nii'
     >>> rats_masker.inputs.intensity_threshold = 1000

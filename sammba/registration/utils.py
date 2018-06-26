@@ -8,7 +8,7 @@ from sammba.externals.nipype.caching import Memory
 from sammba.externals.nipype.utils.filemanip import fname_presuffix
 import sammba.externals.nipype.pipeline.engine as pe
 from sammba.externals.nipype.interfaces import afni
-from sammba.interfaces import segmentation
+from sammba.segmentation import interfaces
 
 
 def _get_afni_output_type(in_file):
@@ -284,7 +284,7 @@ def create_pipeline_graph(pipeline_name, graph_file,
     unifize = pe.Node(interface=afni.Unifize(), name='bias_correct')
     clip_level = pe.Node(interface=afni.ClipLevel(),
                          name='compute_mask_threshold')
-    compute_mask = pe.Node(interface=segmentation.MathMorphoMask(),
+    compute_mask = pe.Node(interface=interfaces.MathMorphoMask(),
                            name='compute_brain_mask')
     apply_mask = pe.Node(interface=afni.Calc(), name='apply_brain_mask')
     center_mass = pe.Node(interface=afni.CenterMass(),
