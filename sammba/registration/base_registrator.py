@@ -42,21 +42,19 @@ class BaseRegistrator(BaseEstimator, TransformerMixin):
                 unifized_file, self.brain_volume, write_dir=self.output_dir,
                 caching=self.caching,
                 terminal_output=self.terminal_output,
-                use_rats_tool=self.use_rats_tool,
-                bias_correct=False)
+                unifize=False)
         elif self.mask_clipping_fraction is None:
             brain_mask_file = compute_brain_mask(
                 in_file, self.brain_volume, write_dir=self.output_dir,
                 caching=self.caching,
                 terminal_output=self.terminal_output,
                 use_rats_tool=self.use_rats_tool,
-                bias_correct=False)
+                unifize=False)
         else:
             brain_mask_file = compute_brain_mask(
                 in_file, self.brain_volume, write_dir=self.output_dir,
                 caching=self.caching,
                 terminal_output=self.terminal_output,
-                use_rats_tool=self.use_rats_tool,
                 cl_frac=self.mask_clipping_fraction)
 
         brain_file = _apply_mask(unifized_file, brain_mask_file,

@@ -82,8 +82,7 @@ def test_coregistrator():
     mean_func_file = os.path.join(tst.tmpdir, 'mean_func.nii.gz')
     image.mean_img(func_img).to_filename(mean_func_file)
     func_brain_mask = compute_histo_brain_mask('/tmp/mean_func.nii.gz', 400,
-                                               '/tmp',
-                                               use_rats_tool=False, opening=2)
+                                               '/tmp', opening=2)
     
     registrator.fit_modality(func_file, 'func', slice_timing=False,
                              prior_rigid_body_registration=True,
