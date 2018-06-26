@@ -3,7 +3,7 @@ from ..segmentation.brain_mask import (compute_histo_brain_mask,
                                        compute_morpho_brain_mask,
                                        _apply_mask)
 from ..preprocessing.bias_correction import ants_n4, afni_unifize
-from .base import _apply_perslice_warp
+from .base import _apply_perslice_warp, _apply_transforms
 from .perfusion import coregister as coregister_perf
 from .func import _realign, _slice_time
 from .func import coregister as coregister_func
