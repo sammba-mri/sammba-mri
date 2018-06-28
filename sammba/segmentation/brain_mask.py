@@ -128,23 +128,18 @@ def compute_morpho_brain_mask(head_file, brain_volume, write_dir=None,
         memory = Memory(write_dir)
         clip_level = memory.cache(afni.ClipLevel)
         compute_mask = memory.cache(interfaces.MathMorphoMask)
-        unifize = memory.cache(afni.Unifize)
-        for step in [compute_mask, unifize]:
-            step.interface().set_default_terminal_output(terminal_output)
+        compute_mask.interface().set_default_terminal_output(terminal_output)
     else:
         clip_level = afni.ClipLevel().run
         compute_mask = interfaces.MathMorphoMask(
             terminal_output=terminal_output).run
-        unifize = afni.Unifize(terminal_output=terminal_output).run
 
     if unifize:
-        if unifize_kwargs is None:
-            unifize_kwargs = {}
-
+        print('_________________________')
         file_to_mask = afni_unifize(
             head_file, write_dir,
             out_file=fname_presuffix(head_file,
-                                     suffix='_unifized_for_extraction',
+                                     suffix='_custom_unifized',
                                      newpath=write_dir),
             caching=caching,
             terminal_output=terminal_output,
@@ -156,7 +151,7 @@ def compute_morpho_brain_mask(head_file, brain_volume, write_dir=None,
     out_clip_level = clip_level(in_file=file_to_mask)
     out_compute_mask = compute_mask(
         in_file=file_to_mask,
-        out_file=fname_presuffix(head_file,
+        out_file=fname_presuffix(file_to_mask,
                                  suffix='_rats_brain_mask',
                                  newpath=write_dir),
         volume_threshold=brain_volume,
@@ -204,23 +199,17 @@ def compute_histo_brain_mask(head_file, brain_volume, write_dir=None,
         memory = Memory(write_dir)
         clip_level = memory.cache(afni.ClipLevel)
         compute_mask = memory.cache(interfaces.HistogramMask)
-        unifize = memory.cache(afni.Unifize)
-        for step in [compute_mask, unifize]:
-            step.interface().set_default_terminal_output(terminal_output)
+        compute_mask.interface().set_default_terminal_output(terminal_output)
     else:
         clip_level = afni.ClipLevel().run
         compute_mask = interfaces.HistogramMask(
             terminal_output=terminal_output).run
-        unifize = afni.Unifize(terminal_output=terminal_output).run
 
     if unifize:
-        if unifize_kwargs is None:
-            unifize_kwargs = {}
-
         file_to_mask = afni_unifize(
             head_file, write_dir,
             out_file=fname_presuffix(head_file,
-                                     suffix='_unifized_for_extraction',
+                                     suffix='_custom_unifized',
                                      newpath=write_dir),
             caching=caching,
             verbose=verbose,

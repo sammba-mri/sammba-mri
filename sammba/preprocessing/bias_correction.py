@@ -25,7 +25,8 @@ def _compute_n4_max_shrink(in_file):
 
 
 def ants_n4(in_file, write_dir=None, caching=False,
-            terminal_output='allatonce', verbose=True, environ=None):
+            terminal_output='allatonce', verbose=True, environ=None,
+            copy_geometry=True):
     if write_dir is None:
         write_dir = os.path.dirname(in_file)
 
@@ -45,22 +46,34 @@ def ants_n4(in_file, write_dir=None, caching=False,
         copy = afni.Copy(terminal_output=terminal_output).run
         copy_geom = fsl.CopyGeom(terminal_output=terminal_output).run
 
+    unbiased_file = fname_presuffix(in_file, suffix='_n4',
+                                    newpath=write_dir)
+    if copy_geometry:
+        output_image = fname_presuffix(in_file, suffix='_n4_rough_geom',
+                                       newpath=write_dir)
+    else:                                     
+        output_image = unbiased_file
+
     out_bias_correct = bias_correct(
         input_image=in_file,
         shrink_factor=_compute_n4_max_shrink(in_file),
         verbose=verbose,
-        output_image=fname_presuffix(in_file, suffix='_n4',
-                                     newpath=write_dir))
+        output_image=output_image)
 
-    out_copy_geom = copy_geom(dest_file=out_bias_correct.outputs.output_image,
-                              in_file=in_file)
-
-    return out_copy_geom.outputs.out_file
+    if copy_geometry:
+        out_copy = copy(
+            in_file=out_bias_correct.outputs.output_image,
+            out_file=unbiased_file,
+            environ=environ)
+        out_copy_geom = copy_geom(dest_file=out_copy.outputs.out_file,
+                                  in_file=in_file)
+    return unbiased_file
 
 
 def afni_unifize(in_file, write_dir=None, out_file=None, caching=False,
                  terminal_output='allatonce', verbose=True, environ=None,
-                **unifize_kwargs):
+                 copy_geometry=False,
+                 **unifize_kwargs):
     if write_dir is None:
         write_dir = os.path.dirname(in_file)
 
@@ -83,11 +96,24 @@ def afni_unifize(in_file, write_dir=None, out_file=None, caching=False,
         out_file = fname_presuffix(in_file,
                                    suffix='_unifized',
                                    newpath=write_dir)
+    if copy_geometry:
+        unifized_file = fname_presuffix(in_file,
+                                        suffix='_unifized_rough_geom',
+                                        newpath=write_dir)
+    else:
+        unifized_file = out_file
+        
     out_unifize = unifize(in_file=in_file,
-                          out_file=out_file,
+                          out_file=unifized_file,
                           environ=environ,
                           quiet=not(verbose),
                           **unifize_kwargs)
-    out_copy_geom = copy_geom(dest_file=out_unifize.outputs.out_file,
-                              in_file=in_file)
-    return out_copy_geom.outputs.out_file
+
+    if copy_geometry:
+        out_copy = copy(
+            in_file=out_unifize.outputs.out_file,
+            out_file=out_file,
+            environ=environ)
+        out_copy_geom = copy_geom(dest_file=out_copy.outputs.out_file,
+                                  in_file=in_file)
+    return out_file

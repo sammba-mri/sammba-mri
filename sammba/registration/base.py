@@ -561,7 +561,7 @@ def _apply_transforms(to_register_filename, target_filename,
                       transforms,
                       transformed_filename=None,
                       transforms_kind='nonlinear',
-                      interpolation='wsinc5',
+                      interpolation=None,
                       voxel_size=None, inverse=False,
                       caching=False, verbose=True):
     """ Applies successive transforms to a given image to put it in
@@ -587,8 +587,8 @@ def _apply_transforms(to_register_filename, target_filename,
         then the inverted transform will do the reverse.
 
     interpolation : one of {'nearestneighbour', 'linear', 'cubic', 'quintic',
-                            'wsinc5'}, optional
-        Interpolation type.
+                            'wsinc5'} or None, optional
+        Interpolation type. If None, AFNI defaults are used.
 
     voxel_size : 3-tuple of floats, optional
         Voxel size of the registered functional, in mm.
@@ -655,25 +655,45 @@ def _apply_transforms(to_register_filename, target_filename,
                           oneline=True,
                           out_file=affine_transform_filename,
                           environ=environ)
-        _ = allineate(
-            in_file=to_register_filename,
-            master=resampled_template_filename,
-            in_matrix=affine_transform_filename,
-            final_interpolation=interpolation,
-            out_file=transformed_filename,
-            environ=environ)
+        if interpolation is None:
+            _ = allineate(
+                in_file=to_register_filename,
+                master=resampled_template_filename,
+                in_matrix=affine_transform_filename,
+                out_file=transformed_filename,
+                environ=environ)
+        else:
+            _ = allineate(
+                in_file=to_register_filename,
+                master=resampled_template_filename,
+                in_matrix=affine_transform_filename,
+                final_interpolation=interpolation,
+                out_file=transformed_filename,
+                environ=environ)
     else:
         warp = "'"
         warp += " ".join(transforms)
         warp += "'"
-        _ = warp_apply(in_file=to_register_filename,
-                       master=resampled_template_filename,
-                       warp=warp,
-                       inv_warp=inverse,
-                       interp=interpolation,
-                       out_file=transformed_filename,
-                       environ=environ)
+        if interpolation is None:
+            _ = warp_apply(in_file=to_register_filename,
+                           master=resampled_template_filename,
+                           warp=warp,
+                           inv_warp=inverse,
+                           out_file=transformed_filename,
+                           environ=environ)
+        else:
+            _ = warp_apply(in_file=to_register_filename,
+                           master=resampled_template_filename,
+                           warp=warp,
+                           inv_warp=inverse,
+                           interp=interpolation,
+                           out_file=transformed_filename,
+                           environ=environ)
+
     # XXX obliquity information is lost if resampling is done
     transformed_filename = fix_obliquity(transformed_filename,
-                                         resampled_template_filename)
+                                         resampled_template_filename,
+                                         verbose=verbose, caching=caching,
+                                         caching_dir=write_dir,
+                                         environ=environ)
     return transformed_filename

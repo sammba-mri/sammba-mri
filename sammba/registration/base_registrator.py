@@ -38,6 +38,7 @@ class BaseRegistrator(BaseEstimator, TransformerMixin):
             compute_brain_mask = compute_histo_brain_mask               
 
         if self.mask_clipping_fraction == .2:
+            # do not repeat unifization step, as .2 is the default fraction
             brain_mask_file = compute_brain_mask(
                 unifized_file, self.brain_volume, write_dir=self.output_dir,
                 caching=self.caching,
@@ -51,6 +52,7 @@ class BaseRegistrator(BaseEstimator, TransformerMixin):
                 use_rats_tool=self.use_rats_tool,
                 unifize=False)
         else:
+            # custom unifization step, as .2 is the default fraction
             brain_mask_file = compute_brain_mask(
                 in_file, self.brain_volume, write_dir=self.output_dir,
                 caching=self.caching,

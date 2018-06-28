@@ -645,8 +645,7 @@ def anat_to_template(anat_filename, brain_filename,
                      brain_template_filename, write_dir=None,
                      dilated_head_mask_filename=None, convergence=.005,
                      maxlev=None,
-                     caching=False, verbose=1, unifize_kwargs=None,
-                     brain_masking_unifize_kwargs=None,
+                     caching=False, verbose=1, environ=None,
                      registration_kind='nonlinear'):
     """ Registers an unbiased anatomical image to a given template.
     Parameters
@@ -707,7 +706,8 @@ def anat_to_template(anat_filename, brain_filename,
             'Registration kind must be one of {0}, you entered {1}'.format(
                 registration_kinds, registration_kind))
 
-    environ = {}
+    if environ is None:
+        environ = {'AFNI_DECONFLICT': 'OVERWRITE'}
     if verbose:
         terminal_output = 'stream'
         quietness_kwargs = {}
@@ -717,9 +717,8 @@ def anat_to_template(anat_filename, brain_filename,
         quietness_kwargs = {'quiet': True}
         verbosity_quietness_kwargs = {'quiet': True}
 
-    current_dir = os.getcwd()
     if write_dir is None:
-        write_dir = current_dir
+        write_dir = os.path.dirname(anat_filename)
 
     if caching:
         memory = Memory(write_dir)
@@ -738,7 +737,6 @@ def anat_to_template(anat_filename, brain_filename,
         allineate = afni.Allineate(terminal_output=terminal_output).run
         allineate_apply = afni.Allineate(terminal_output=terminal_output).run
         qwarp = afni.Qwarp(terminal_output=terminal_output).run
-        environ['AFNI_DECONFLICT'] = 'OVERWRITE'
 
     intermediate_files = []
     if dilated_head_mask_filename is None:
@@ -797,7 +795,9 @@ def anat_to_template(anat_filename, brain_filename,
     # iniwarp due to weird errors (like it creating an Allin it then can't
     # find)
     if registration_kind != 'nonlinear':
-        registered = fix_obliquity(allineated_filename, head_template_filename)
+        registered = fix_obliquity(allineated_filename, head_template_filename,
+                                   caching=caching,
+                                   caching_dir=write_dir, environ=environ)
         warp_transform = None
     else:
         intermediate_files.extend(allineated_filename)
@@ -824,7 +824,10 @@ def anat_to_template(anat_filename, brain_filename,
                 out_file=fname_presuffix(allineated_filename, suffix='_warped'),
                 environ=environ,
                 **verbosity_quietness_kwargs)
-        registered = fix_obliquity(out_qwarp.outputs.warped_source, head_template_filename)
+        registered = fix_obliquity(out_qwarp.outputs.warped_source,
+                                   head_template_filename,
+                                   caching=caching,
+                                   caching_dir=write_dir, environ=environ)
         warp_transform = out_qwarp.outputs.source_warp
 
     if not caching:

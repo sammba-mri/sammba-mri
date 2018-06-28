@@ -70,10 +70,8 @@ def coregister(unifized_anat_file,
     if caching:
         memory = Memory(write_dir)
         catmatvec = memory.cache(afni.CatMatvec)
-        overwrite = False
     else:
         catmatvec = afni.CatMatvec().run
-        overwrite = True
 
     output_files = []
 
