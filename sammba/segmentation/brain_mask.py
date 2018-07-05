@@ -135,7 +135,6 @@ def compute_morpho_brain_mask(head_file, brain_volume, write_dir=None,
             terminal_output=terminal_output).run
 
     if unifize:
-        print('_________________________')
         file_to_mask = afni_unifize(
             head_file, write_dir,
             out_file=fname_presuffix(head_file,

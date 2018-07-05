@@ -127,7 +127,8 @@ class TemplateRegistrator(BaseRegistrator):
                 write_dir=self.output_dir,
                 caching=self.caching,
                 terminal_output=self.terminal_output,
-                unifize=False)
+                unifize=False,
+                verbose=self.verbose)
         else:
             template_brain_mask_file = self.template_brain_mask
 
@@ -247,8 +248,7 @@ class TemplateRegistrator(BaseRegistrator):
         unbiased_file = ants_n4(to_coregister_file,
                                       write_dir=self.output_dir,
                                       terminal_output=self.terminal_output,
-                                      caching=self.caching,
-                                      verbose=self.verbose)
+                                      caching=self.caching)
 
         if prior_rigid_body_registration:
             if self.use_rats_tool:
@@ -262,14 +262,16 @@ class TemplateRegistrator(BaseRegistrator):
                     write_dir=self.output_dir,
                     caching=self.caching,
                     terminal_output=self.terminal_output,
-                    cl_frac=self.mask_clipping_fraction)
+                    cl_frac=self.mask_clipping_fraction,
+                    verbose=self.verbose)
             else:
                 brain_mask_file = compute_brain_mask(
                     to_coregister_file, self.brain_volume,
                     write_dir=self.output_dir,
                     caching=self.caching,
                     terminal_output=self.terminal_output,
-                    unifize=False)
+                    unifize=False,
+                    verbose=self.verbose)
 
             brain_file = _apply_mask(unbiased_file, brain_mask_file,
                                      write_dir=self.output_dir,
@@ -286,7 +288,8 @@ class TemplateRegistrator(BaseRegistrator):
                 anat_brain_file=self.anat_brain_,
                 func_brain_file=brain_file,
                 prior_rigid_body_registration=prior_rigid_body_registration,
-                caching=self.caching)
+                caching=self.caching,
+                verbose=self.verbose)
             self._func_undistort_warps = coregistration.coreg_warps_
             self.anat_in_func_space_ = coregistration.coreg_anat_
             self._func_to_anat_transform = coregistration.coreg_transform_
@@ -307,7 +310,8 @@ class TemplateRegistrator(BaseRegistrator):
                 anat_brain_file=self.anat_brain_,
                 m0_brain_file=brain_file,
                 prior_rigid_body_registration=prior_rigid_body_registration,
-                caching=self.caching)
+                caching=self.caching,
+                verbose=self.verbose)
             self.undistorted_perf_ = coregistration.coreg_m0_
             self._perf_undistort_warps = coregistration.coreg_warps_
             self.anat_in_perf_space_ = coregistration.coreg_anat_
@@ -317,7 +321,8 @@ class TemplateRegistrator(BaseRegistrator):
                 self.undistorted_perf_, self.template, self.output_dir,
                 self._normalization_transforms + [self._perf_to_anat_transform],
                 transforms_kind=self.registration_kind,
-                voxel_size=voxel_size, caching=self.caching)
+                voxel_size=voxel_size, caching=self.caching,
+                verbose=self.verbose)
 
         return self
 
@@ -364,7 +369,7 @@ class TemplateRegistrator(BaseRegistrator):
             undistorted_file, self.template, self.output_dir,
             self._normalization_transforms + [coreg_transform_file],
             transforms_kind=self.registration_kind,
-            voxel_size=voxel_size, caching=self.caching)
+            voxel_size=voxel_size, caching=self.caching, verbose=self.verbose)
         return normalized_file
 
     def inverse_transform_towards_modality(self, in_file, modality,

@@ -141,7 +141,6 @@ def fix_obliquity(to_fix_filename, reference_filename, caching=False,
                     environ=environ)
 
     if not caching:
-        os.remove(to_fix_filename)
         shutil.rmtree(tmp_folder)
 
     return out_copy.outputs.out_file

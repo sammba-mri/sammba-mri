@@ -21,7 +21,7 @@ def crop_and_oblique(in_file, out_file):
     oblique_img.to_filename(out_file)
 
 
-def empty_mask(in_file, out_file):
+def empty_img_like(in_file, out_file):
     img = nibabel.load(in_file)
     new_img = nibabel.Nifti1Image(np.zeros(img.get_data().shape),
                                         img.affine)
@@ -45,6 +45,7 @@ def test_fit_anat_with_affine_registration():
     anat_file = os.path.join(os.path.dirname(testing_data.__file__),
                              'anat.nii.gz')
     template_file = os.path.join(tst.tmpdir, 'template.nii.gz')
+    # Create template
     crop_and_oblique(anat_file, template_file)
     registrator = TemplateRegistrator(template_file, 400,
                                       output_dir=tst.tmpdir,
@@ -57,6 +58,7 @@ def test_fit_anat_with_affine_registration():
     registrator.fit_anat(anat_file)
     assert_true(_check_same_fov(nibabel.load(registrator.registered_anat_),
                                 nibabel.load(template_file)))
+
     
 @with_setup(tst.setup_tmpdata, tst.teardown_tmpdata)
 def test_fit_anat_with_nonlinear_registration():
@@ -67,9 +69,14 @@ def test_fit_anat_with_nonlinear_registration():
     registrator = TemplateRegistrator(template_file, 400,
                                       output_dir=tst.tmpdir,
                                       use_rats_tool=False, verbose=False)
+    assert_raises_regex(
+        ValueError, 'has not been anat fitted',
+        registrator.transform_anat_like, anat_file)
+
     registrator.fit_anat(anat_file)
     assert_true(_check_same_fov(nibabel.load(registrator.registered_anat_),
                                 nibabel.load(template_file)))
+
 
 @with_setup(tst.setup_tmpdata, tst.teardown_tmpdata)
 def test_transform_anat_with_affine_registration():
@@ -82,7 +89,27 @@ def test_transform_anat_with_affine_registration():
                                       use_rats_tool=False, verbose=False,
                                       registration_kind='affine')
     anat_like_file = os.path.join(tst.tmpdir, 'anat_like.nii.gz')
-    empty_mask(anat_file, anat_like_file)
+    empty_img_like(anat_file, anat_like_file)
+    registrator.fit_anat(anat_file)
+    
+    transformed_file = registrator.transform_anat_like(anat_like_file)
+    assert_true(_check_same_fov(nibabel.load(transformed_file),
+                                nibabel.load(template_file)))
+
+
+@with_setup(tst.setup_tmpdata, tst.teardown_tmpdata)
+def test_transform_anat_with_nonlinear_registration():
+    anat_file = os.path.join(os.path.dirname(testing_data.__file__),
+                             'anat.nii.gz')
+    template_file = os.path.join(tst.tmpdir, 'template.nii.gz')
+    crop_and_oblique(anat_file, template_file)
+    registrator = TemplateRegistrator(template_file, 400,
+                                      output_dir=tst.tmpdir,
+                                      use_rats_tool=False, verbose=False)
+    anat_like_file = os.path.join(tst.tmpdir, 'anat_like.nii.gz')
+    empty_img_like(anat_file, anat_like_file)
+    registrator.fit_anat(anat_file)
+    
     transformed_file = registrator.transform_anat_like(anat_like_file)
     assert_true(_check_same_fov(nibabel.load(transformed_file),
                                 nibabel.load(template_file)))
@@ -113,7 +140,7 @@ def test_fit_modality_for_func_with_affine_registration():
         ValueError, 'has not been func fitted',
         registrator.transform_modality_like, func_file, 'func')
 
-    # test fit_modality with func
+    # Check affine and shape
     registrator.fit_modality(func_file, 'func', slice_timing=False)
     registered_func_img = nibabel.load(registrator.registered_func_)
     template_img = nibabel.load(template_file)
@@ -122,25 +149,92 @@ def test_fit_modality_for_func_with_affine_registration():
     np.testing.assert_array_equal(registered_func_img.shape[:-1],
                                   template_img.shape)
 
+
 @with_setup(tst.setup_tmpdata, tst.teardown_tmpdata)
-def test_transform_modality_for_func_with_affine_registration():
+def test_fit_modality_for_func_with_nonlinear_registration():
     anat_file = os.path.join(os.path.dirname(testing_data.__file__),
                              'anat.nii.gz')
     func_file = os.path.join(os.path.dirname(testing_data.__file__),
                              'func.nii.gz')
-    anat_img = nibabel.load(anat_file)
     template_file = os.path.join(tst.tmpdir, 'template.nii.gz')
-    template_affine = .2 * np.eye(4)
-    template_affine[0, 1] = .01
-    template_affine[1, 0] = .01
-    template_affine[3, 3] = 1
-    template_data = anat_img.get_data()[1:]
-    template_img = nibabel.Nifti1Image(template_data, template_affine)
-    template_img.to_filename(template_file)
+    crop_and_oblique(anat_file, template_file)
 
+    registrator = TemplateRegistrator(template_file, 400,
+                                      output_dir=tst.tmpdir,
+                                      use_rats_tool=False, verbose=False)
+    registrator.fit_anat(anat_file)
+
+    assert_raises_regex(
+        ValueError, "Only 'func' and 'perf' ", registrator.fit_modality,
+        func_file, 'diffusion')
+    assert_raises_regex(
+        ValueError, "'t_r' is needed for slice ", registrator.fit_modality,
+        func_file, 'func')
+    assert_raises_regex(
+        ValueError, 'has not been func fitted',
+        registrator.transform_modality_like, func_file, 'func')
+
+    # Check affine and shape
+    registrator.fit_modality(func_file, 'func', slice_timing=False)
+    registered_func_img = nibabel.load(registrator.registered_func_)
+    template_img = nibabel.load(template_file)
+    np.testing.assert_array_almost_equal(registered_func_img.affine,
+                                         template_img.affine)
+    np.testing.assert_array_equal(registered_func_img.shape[:-1],
+                                  template_img.shape)
+
+
+@with_setup(tst.setup_tmpdata, tst.teardown_tmpdata)
+def test_transform_modality_for_func_with_nonlinear_registration():
+    anat_file = os.path.join(os.path.dirname(testing_data.__file__),
+                             'anat.nii.gz')
+    func_file = os.path.join(os.path.dirname(testing_data.__file__),
+                             'func.nii.gz')
+    template_file = os.path.join(tst.tmpdir, 'template.nii.gz')
+    crop_and_oblique(anat_file, template_file)
+    registrator = TemplateRegistrator(template_file, 400,
+                                      output_dir=tst.tmpdir,
+                                      use_rats_tool=False, verbose=False)
+    registrator.fit_anat(anat_file)
+    registrator.fit_modality(func_file, 'func', slice_timing=False)
+
+    # test affine and shape
+    func_like_file = os.path.join(tst.tmpdir, 'func_like.nii.gz')
+    empty_img_like(func_file, func_like_file)
+    transformed_file = registrator.transform_modality_like(func_like_file,
+                                                           'func')
+    transformed_img = nibabel.load(transformed_file)
+    assert_true(_check_same_fov(transformed_img, nibabel.load(template_file)))
+
+    # test transform then inverse transform brings back to the original image
+    inverse_transformed_file = registrator.inverse_transform_towards_modality(
+        transformed_file, 'func')
+    inverse_transformed_img = nibabel.load(inverse_transformed_file)
+    func_like_img = nibabel.load(func_like_file)
+    assert_true(_check_same_fov(inverse_transformed_img, func_like_img))
+    np.testing.assert_array_equal(inverse_transformed_img.get_data(),
+                                  func_like_img.get_data())
+
+    # test inverse transform then transform brings back to the original image 
+    transformed_file2 = registrator.transform_modality_like(
+        inverse_transformed_file, 'func')
+    transformed_img2 = nibabel.load(transformed_file2)
+    assert_true(_check_same_fov(transformed_img2,
+                                transformed_img))
+    np.testing.assert_array_equal(transformed_img2.get_data(),
+                                  transformed_img.get_data())
+
+
+@with_setup(tst.setup_tmpdata, tst.teardown_tmpdata)
+def test_trasform_modality_for_func_with_nonlinear_registration():
+    anat_file = os.path.join(os.path.dirname(testing_data.__file__),
+                             'anat.nii.gz')
+    func_file = os.path.join(os.path.dirname(testing_data.__file__),
+                             'func.nii.gz')
+    template_file = os.path.join(tst.tmpdir, 'template.nii.gz')
+    crop_and_oblique(anat_file, template_file)
     registrator = TemplateRegistrator(template_file, 400, output_dir=tst.tmpdir,
-                                      use_rats_tool=False, verbose=False,
-                                      registration_kind='affine')
+                                      use_rats_tool=False, verbose=False)
     registrator.fit_anat(anat_file)
     registrator.fit_modality(func_file, 'func', slice_timing=False)
     # test transform_modality
@@ -148,10 +242,11 @@ def test_transform_modality_for_func_with_affine_registration():
     func_like_img = nibabel.Nifti1Image(np.zeros(func_img.get_data().shape[:-1]),
                                         func_img.affine)
     func_like_file = os.path.join(tst.tmpdir, 'func_like.nii.gz')
-    func_like_img.to_filename(func_like_file)
-    transformed_file = registrator.transform_modality_like(func_like_file, 'func')
+    empty_img_like(func_file, func_like_file)
+    transformed_file = registrator.transform_modality_like(func_like_file,
+                                                           'func')
     transformed_img = nibabel.load(transformed_file)
-    assert_true(_check_same_fov(transformed_img, template_img))
+    assert_true(_check_same_fov(transformed_img, nibabel.load(template_file)))
 
     # test transform then inverse transform brings back to the original image
     inverse_transformed_file = registrator.inverse_transform_towards_modality(
@@ -162,8 +257,14 @@ def test_transform_modality_for_func_with_affine_registration():
                                   func_like_img.get_data())
 
     # test inverse transform then transform brings back to the original image 
-    transformed_file2 = registrator.transform_modality_like(inverse_transformed_file, 'func')
-    assert_true(_check_same_fov(nibabel.load(transformed_file2), transformed_img))
+    transformed_file2 = registrator.transform_modality_like(
+        inverse_transformed_file, 'func')
+    transformed_img2 = nibabel.load(transformed_file2)
+    np.testing.assert_array_equal(transformed_img2.affine,
+                                  transformed_img.affine)
+    np.testing.assert_array_equal(transformed_img2.get_data(),
+                                  transformed_img.get_data())
+
 
 @with_setup(tst.setup_tmpdata, tst.teardown_tmpdata)
 def test_fit_modality_for_perf_with_affine_registration():
@@ -171,17 +272,10 @@ def test_fit_modality_for_perf_with_affine_registration():
                              'anat.nii.gz')
     func_file = os.path.join(os.path.dirname(testing_data.__file__),
                              'func.nii.gz')
-    anat_img = nibabel.load(anat_file)
     template_file = os.path.join(tst.tmpdir, 'template.nii.gz')
-    template_affine = .2 * np.eye(4)
-    template_affine[0, 1] = .01
-    template_affine[1, 0] = .01
-    template_affine[3, 3] = 1
-    template_data = anat_img.get_data()[1:]
-    template_img = nibabel.Nifti1Image(template_data, template_affine)
-    template_img.to_filename(template_file)
-
-    registrator = TemplateRegistrator(template_file, 400, output_dir=tst.tmpdir,
+    crop_and_oblique(anat_file, template_file)
+    registrator = TemplateRegistrator(template_file, 400,
+                                      output_dir=tst.tmpdir,
                                       use_rats_tool=False, verbose=False,
                                       registration_kind='affine')
     registrator.fit_anat(anat_file)
@@ -193,10 +287,36 @@ def test_fit_modality_for_perf_with_affine_registration():
     m0_file = os.path.join(tst.tmpdir, 'm0.nii.gz')
     m0_img.to_filename(m0_file)
     registrator.fit_modality(m0_file, 'perf')
-    _check_same_fov(nibabel.load(registrator.registered_perf_), template_img)
+    assert_true(_check_same_fov(nibabel.load(registrator.registered_perf_),
+                                nibabel.load(template_file)))
+
 
 @with_setup(tst.setup_tmpdata, tst.teardown_tmpdata)
-def test_fit_modality_for_perf_with_affine_registration():
+def test_fit_modality_for_perf_with_nonlinear_registration():
+    anat_file = os.path.join(os.path.dirname(testing_data.__file__),
+                             'anat.nii.gz')
+    func_file = os.path.join(os.path.dirname(testing_data.__file__),
+                             'func.nii.gz')
+    template_file = os.path.join(tst.tmpdir, 'template.nii.gz')
+    crop_and_oblique(anat_file, template_file)
+    registrator = TemplateRegistrator(template_file, 400,
+                                      output_dir=tst.tmpdir,
+                                      use_rats_tool=False, verbose=False)
+    registrator.fit_anat(anat_file)
+    assert_raises_regex(
+        ValueError, 'has not been perf fitted',
+        registrator.transform_modality_like, func_file, 'perf')
+    func_img = nibabel.load(func_file)
+    m0_img = nibabel.Nifti1Image(func_img.get_data()[..., 0], func_img.affine)
+    m0_file = os.path.join(tst.tmpdir, 'm0.nii.gz')
+    m0_img.to_filename(m0_file)
+    registrator.fit_modality(m0_file, 'perf')
+    assert_true(_check_same_fov(nibabel.load(registrator.registered_perf_),
+                                nibabel.load(template_file)))
+
+
+@with_setup(tst.setup_tmpdata, tst.teardown_tmpdata)
+def test_transform_modality_for_perf_with_affine_registration():
     anat_file = os.path.join(os.path.dirname(testing_data.__file__),
                              'anat.nii.gz')
     func_file = os.path.join(os.path.dirname(testing_data.__file__),
@@ -205,16 +325,8 @@ def test_fit_modality_for_perf_with_affine_registration():
     m0_file = os.path.join(tst.tmpdir, 'm0.nii.gz')
     m0_img = nibabel.Nifti1Image(func_img.get_data()[..., 0], func_img.affine)
     m0_img.to_filename(m0_file)
-
-    anat_img = nibabel.load(anat_file)
     template_file = os.path.join(tst.tmpdir, 'template.nii.gz')
-    template_affine = .2 * np.eye(4)
-    template_affine[0, 1] = .01
-    template_affine[1, 0] = .01
-    template_affine[3, 3] = 1
-    template_data = anat_img.get_data()[1:]
-    template_img = nibabel.Nifti1Image(template_data, template_affine)
-    template_img.to_filename(template_file)
+    crop_and_oblique(anat_file, template_file)
 
     registrator = TemplateRegistrator(template_file, 400, output_dir=tst.tmpdir,
                                       use_rats_tool=False, verbose=False,
@@ -223,84 +335,13 @@ def test_fit_modality_for_perf_with_affine_registration():
     registrator.fit_modality(m0_file, 'perf')
 
     func_img = nibabel.load(func_file)
-    m0_like_img = nibabel.Nifti1Image(np.zeros(m0_img.shape), m0_img.affine)
     m0_like_file = os.path.join(tst.tmpdir, 'm0_like.nii.gz')
-    m0_like_img.to_filename(m0_like_file)
-    transformed_file = registrator.transform_modality_like(m0_like_file, 'perf')
-    _check_same_fov(nibabel.load(transformed_file), template_img)
+    empty_img_like(m0_file, m0_like_file)
+    transformed_file = registrator.transform_modality_like(m0_like_file,
+                                                           'perf')
+    assert_true(_check_same_fov(nibabel.load(transformed_file),
+                                nibabel.load(template_file)))
 
-
-@with_setup(tst.setup_tmpdata, tst.teardown_tmpdata)
-def test_fit_modality_for_func_with_nonlinear_registration():
-    anat_file = os.path.join(os.path.dirname(testing_data.__file__),
-                             'anat.nii.gz')
-    func_file = os.path.join(os.path.dirname(testing_data.__file__),
-                             'func.nii.gz')
-    anat_img = nibabel.load(anat_file)
-    template_file = os.path.join(tst.tmpdir, 'template.nii.gz')
-    template_affine = .2 * np.eye(4)
-    template_affine[0, 1] = .01
-    template_affine[1, 0] = .01
-    template_affine[3, 3] = 1
-    template_data = anat_img.get_data()[1:]
-    template_img = nibabel.Nifti1Image(template_data, template_affine)
-    template_img.to_filename(template_file)
-    registrator = TemplateRegistrator(template_file, 400, output_dir=tst.tmpdir,
-                                      use_rats_tool=False, verbose=False)
-    registrator.fit_anat(anat_file)
-
-    # test fit_modality with func
-    registrator.fit_modality(func_file, 'func', slice_timing=False)
-    registered_func_img = nibabel.load(registrator.registered_func_)
-    np.testing.assert_array_almost_equal(registered_func_img.affine,
-                                         template_img.affine)
-    np.testing.assert_array_equal(registered_func_img.shape[:-1],
-                                  template_img.shape)
-
-@with_setup(tst.setup_tmpdata, tst.teardown_tmpdata)
-def test_trasform_modality_for_func_with_nonlinear_registration():
-    anat_file = os.path.join(os.path.dirname(testing_data.__file__),
-                             'anat.nii.gz')
-    func_file = os.path.join(os.path.dirname(testing_data.__file__),
-                             'func.nii.gz')
-    anat_img = nibabel.load(anat_file)
-    template_file = os.path.join(tst.tmpdir, 'template.nii.gz')
-    template_affine = .2 * np.eye(4)
-    template_affine[0, 1] = .01
-    template_affine[1, 0] = .01
-    template_affine[3, 3] = 1
-    template_data = anat_img.get_data()[1:]
-    template_img = nibabel.Nifti1Image(template_data, template_affine)
-    template_img.to_filename(template_file)
-    registrator = TemplateRegistrator(template_file, 400, output_dir=tst.tmpdir,
-                                      use_rats_tool=False, verbose=False)
-    registrator.fit_anat(anat_file)
-    registrator.fit_modality(func_file, 'func', slice_timing=False)
-    # test transform_modality
-    func_img = nibabel.load(func_file)
-    func_like_img = nibabel.Nifti1Image(np.zeros(func_img.get_data().shape[:-1]),
-                                        func_img.affine)
-    func_like_file = os.path.join(tst.tmpdir, 'func_like.nii.gz')
-    func_like_img.to_filename(func_like_file)
-    transformed_file = registrator.transform_modality_like(func_like_file, 'func')
-    transformed_img = nibabel.load(transformed_file)
-    assert_true(_check_same_fov(nibabel.load(transformed_file), template_img))
-
-    # test transform then inverse transform brings back to the original image
-    inverse_transformed_file = registrator.inverse_transform_towards_modality(
-        transformed_file, 'func')
-    inverse_transformed_img = nibabel.load(inverse_transformed_file)
-    assert_true(_check_same_fov(inverse_transformed_img, func_img))
-    np.testing.assert_array_equal(inverse_transformed_img.get_data(),
-                                  func_like_img.get_data())
-
-    # test inverse transform then transform brings back to the original image 
-    transformed_file2 = registrator.transform_modality_like(inverse_transformed_file, 'func')
-    transformed_img2 = nibabel.load(transformed_file2)
-    np.testing.assert_array_equal(transformed_img2.affine,
-                                  transformed_img.affine)
-    np.testing.assert_array_equal(transformed_img2.get_data(),
-                                  transformed_img.get_data())
 
 @with_setup(tst.setup_tmpdata, tst.teardown_tmpdata)
 def test_trasform_modality_for_perf_with_nonlinear_registration():
@@ -308,16 +349,10 @@ def test_trasform_modality_for_perf_with_nonlinear_registration():
                              'anat.nii.gz')
     func_file = os.path.join(os.path.dirname(testing_data.__file__),
                              'func.nii.gz')
-    anat_img = nibabel.load(anat_file)
     template_file = os.path.join(tst.tmpdir, 'template.nii.gz')
-    template_affine = .2 * np.eye(4)
-    template_affine[0, 1] = .01
-    template_affine[1, 0] = .01
-    template_affine[3, 3] = 1
-    template_data = anat_img.get_data()[1:]
-    template_img = nibabel.Nifti1Image(template_data, template_affine)
-    template_img.to_filename(template_file)
-    registrator = TemplateRegistrator(template_file, 400, output_dir=tst.tmpdir,
+    crop_and_oblique(anat_file, template_file)
+    registrator = TemplateRegistrator(template_file, 400,
+                                      output_dir=tst.tmpdir,
                                       use_rats_tool=False, verbose=False)
     registrator.fit_anat(anat_file)
     # similar tests with perf
@@ -330,6 +365,7 @@ def test_trasform_modality_for_perf_with_nonlinear_registration():
     m0_file = os.path.join(tst.tmpdir, 'm0.nii.gz')
     m0_img.to_filename(m0_file)
     registrator.fit_modality(m0_file, 'perf')
+    template_img = nibabel.load(template_file)
     _check_same_fov(nibabel.load(registrator.registered_perf_), template_img)
 
     # test transform_modality

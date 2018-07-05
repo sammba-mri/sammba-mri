@@ -130,8 +130,7 @@ class Coregistrator(BaseRegistrator):
             to_coregister_file,
             write_dir=self.output_dir,
             terminal_output=self.terminal_output,
-            caching=self.caching,
-            verbose=self.verbose)
+            caching=self.caching)
 
         if prior_rigid_body_registration:
             if brain_mask_file is None or self._anat_brain_mask is None:
@@ -150,14 +149,16 @@ class Coregistrator(BaseRegistrator):
                         write_dir=self.output_dir,
                         caching=self.caching,
                         terminal_output=self.terminal_output,
-                        cl_frac=self.mask_clipping_fraction)
+                        cl_frac=self.mask_clipping_fraction,
+                        verbose=self.verbose)
                 else:
                     brain_mask_file = compute_brain_mask(
                         to_coregister_file, self.brain_volume,
                         write_dir=self.output_dir,
                         caching=self.caching,
                         terminal_output=self.terminal_output,
-                        unifize=False)
+                        unifize=False,
+                        verbose=self.verbose)
 
             modality_brain_file = _apply_mask(
                 unbiased_file, brain_mask_file, write_dir=self.output_dir,
@@ -178,7 +179,8 @@ class Coregistrator(BaseRegistrator):
         else:
             unifized_anat_file = afni_unifize(
                 self.anat_, write_dir=self.output_dir,
-                terminal_output=self.terminal_output, caching=self.caching, verbose=self.verbose)
+                terminal_output=self.terminal_output, caching=self.caching,
+                verbose=self.verbose)
             self.anat_brain_ = None
             modality_brain_file = None
 
@@ -190,7 +192,8 @@ class Coregistrator(BaseRegistrator):
                 anat_brain_file=self.anat_brain_,
                 func_brain_file=modality_brain_file,
                 prior_rigid_body_registration=prior_rigid_body_registration,
-                caching=self.caching)
+                caching=self.caching,
+                verbose=self.verbose)
             self._func_undistort_warps = coregistration.coreg_warps_
             self.anat_in_func_space_ = coregistration.coreg_anat_
             self._func_to_anat_transform = coregistration.coreg_transform_
@@ -205,7 +208,8 @@ class Coregistrator(BaseRegistrator):
                 anat_brain_file=self.anat_brain_,
                 m0_brain_file=modality_brain_file,
                 prior_rigid_body_registration=prior_rigid_body_registration,
-                caching=self.caching)
+                caching=self.caching,
+                verbose=self.verbose)
             self.undistorted_perf_ = coregistration.coreg_m0_
             self._perf_undistort_warps = coregistration.coreg_warps_
             self.anat_in_perf_space_ = coregistration.coreg_anat_
@@ -230,5 +234,6 @@ class Coregistrator(BaseRegistrator):
 
         coreg_apply_to_file = _apply_perslice_warp(
             apply_to_file, self.__getattribute__(modality_undistort_warps),
-            .1, .1, write_dir=self.output_dir, caching=self.caching)
+            .1, .1, write_dir=self.output_dir, caching=self.caching,
+            verbose=self.verbose)
         return coreg_apply_to_file

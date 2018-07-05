@@ -25,7 +25,7 @@ def _compute_n4_max_shrink(in_file):
 
 
 def ants_n4(in_file, write_dir=None, caching=False,
-            terminal_output='allatonce', verbose=True, environ=None,
+            terminal_output='allatonce', environ=None,
             copy_geometry=True):
     if write_dir is None:
         write_dir = os.path.dirname(in_file)
@@ -57,7 +57,6 @@ def ants_n4(in_file, write_dir=None, caching=False,
     out_bias_correct = bias_correct(
         input_image=in_file,
         shrink_factor=_compute_n4_max_shrink(in_file),
-        verbose=verbose,
         output_image=output_image)
 
     if copy_geometry:

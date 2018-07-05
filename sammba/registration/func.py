@@ -186,10 +186,8 @@ def coregister(unifized_anat_file, unbiased_mean_func_file, write_dir,
     if caching:
         memory = Memory(write_dir)
         catmatvec = memory.cache(afni.CatMatvec)
-        overwrite = False
     else:
         catmatvec = afni.CatMatvec().run
-        overwrite = True
 
     for (key, value) in environ_kwargs.items():
         environ[key] = value
