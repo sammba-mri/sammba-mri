@@ -185,21 +185,21 @@ def test_fit_modality_for_func_with_nonlinear_registration():
 
 
 @with_setup(tst.setup_tmpdata, tst.teardown_tmpdata)
-def test_trasform_modality_for_func_with_nonlinear_registration():
+def test_transform_modality_for_func_with_affine_registration():
     anat_file = os.path.join(os.path.dirname(testing_data.__file__),
                              'anat.nii.gz')
     func_file = os.path.join(os.path.dirname(testing_data.__file__),
                              'func.nii.gz')
     template_file = os.path.join(tst.tmpdir, 'template.nii.gz')
     crop_and_oblique(anat_file, template_file)
-    registrator = TemplateRegistrator(template_file, 400, output_dir=tst.tmpdir,
-                                      use_rats_tool=False, verbose=False)
+    registrator = TemplateRegistrator(template_file, 400,
+                                      output_dir=tst.tmpdir,
+                                      use_rats_tool=False, verbose=False,
+                                      registration_kind='affine')
     registrator.fit_anat(anat_file)
     registrator.fit_modality(func_file, 'func', slice_timing=False)
-    # test transform_modality
-    func_img = nibabel.load(func_file)
-    func_like_img = nibabel.Nifti1Image(np.zeros(func_img.get_data().shape[:-1]),
-                                        func_img.affine)
+
+    # test affine and shape
     func_like_file = os.path.join(tst.tmpdir, 'func_like.nii.gz')
     empty_img_like(func_file, func_like_file)
     transformed_file = registrator.transform_modality_like(func_like_file,
@@ -211,7 +211,8 @@ def test_trasform_modality_for_func_with_nonlinear_registration():
     inverse_transformed_file = registrator.inverse_transform_towards_modality(
         transformed_file, 'func')
     inverse_transformed_img = nibabel.load(inverse_transformed_file)
-    assert_true(_check_same_fov(inverse_transformed_img, func_img))
+    func_like_img = nibabel.load(func_like_file)
+    assert_true(_check_same_fov(inverse_transformed_img, func_like_img))
     np.testing.assert_array_equal(inverse_transformed_img.get_data(),
                                   func_like_img.get_data())
 
@@ -219,10 +220,11 @@ def test_trasform_modality_for_func_with_nonlinear_registration():
     transformed_file2 = registrator.transform_modality_like(
         inverse_transformed_file, 'func')
     transformed_img2 = nibabel.load(transformed_file2)
-    np.testing.assert_array_equal(transformed_img2.affine,
-                                  transformed_img.affine)
+    assert_true(_check_same_fov(transformed_img2,
+                                transformed_img))
     np.testing.assert_array_equal(transformed_img2.get_data(),
                                   transformed_img.get_data())
+
 
 
 @with_setup(tst.setup_tmpdata, tst.teardown_tmpdata)
