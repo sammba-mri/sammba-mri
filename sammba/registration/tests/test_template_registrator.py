@@ -59,24 +59,6 @@ def test_fit_anat_with_affine_registration():
     assert_true(_check_same_fov(nibabel.load(registrator.registered_anat_),
                                 nibabel.load(template_file)))
 
-    
-@with_setup(tst.setup_tmpdata, tst.teardown_tmpdata)
-def test_fit_anat_with_nonlinear_registration():
-    anat_file = os.path.join(os.path.dirname(testing_data.__file__),
-                             'anat.nii.gz')
-    template_file = os.path.join(tst.tmpdir, 'template.nii.gz')
-    crop_and_oblique(anat_file, template_file)
-    registrator = TemplateRegistrator(template_file, 400,
-                                      output_dir=tst.tmpdir,
-                                      use_rats_tool=False, verbose=False)
-    assert_raises_regex(
-        ValueError, 'has not been anat fitted',
-        registrator.transform_anat_like, anat_file)
-
-    registrator.fit_anat(anat_file)
-    assert_true(_check_same_fov(nibabel.load(registrator.registered_anat_),
-                                nibabel.load(template_file)))
-
 
 @with_setup(tst.setup_tmpdata, tst.teardown_tmpdata)
 def test_transform_anat_with_affine_registration():
