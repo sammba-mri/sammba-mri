@@ -61,7 +61,7 @@ def brain_extraction_report(head_file, brain_volume, write_dir=None,
                                              verbose=verbose,
                                              terminal_output=terminal_output,
                                              **unifize_kwargs)
-
+        print(brain_mask_file)
         masks_measures.append(_get_mask_measures(brain_mask_file))
 
     target_names = ['fraction {0:0.2f}'.format(cl_frac) if cl_frac is not None
@@ -135,10 +135,19 @@ def compute_morpho_brain_mask(head_file, brain_volume, write_dir=None,
             terminal_output=terminal_output).run
 
     if unifize:
+        suffix= '_unifized'
+        if unifize_kwargs.has_key('cl_frac'):
+            if unifize_kwargs['cl_frac'] != .2:
+                suffix += '_clfrac{0:.2f}'.format(
+                    unifize_kwargs['cl_frac'])
+                suffix = suffix.replace('.', 'pt')
+        elif unifize_kwargs:
+            suffix += '_custom'
+
         file_to_mask = afni_unifize(
             head_file, write_dir,
             out_file=fname_presuffix(head_file,
-                                     suffix='_custom_unifized',
+                                     suffix=suffix,
                                      newpath=write_dir),
             caching=caching,
             terminal_output=terminal_output,
@@ -167,7 +176,7 @@ def compute_histo_brain_mask(head_file, brain_volume, write_dir=None,
                              unifize=True,
                              caching=False,
                              terminal_output='allatonce',
-                              verbose=True,
+                             verbose=True,
                              lower_cutoff=.2, upper_cutoff=.85, closing=0,
                              connected=True, dilation_size=(1, 1, 2),
                              opening=5,
@@ -205,10 +214,19 @@ def compute_histo_brain_mask(head_file, brain_volume, write_dir=None,
             terminal_output=terminal_output).run
 
     if unifize:
+        suffix= '_unifized'
+        if unifize_kwargs.has_key('cl_frac'):
+            if unifize_kwargs['cl_frac'] != .2:
+                suffix += '_clfrac{0:.2f}'.format(
+                    unifize_kwargs['cl_frac'])
+                suffix = suffix.replace('.', 'pt')
+        elif unifize_kwargs:
+            suffix += '_custom'
+
         file_to_mask = afni_unifize(
             head_file, write_dir,
             out_file=fname_presuffix(head_file,
-                                     suffix='_custom_unifized',
+                                     suffix=suffix,
                                      newpath=write_dir),
             caching=caching,
             verbose=verbose,
@@ -220,7 +238,7 @@ def compute_histo_brain_mask(head_file, brain_volume, write_dir=None,
     out_clip_level = clip_level(in_file=file_to_mask)
     out_compute_mask = compute_mask(
         in_file=file_to_mask,
-        out_file=fname_presuffix(head_file,
+        out_file=fname_presuffix(file_to_mask,
                                  suffix='_histo_brain_mask',
                                  newpath=write_dir),
         volume_threshold=brain_volume,
