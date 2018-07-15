@@ -41,7 +41,7 @@ def test_segment():
 
 
 @with_setup(tst.setup_tmpdata, tst.teardown_tmpdata)
-def test_anat_registration():
+def test_fit_anat_and_transform_anat_like():
     anat_file = os.path.join(os.path.dirname(testing_data.__file__),
                              'anat.nii.gz')
     template_file = os.path.join(tst.tmpdir, 'template.nii.gz')
@@ -71,7 +71,7 @@ def test_anat_registration():
 
 
 @with_setup(tst.setup_tmpdata, tst.teardown_tmpdata)
-def test_modality_registration_for_func():
+def test_fit_transform_and_inverse_modality_with_func():
     anat_file = os.path.join(os.path.dirname(testing_data.__file__),
                              'anat.nii.gz')
     func_file = os.path.join(os.path.dirname(testing_data.__file__),
@@ -133,7 +133,7 @@ def test_modality_registration_for_func():
 
 
 @with_setup(tst.setup_tmpdata, tst.teardown_tmpdata)
-def test_fit_modality_for_perf_with_affine_registration():
+def test_fit_and_transform_modality_with_perf():
     anat_file = os.path.join(os.path.dirname(testing_data.__file__),
                              'anat.nii.gz')
     func_file = os.path.join(os.path.dirname(testing_data.__file__),
