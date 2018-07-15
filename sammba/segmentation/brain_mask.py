@@ -136,7 +136,7 @@ def compute_morpho_brain_mask(head_file, brain_volume, write_dir=None,
 
     if unifize:
         suffix= '_unifized'
-        if unifize_kwargs.has_key('cl_frac'):
+        if 'cl_frac' in unifize_kwargs.keys():
             if unifize_kwargs['cl_frac'] != .2:
                 suffix += '_clfrac{0:.2f}'.format(
                     unifize_kwargs['cl_frac'])
@@ -215,7 +215,7 @@ def compute_histo_brain_mask(head_file, brain_volume, write_dir=None,
 
     if unifize:
         suffix= '_unifized'
-        if unifize_kwargs.has_key('cl_frac'):
+        if 'cl_frac' in unifize_kwargs.keys():
             if unifize_kwargs['cl_frac'] != .2:
                 suffix += '_clfrac{0:.2f}'.format(
                     unifize_kwargs['cl_frac'])
