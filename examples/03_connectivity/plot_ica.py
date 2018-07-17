@@ -13,38 +13,37 @@ retest = data_fetchers.fetch_zurich_test_retest(subjects=range(5),
                                                 correct_headers=True)
 
 ##############################################################################
-# We encapsulate data for each mouse through an object called `FMRISession`
-from sammba.registration import FMRISession
-
-sessions = [FMRISession(anat=anat_filename, func=func_filename)
-            for anat_filename, func_filename in zip(retest.anat, retest.func)]
-
-##############################################################################
 # Load the template
 # -------------------
 dorr = data_fetchers.fetch_atlas_dorr_2008(downsample='100')
-template_filename = dorr.t2
+template = dorr.t2
 
 ##############################################################################
-# Define the writing directory
-# ----------------------------
+# Load the brain mask of the template
+# -----------------------------------
 import os
 
-write_dir = os.path.join(os.getcwd(), 'zurich_ica')
-if not os.path.exists(write_dir):
-    os.makedirs(write_dir)
+dorr_masks = data_fetchers.fetch_masks_dorr_2008(downsample='100')
+template_brain_mask = os.path.join('dorr_100_mask.nii.gz')
+dorr_masks.brain.to_filename(template_brain_mask)
 
 ##############################################################################
 # Register to the template
 # ------------------------
-from sammba.registration import fmri_sessions_to_template
+from sammba.registration import TemplateRegistrator
 
-fmri_sessions_to_template(sessions, head_template_filename=dorr.t2,
-                          t_r=1., write_dir=write_dir,
-                          brain_volume=400,
-                          prior_rigid_body_registration=True, caching=True)
+registrator = TemplateRegistrator(brain_volume=400, caching=True,
+                                  template=template,
+                                  template_brain_mask=template_brain_mask)
 
-registered_funcs = [sess.registered_func_ for sess in sessions]
+registered_funcs = []
+for anat, func in zip(retest.anat, retest.func):
+    animal_id = os.path.basename(os.path.dirname(anat))
+    registrator.output_dir = os.path.join('ica', animal_id)
+    registrator.fit_anat(anat)
+    registrator.fit_modality(func, 'func', t_r=1., voxel_size=(.3, .3, .3),
+                             prior_rigid_body_registration=True)
+    registered_funcs.append(registrator.registered_func_)
 
 ##############################################################################
 # Run ICA
@@ -65,5 +64,6 @@ components_img = canica.masker_.inverse_transform(canica.components_)
 from nilearn import plotting
 
 plotting.plot_prob_atlas(components_img,
-                         anat_img=dorr.t2,
+                         bg_img=registrator.template_brain_,
+                         display_mode='z',
                          title='All ICA components')

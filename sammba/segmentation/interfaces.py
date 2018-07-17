@@ -12,7 +12,6 @@ import copy
 import numpy as np
 import nibabel
 from nilearn import image, masking
-from scipy import ndimage
 from scipy.ndimage.morphology import (generate_binary_structure,
                                       binary_closing,
                                       binary_fill_holes,
@@ -26,6 +25,7 @@ from sammba.externals.nipype.interfaces.base import (TraitedSpec,
                                                      isdefined)
 from sammba.externals.nipype.utils.filemanip import fname_presuffix
 from sammba.externals.nipype import logging
+
 
 LOGGER = logging.getLogger('interface')
 VALID_TERMINAL_OUTPUT = ['stream', 'allatonce', 'file', 'file_split',
@@ -151,7 +151,7 @@ class HistogramMask(BaseInterface):
     Examples
     ========
 
-    >>> from sammba.interfaces import HistogramMask
+    >>> from sammba.segmentation import HistogramMask
     >>> nichols_masker = HistogramMask()
     >>> nichols_masker.inputs.in_file = 'structural.nii'
     >>> nichols_masker.inputs.volume_threshold = 1650
@@ -307,9 +307,10 @@ class HistogramMask(BaseInterface):
                 if n_voxels_mask > n_voxels_min:
                     break
 
-        print('volume {0}, lower_cutoff {1}, opening {2}, closing '
-              '{3}'.format(n_voxels_mask * affine_det, lower_cutoff,
-                           opening, iterations))
+        if self.inputs.verbose:
+            print('volume {0}, lower_cutoff {1}, opening {2}, closing '
+                  '{3}'.format(n_voxels_mask * affine_det, lower_cutoff,
+                               opening, iterations))
 
         # Fill holes
         n_voxels_min = int(self.inputs.volume_threshold / affine_det)
@@ -411,7 +412,7 @@ class MathMorphoMask(CommandLine):
     Examples
     ========
 
-    >>> from sammba.interfaces import MathMorphoMask
+    >>> from sammba.segmentation import MathMorphoMask
     >>> rats_masker = MathMorphoMask()
     >>> rats_masker.inputs.in_file = 'structural.nii'
     >>> rats_masker.inputs.intensity_threshold = 1000
@@ -422,6 +423,23 @@ class MathMorphoMask(CommandLine):
     input_spec = MathMorphoMaskInputSpec
     output_spec = MathMorphoMaskOutputSpec
     _cmd = 'RATS_MM'
+
+    def _run_interface(self, runtime):
+        runtime = super(MathMorphoMask, self)._run_interface(runtime)
+
+        if runtime is not None:
+            if isdefined(self.inputs.out_file):
+                tmp_file = os.path.abspath(self.inputs.out_file)
+            else:
+                tmp_file = os.path.abspath(
+                    self._filename_from_source('out_file'))
+
+            # Ensure the affine is the same
+            mask_data = nibabel.load(tmp_file).get_data()
+            mask_img = image.new_img_like(self.inputs.in_file, mask_data)
+            mask_img.to_filename(tmp_file)
+
+        return runtime
 
     def _list_outputs(self):
         outputs = self.output_spec().get()

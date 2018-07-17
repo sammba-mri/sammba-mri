@@ -1,45 +1,54 @@
 import os
-from nose.tools import assert_true, assert_equal
+from nose.tools import assert_true, assert_equal, assert_less
 from nose import with_setup
+import nibabel
 from nilearn.datasets.tests import test_utils as tst
 from nilearn._utils.testing import assert_raises_regex
 from nilearn._utils.niimg_conversions import _check_same_fov
+from nilearn.image import mean_img
 from sammba.registration import FMRISession, func
 from sammba.registration.utils import _check_same_obliquity
 from sammba import testing_data
-import nibabel
 
 
 @with_setup(tst.setup_tmpdata, tst.teardown_tmpdata)
-def test_coregister_fmri_session():
+def test_coregister():
     anat_file = os.path.join(os.path.dirname(testing_data.__file__),
                              'anat.nii.gz')
     func_file = os.path.join(os.path.dirname(testing_data.__file__),
                              'func.nii.gz')
+    mean_func_file = os.path.join(tst.tmpdir, 'mean_func.nii.gz')
+    mean_img(func_file).to_filename(mean_func_file)
 
-    animal_session = FMRISession(anat=anat_file, func=func_file,
-                                 animal_id='test_coreg_dir')
-
-    func.coregister_fmri_session(animal_session, 1., tst.tmpdir, 400,
-                                 slice_timing=False, verbose=False,
-                                 use_rats_tool=False)
-    assert_true(_check_same_fov(nibabel.load(animal_session.coreg_func_),
-                                nibabel.load(animal_session.coreg_anat_)))
-    assert_true(_check_same_obliquity(animal_session.coreg_anat_,
-                                      animal_session.coreg_func_))
-    assert_true(os.path.isfile(animal_session.coreg_transform_))
-    assert_equal(os.path.join(tst.tmpdir, 'test_coreg_dir'),
-                 animal_session.output_dir_)
+    bunch = func.coregister(anat_file, mean_func_file, tst.tmpdir,
+                            slice_timing=False, verbose=False)
+    assert_true(_check_same_fov(nibabel.load(bunch.coreg_func_),
+                                nibabel.load(bunch.coreg_anat_)))
+    assert_true(_check_same_obliquity(bunch.coreg_anat_,
+                                      bunch.coreg_func_))
+    assert_true(os.path.isfile(bunch.coreg_transform_))
+    assert_less(0, len(bunch.coreg_warps_))
+    assert_true(bunch.coreg_warps_[-1] is None)  # Last slice in functional
+                                                 # is without signal
+    for warp_file in bunch.coreg_warps_[:-1]:
+        assert_true(os.path.isfile(warp_file))
 
     # Check environement variables setting
-    current_dir = os.getcwd()  # coregister_fmri_session changes the directory
     assert_raises_regex(RuntimeError,
-                        "already exists",
-                        func.coregister_fmri_session, animal_session, 1.,
-                        tst.tmpdir, 400, slice_timing=False,
-                        use_rats_tool=False, AFNI_DECONFLICT='NO')
-    os.chdir(current_dir)
+                        "3dcopy",
+                        func.coregister, anat_file, mean_func_file, tst.tmpdir,
+                        slice_timing=False, verbose=False,
+                        AFNI_DECONFLICT='NO')
 
+    # Check caching does not change the paths
+    bunch2 = func.coregister(anat_file, mean_func_file, tst.tmpdir,
+                             slice_timing=False, verbose=False, caching=True,
+                             AFNI_DECONFLICT='OVERWRITE')
+    assert_equal(bunch.coreg_func_, bunch2.coreg_func_)
+    assert_equal(bunch.coreg_anat_, bunch2.coreg_anat_)
+    assert_equal(bunch.coreg_transform_, bunch2.coreg_transform_)
+    for warp_file, warp_file2 in zip(bunch.coreg_warps_, bunch2.coreg_warps_):
+        assert_equal(warp_file, warp_file2)
 
 
 @with_setup(tst.setup_tmpdata, tst.teardown_tmpdata)

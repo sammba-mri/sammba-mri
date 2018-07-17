@@ -28,5 +28,5 @@ from .version import _check_module_dependencies, __version__
 
 _check_module_dependencies()
 
-__all__ = ['__version__', 'data_fetchers', 'io_conversions', 'registration',
-           'modality_processors', 'interfaces']
+__all__ = ['__version__', 'data_fetchers', 'io_conversions', 'segmentation',
+           'preprocessing', 'registration', 'modality_processors']

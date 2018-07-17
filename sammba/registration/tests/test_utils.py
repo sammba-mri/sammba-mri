@@ -69,9 +69,9 @@ def test_fix_obliquity():
                out_file=tmp_filename)
     assert_false(
         utils._check_same_obliquity(tmp_filename, target_filename))
-    utils.fix_obliquity(tmp_filename, target_filename)
+    tmp_filename_oblique = utils.fix_obliquity(tmp_filename, target_filename)
     assert_true(
-        utils._check_same_obliquity(tmp_filename, target_filename))
+        utils._check_same_obliquity(tmp_filename_oblique, target_filename))
 
 
 def test_check_same_geometry():

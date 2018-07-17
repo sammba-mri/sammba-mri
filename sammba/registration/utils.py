@@ -8,7 +8,24 @@ from sammba.externals.nipype.caching import Memory
 from sammba.externals.nipype.utils.filemanip import fname_presuffix
 import sammba.externals.nipype.pipeline.engine as pe
 from sammba.externals.nipype.interfaces import afni
-from sammba.interfaces import segmentation
+from sammba.segmentation import interfaces
+
+
+def _get_afni_output_type(in_file):
+    """ Extracts AFNI outputtype name from file extension
+    """
+    fname, ext = os.path.splitext(in_file)
+    if '.gz' in ext:
+        _, ext2 = os.path.splitext(fname)
+        ext = ext2 + ext
+    if ext == '.nii':
+        output_type = 'NIFTI'
+    elif ext == '.nii.gz':
+        output_type = 'NIFTI_GZ'
+    else:
+        raise ValueError('Unknown extension for {}'.format(in_file))
+
+    return output_type
 
 
 def _reset_affines(in_file, out_file, overwrite=False, axes_to_permute=None,
@@ -66,7 +83,7 @@ def _reset_affines(in_file, out_file, overwrite=False, axes_to_permute=None,
 
 def fix_obliquity(to_fix_filename, reference_filename, caching=False,
                   caching_dir=None, overwrite=False,
-                  verbose=True):
+                  verbose=True, environ=None):
     if caching_dir is None:
         caching_dir = os.getcwd()
     if caching:
@@ -77,10 +94,11 @@ def fix_obliquity(to_fix_filename, reference_filename, caching=False,
     else:
         terminal_output = 'none'
 
-    if overwrite:
-        environ = {'AFNI_DECONFLICT': 'OVERWRITE'}
-    else:
-        environ = {}
+    if environ is None:
+        if caching:
+            environ = {}
+        else:
+            environ = {'AFNI_DECONFLICT': 'OVERWRITE'}
 
     if caching:
         copy = memory.cache(afni.Copy)
@@ -99,34 +117,31 @@ def fix_obliquity(to_fix_filename, reference_filename, caching=False,
     orig_reference_filename = fname_presuffix(os.path.join(
         tmp_folder, reference_basename), suffix='+orig.BRIK',
         use_ext=False)
-    if not os.path.isfile(orig_reference_filename) or overwrite:
-        out_copy_oblique = copy(in_file=reference_filename,
-                                out_file=orig_reference_filename,
-                                environ=environ)
-        orig_reference_filename = out_copy_oblique.outputs.out_file
+    out_copy_oblique = copy(in_file=reference_filename,
+                            out_file=orig_reference_filename,
+                            environ=environ)
+    orig_reference_filename = out_copy_oblique.outputs.out_file
 
     to_fix_basename = os.path.basename(to_fix_filename)
     orig_to_fix_filename = fname_presuffix(os.path.join(
         tmp_folder, to_fix_basename), suffix='+orig.BRIK',
         use_ext=False)
-    if not os.path.isfile(orig_to_fix_filename) or overwrite:
-        out_copy = copy(in_file=to_fix_filename,
-                        out_file=orig_to_fix_filename,
-                        environ=environ)
-        orig_to_fix_filename = out_copy.outputs.out_file
+    out_copy = copy(in_file=to_fix_filename,
+                    out_file=orig_to_fix_filename,
+                    environ=environ)
+    orig_to_fix_filename = out_copy.outputs.out_file
 
     out_refit = refit(in_file=orig_to_fix_filename,
                       atrcopy=(orig_reference_filename,
                                'IJK_TO_DICOM_REAL'))
 
     out_copy = copy(in_file=out_refit.outputs.out_file,
-                    environ={'AFNI_DECONFLICT': 'OVERWRITE'},
-                    out_file=to_fix_filename)
+                    out_file=fname_presuffix(to_fix_filename,
+                                             suffix='_oblique'),
+                    environ=environ)
 
-    if overwrite:
+    if not caching:
         shutil.rmtree(tmp_folder)
-        if caching:
-            memory.clear_previous_run()
 
     return out_copy.outputs.out_file
 
@@ -268,7 +283,7 @@ def create_pipeline_graph(pipeline_name, graph_file,
     unifize = pe.Node(interface=afni.Unifize(), name='bias_correct')
     clip_level = pe.Node(interface=afni.ClipLevel(),
                          name='compute_mask_threshold')
-    compute_mask = pe.Node(interface=segmentation.MathMorphoMask(),
+    compute_mask = pe.Node(interface=interfaces.MathMorphoMask(),
                            name='compute_brain_mask')
     apply_mask = pe.Node(interface=afni.Calc(), name='apply_brain_mask')
     center_mass = pe.Node(interface=afni.CenterMass(),
