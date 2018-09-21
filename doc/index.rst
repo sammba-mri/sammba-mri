@@ -3,7 +3,7 @@
    You can adapt this file completely to your liking, but it should at least
    contain the root `toctree` directive.
 
-Welcome to sammba-MRI's documentation!
+Sammba-MRI - Documentation
 ======================================
 
 Contents:
@@ -11,10 +11,10 @@ Contents:
 .. toctree::
    :maxdepth: 2
 
-   authors.rst
    user_guide.rst
    auto_examples/index.rst
    reference.rst
+   authors.rst
 
 .. raw:: html
 
