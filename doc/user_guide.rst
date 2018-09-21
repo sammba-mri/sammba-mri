@@ -8,3 +8,6 @@ User guide: table of contents
    :numbered:
 
    introduction.rst
+   dataorg.rst
+   MRI_reg.rst
+   Cereb_Atrophy.rst
