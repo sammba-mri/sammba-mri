@@ -21,12 +21,12 @@ matrix:
     # Ubuntu 14.04 version without matplotlib
     - env: DISTRIB="conda" PYTHON_VERSION="2.7"
            NUMPY_VERSION="1.8.2" SCIPY_VERSION="0.13.3"
-           SCIKIT_LEARN_VERSION="0.15.0"
+           SCIKIT_LEARN_VERSION="0.15.0" COVERAGE="true"
            PANDAS_VERSION="0.13.0" NETWORKX_VERSION="*"
            PACKAGING_VERSION="*" CONFIGPARSER_VERSION="*"
            FUTURE_VERSION="0.16.0" TRAITS_VERSION="4.6"
            SIMPLEJSON_VERSION="3.8.0" PROV_VERSION="1.5.0"
-           FUNCSIGS_VERSION="*" CLICK_VERSION="6.6.0"
+           FUNCSIGS_VERSION="*" CLICK_VERSION="6.6.0" TQDM_VERSION="4.19.5"
     # Neurodebian on Ubuntu 14.04
     - dist: trusty
       env: DISTRIB="neurodebian" PYTHON_VERSION="2.7"
@@ -40,7 +40,7 @@ matrix:
            PACKAGING_VERSION="*" CONFIGPARSER_VERSION="*"
            FUTURE_VERSION="0.16.0" TRAITS_VERSION="4.6"
            SIMPLEJSON_VERSION="3.8.0" PROV_VERSION="1.5.0"
-           FUNCSIGS_VERSION="*" CLICK_VERSION="6.6.0"
+           FUNCSIGS_VERSION="*" CLICK_VERSION="6.6.0" TQDM_VERSION="4.19.5"
     # Python 3.4 with intermediary versions
     - env: DISTRIB="conda" PYTHON_VERSION="3.4"
            NUMPY_VERSION="1.8.2" SCIPY_VERSION="0.14.0"
@@ -58,7 +58,7 @@ matrix:
            FUTURE_VERSION="0.16.0" PACKAGING_VERSION="*"
            TRAITS_VERSION="4.6" SIMPLEJSON_VERSION="3.8.0"
            PROV_VERSION="1.5.0" FUNCSIGS_VERSION="*"
-           CLICK_VERSION="6.6.0"
+           CLICK_VERSION="6.6.0" TQDM_VERSION="4.19.5"
 
 install:
     - source continuous_integration/install.sh
@@ -72,7 +72,7 @@ script:
     # Mainly for nose config settings
     - cp setup.cfg "$TEST_RUN_FOLDER"
     # We want to back out of the current working directory to make
-    # sure we are using nistats installed in site-packages rather
+    # sure we are using sammba installed in site-packages rather
     # than the one from the current working directory
     # Parentheses (run in a subshell) are used to leave
     # the current directory unchanged

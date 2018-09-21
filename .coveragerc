@@ -1,11 +1,7 @@
 [run]
 branch = True
 source = sammba
-include = 
-    */sammba/data_fetchers/*
-    */sammba/preprocessors/*
-    */sammba/interfaces/*
-
 omit =
     */sammba/externals/*
     */setup.py
+

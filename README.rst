@@ -4,7 +4,7 @@
     :target: https://travis-ci.org/sammba-mri/sammba-mri
 
 .. image:: https://coveralls.io/repos/github/sammba-mri/sammba-mri/badge.svg?branch=master
-   :target: https://coveralls.io/github/sammba-mri/sammba-mri?branch=master
+    :target: https://coveralls.io/github/sammba-mri/sammba-mri?branch=master
 
 sammba-MRI
 ==========
@@ -36,6 +36,6 @@ as well as the interfaces:
 Installation
 ============
 
-For the moment process-asl is available as a development version. You can download the source code with the command::
+For the moment SaMmBa-MRI is available as a development version. You can download the source code with the command::
 
     git clone https://github.com/sammba-mri/sammba-mri

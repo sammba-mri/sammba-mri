@@ -6,6 +6,27 @@ sammba-MRI API Reference
    :local:
 
 
+.. _io_conversions_ref:
+
+:mod:`sammba.io_conversions`: From scanner to NIFTI
+=====================================================
+
+.. automodule:: sammba.io_conversions
+   :no-members:
+   :no-inherited-members:
+
+**Functions**:
+
+.. currentmodule:: sammba.io_conversions
+
+.. autosummary::
+   :toctree: generated/
+   :template: function.rst
+
+   dcm_to_nii
+   recursive_dcm_to_nii
+
+
 .. _data_fetchers_ref:
 
 :mod:`sammba.data_fetchers`: Datasets and atlas
@@ -44,7 +65,20 @@ sammba-MRI API Reference
    :template: function.rst
 
    anats_to_common
+   anats_to_template
+   fmri_sessions_to_template
+   coregister_fmri_session
    create_pipeline_graph
+
+**Classes**:
+
+.. currentmodule:: sammba.registration
+
+.. autosummary::
+   :toctree: generated/
+   :template: class.rst
+
+   FMRISession
 
 .. _interfaces_ref:
 

@@ -37,7 +37,7 @@ if not os.path.exists(write_dir):
 # -------------------
 from sammba.registration import anats_to_common
 
-affine_register = anats_to_common(retest.anat, write_dir, caching=True)
+affine_register = anats_to_common(retest.anat, write_dir, 400, caching=True)
 
 ##############################################################################
 # We set caching to True, so that this step computations are not restarted.
@@ -52,7 +52,7 @@ print(registered_anats)
 from nilearn import plotting, image
 
 average_img = image.mean_img(registered_anats)
-display = plotting.plot_anat(average_img, dim=-1.8, title='affine register')
+display = plotting.plot_anat(average_img, dim=-1.6, title='affine register')
 display.add_edges(registered_anats[0])
 plotting.show()
 

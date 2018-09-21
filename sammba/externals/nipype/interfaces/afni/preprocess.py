@@ -218,10 +218,16 @@ class AllineateInputSpec(AFNICommandInputSpec):
         argstr='-base %s',
         desc='file to be used as reference, the first volume will be used if '
              'not given the reference will be the first volume of in_file.')
+#    out_file = File(
+#        desc='output file from 3dAllineate',
+#        argstr='-prefix %s',
+#        genfile=True,
+#        xor=['allcostx'])
     out_file = File(
+        name_template='%s_allineated',
         desc='output file from 3dAllineate',
         argstr='-prefix %s',
-        genfile=True,
+        name_source='in_file',
         xor=['allcostx'])
     out_param_file = File(
         argstr='-1Dparam_save %s',
@@ -235,6 +241,9 @@ class AllineateInputSpec(AFNICommandInputSpec):
         xor=['out_param_file'])
     out_matrix = File(
         argstr='-1Dmatrix_save %s',
+        name_template='%s_allineated.aff12.1D',
+        name_source='in_file',
+        keep_extension=False,
         desc='Save the transformation matrix for each volume.',
         xor=['in_matrix','allcostx'])
     in_matrix = File(
@@ -438,6 +447,13 @@ class AllineateInputSpec(AFNICommandInputSpec):
         traits.Enum(*_dirs),
         argstr='-nwarp_fixdep%s',
         desc='To fix non-linear warp dependency along directions.')
+    verb = traits.Bool(
+        argstr='-verb',
+        desc='Print out verbose progress reports.')
+    quiet = traits.Bool(
+        argstr='-quiet',
+        desc='Don\'t print out verbose progress reports.',
+        xor=['verb'])
 
 
 class AllineateOutputSpec(TraitedSpec):
@@ -2698,6 +2714,7 @@ class WarpInputSpec(AFNICommandInputSpec):
         copyfile=False)
     out_file = File(
         name_template='%s_warp',
+        keep_extension=True,
         desc='output image file name',
         argstr='-prefix %s',
         name_source='in_file')
@@ -2736,6 +2753,14 @@ class WarpInputSpec(AFNICommandInputSpec):
     verbose = traits.Bool(
         desc='Print out some information along the way.',
         argstr='-verb')
+    save_matfile = traits.Bool(
+        desc='save transform as .mat file',
+        xand=['verbose'])
+
+
+class WarpOutputSpec(TraitedSpec):
+    out_file = File(desc='Warped file.', exists=True)
+    mat_file = File(desc='warp transfrom mat file')
 
 
 class Warp(AFNICommand):
@@ -2767,7 +2792,35 @@ class Warp(AFNICommand):
     """
     _cmd = '3dWarp'
     input_spec = WarpInputSpec
-    output_spec = AFNICommandOutputSpec
+    output_spec = WarpOutputSpec
+
+    def _run_interface(self, runtime):
+        runtime = super(Warp, self)._run_interface(runtime)
+
+        if self.inputs.save_matfile:
+            import numpy as np
+            matfile = fname_presuffix(self.inputs.in_file,
+                                      suffix='_warp.mat', use_ext=False)
+            np.savetxt(matfile, [runtime.stdout], fmt=str('%s'))
+        return runtime
+
+    def _list_outputs(self):
+        outputs = self.output_spec().get()
+        if self.inputs.save_matfile:
+            outputs['mat_file'] = fname_presuffix(self.inputs.in_file,
+                                                  suffix='_warp.mat',
+                                                  use_ext=False)
+        if not self.inputs.out_file:
+            fname, ext = os.path.splitext(self.inputs.in_file)
+            if '.gz' in ext:
+                _, ext2 = os.path.splitext(fname)
+                ext = ext2 + ext
+            out_file = self._gen_fname(self.inputs.in_file, suffix='_warp',
+                                       ext=ext)
+            outputs['out_file'] = os.path.abspath(out_file)
+        else:
+            outputs['out_file'] = os.path.abspath(self.inputs.out_file)
+        return outputs
 
 
 class QwarpPlusMinusInputSpec(CommandLineInputSpec):
@@ -2889,7 +2942,6 @@ class QwarpInputSpec(AFNICommandInputSpec):
     out_file = File(argstr='-prefix %s',
                     name_template='%s_QW',
                     name_source=['in_file'],
-                    genfile=True,
                     desc='out_file ppp'
                          'Sets the prefix for the output datasets.'
                          '* The source dataset is warped to match the base'
@@ -3349,8 +3401,7 @@ class QwarpInputSpec(AFNICommandInputSpec):
         xor=['quiet'])
     quiet = traits.Bool(
         desc='Cut out most of the fun fun fun progress messages :-(',
-        argstr='-quiet',
-        xor=['verb'])
+        argstr='-quiet')
     # Hidden and semi-hidden options
     overwrite = traits.Bool(
         desc='Overwrite outputs',
@@ -3519,7 +3570,6 @@ class Qwarp(AFNICommand):
             else:
                 ext = prefix[ext_ind:]
                 suffix = ''
-        print(ext,"ext")
         outputs['warped_source'] = fname_presuffix(prefix, suffix=suffix,
                                                    use_ext=False) + ext
         if not self.inputs.nowarp:

@@ -73,7 +73,8 @@ def fetch_zurich_test_retest(subjects=range(15), sessions=[1], data_dir=None,
 
     # Return the json file contents as a dictionary
     with open(json_file) as json_data:
-        rows = json.load(json_data).values()[0]['Result']
+        json_values = list(json.load(json_data).values())
+        rows = json_values[0]['Result']
 
     names = [name for name in rows[0].keys()]
     projects = {}
@@ -240,7 +241,8 @@ def fetch_zurich_anesthesiant(subjects=range(30), url=None,
 
     # Return the json file contents as a dictionary
     with open(json_file) as json_data:
-        rows = json.load(json_data).values()[0]['Result']
+        json_values = list(json.load(json_data).values())
+        rows = json_values[0]['Result']
 
     names = [name for name in rows[0].keys()]
     projects = {}

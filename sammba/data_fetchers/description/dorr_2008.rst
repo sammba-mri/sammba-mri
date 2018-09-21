@@ -1,0 +1,35 @@
+DORR
+
+
+Notes
+-----
+A three-dimensional atlas of the mouse brain, manually segmented into 62
+structures, based on an average of 32 mum isotropic resolution T(2)-weighted,
+within skull images of forty 12 week old C57Bl/6J mice, scanned on a 7 T
+scanner. Individual scans were normalized, registered, and averaged into one
+volume. Structures within the cerebrum, cerebellum, and brainstem were painted
+on each slice of the average MR image while using simultaneous viewing
+of the coronal, sagittal and horizontal orientations.
+
+For more information, see
+
+http://www.mouseimaging.ca/research/mouse_atlas.html
+
+Content
+-------
+    :"t2": str. path to mnc file containing the T2 weighted average.
+    :"maps": str. path to mnc file containing regions.
+    :"labels": numpy recarray containing the names of each region
+    :"indices": intensity for each region
+    :"description": description about the atlas.
+
+References
+----------
+
+A.E. Dorr, J.P. Lerch, S. Spring, N. Kabani and R.M. Henkelman
+"High resolution three dimensional brain atlas using an average magnetic
+resonance image of 40 adult C57Bl/6j mice", NeuroImage 42(1):60-69, 2008.
+
+Licence
+-------
+Unknown

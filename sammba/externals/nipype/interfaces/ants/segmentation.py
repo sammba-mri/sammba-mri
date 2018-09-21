@@ -262,6 +262,7 @@ class N4BiasFieldCorrectionInputSpec(ANTSCommandInputSpec):
     copy_header = traits.Bool(False, mandatory=True, usedefault=True,
                               desc='copy headers of the original image into the '
                                    'output (corrected) file')
+    verbose = traits.Bool(False, argstr="-v", desc=('Verbose output.'))
 
 
 class N4BiasFieldCorrectionOutputSpec(TraitedSpec):
