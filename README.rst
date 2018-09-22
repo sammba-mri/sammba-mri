@@ -11,6 +11,7 @@ sammba-MRI: small mammals neuroimaging with python
 
 Sammba-MRI provides easy-to-use **pipelines** to process and analyze small mammals brain MRI multimodal images. 
 Sammba-MRI will perform automatically several critical steps for MR image analysis.
+
 * Conversion of Bruker DICOM files to NIFTI-1
 * Image quality check
 * Image registration and creation of a template
