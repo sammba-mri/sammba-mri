@@ -63,7 +63,7 @@ def fetch_atlas_dorr_2008(image_format='nifti', downsample='30',
     See http://www.mouseimaging.ca/research/mouse_atlas.html for more
     information on this parcellation.
 
-    Licence: Unknown
+    Licence: To be specified
     """
     if image_format not in ['nifti', 'minc']:
         raise ValueError("Images format must be 'nifti' or 'minc', you "
