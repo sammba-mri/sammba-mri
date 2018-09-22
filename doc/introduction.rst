@@ -1,5 +1,5 @@
 =====================================
-Introduction: SmAll-maMMals BrAin MRI
+Introduction: Sammba-MRI
 =====================================
 
 .. contents:: **Contents**
