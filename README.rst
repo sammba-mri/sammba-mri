@@ -11,13 +11,13 @@ sammba-MRI: small mammals neuroimaging with python
 
 Sammba-MRI provides easy-to-use **pipelines** to process and analyze small mammals brain MRI multimodal images. 
 Sammba-MRI will perform automatically several critical steps for MR image analysis.
-° Conversion of Bruker DICOM filles to NIFTI-1
-° Image quality check
-° Image registration and creation of a template
-° Transformation of individual dataset to the template (or to an atlas)
-° Evaluation of cerebral atrophy on the basis of an atlas
-° Estimation of cerebral perfusion maps from FAIR EPI images
-° Resting state fMRI analysis connectivity  and brain images visualization are straightforward with nilearn once the registration is performed.
+* Conversion of Bruker DICOM files to NIFTI-1
+* Image quality check
+* Image registration and creation of a template
+* Transformation of individual dataset to the template (or to an atlas)
+* Evaluation of cerebral atrophy on the basis of an atlas
+* Estimation of cerebral perfusion maps from FAIR EPI images
+* Resting state fMRI analysis connectivity  and brain images visualization are straightforward with nilearn once the registration is performed.
 
 Sammba-MRI integrates functionalities from a number of other packages (listed under the dependencies section below)
 
@@ -44,14 +44,14 @@ as well as the interfaces:
 * FSL >= 4.1.0
 * AFNI
 
-User guide, gallery of examples and function reference are available on
-========================================================================
+User guide and gallery of examples are available on
+====================================================
 https://sammba-mri.github.io/
 
 
 Installation
 ============
 
-Sammba-MRI source code can be downloaded with the command:
+Sammba-MRI source code can be downloaded with the command::
 
     git clone https://github.com/sammba-mri/sammba-mri
