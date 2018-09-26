@@ -31,7 +31,7 @@ REQUIRED_MODULE_METADATA = (
         'required_at_installation': True,
         'install_info': _SAMMBA_INSTALL_MSG}),
     ('scipy', {
-        'min_version': '0.13.3',
+        'min_version': '0.17',
         'required_at_installation': True,
         'install_info': _SAMMBA_INSTALL_MSG}),
     ('nilearn', {
@@ -55,10 +55,6 @@ REQUIRED_MODULE_METADATA = (
         'install_info': _SAMMBA_INSTALL_MSG}),
     ('tqdm', {
         'min_version': '4.11.2',
-        'required_at_installation': True,
-        'install_info': _SAMMBA_INSTALL_MSG}),
-    ('lmfit', {
-        'min_version': '0.9.4',
         'required_at_installation': True,
         'install_info': _SAMMBA_INSTALL_MSG}),
     )

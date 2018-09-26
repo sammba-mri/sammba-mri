@@ -20,7 +20,7 @@ matrix:
   include:
     # Ubuntu 14.04 version without matplotlib
     - env: DISTRIB="conda" PYTHON_VERSION="2.7"
-           NUMPY_VERSION="1.8.2" SCIPY_VERSION="0.13.3"
+           NUMPY_VERSION="1.8.2" SCIPY_VERSION="0.17"
            SCIKIT_LEARN_VERSION="0.15.0" COVERAGE="true"
            PANDAS_VERSION="0.13.0" NETWORKX_VERSION="*"
            PACKAGING_VERSION="*" CONFIGPARSER_VERSION="*"
@@ -33,7 +33,7 @@ matrix:
     # Trying to get as close to the minimum required versions while
     # still having the package version available through conda
     - env: DISTRIB="conda" PYTHON_VERSION="2.7"
-           NUMPY_VERSION="1.8.2" SCIPY_VERSION="0.13.3"
+           NUMPY_VERSION="1.8.2" SCIPY_VERSION="0.17"
            SCIKIT_LEARN_VERSION="0.15.0" MATPLOTLIB_VERSION="1.3.1"
            NIBABEL_VERSION="1.2.0" PANDAS_VERSION="0.13.0"
            NETWORKX_VERSION="*" COVERAGE="true"
@@ -43,7 +43,7 @@ matrix:
            FUNCSIGS_VERSION="*" CLICK_VERSION="6.6.0" TQDM_VERSION="4.19.5"
     # Python 3.4 with intermediary versions
     - env: DISTRIB="conda" PYTHON_VERSION="3.4"
-           NUMPY_VERSION="1.8.2" SCIPY_VERSION="0.14.0"
+           NUMPY_VERSION="1.8.2" SCIPY_VERSION="0.17"
            SCIKIT_LEARN_VERSION="0.15.2" MATPLOTLIB_VERSION="1.4.0"
            PANDAS_VERSION="*" PATSY_VERSION="*" NETWORKX_VERSION="*"
            FUTURE_VERSION="0.16.0" PACKAGING_VERSION="*"

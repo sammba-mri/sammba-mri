@@ -9,8 +9,7 @@ Created on Sunday 4th March 2018
 import pandas as pd
 import nibabel as nib
 import numpy as np
-# from scipy.optimize import least_squares as ls
-import lmfit
+from scipy.optimize import least_squares as ls
 from multiprocessing import cpu_count, Pool
 from functools import partial
 import tqdm
@@ -133,16 +132,8 @@ def _fair_t1_fit(s0, ti, t1_guess):
     scipy.optimize.least_squares with method='trf' (default).
     """
 
-    # return ls(_fair_t1_func, np.array([0, np.mean(s0), t1_guess]),
-    #           bounds=([0, 0, 0], np.inf), args=(s0, np.array(ti)))
-    p = lmfit.Parameters()
-    p.add('bias', value=0, min=0.0)
-    p.add('M0', value=np.mean(s0), min=0.0)
-    p.add('T1', value=t1_guess, min=0.0)
-    minner = lmfit.Minimizer(_fair_t1_func, params=p,
-                             fcn_args=(s0, np.asarray(ti)),
-                             nan_policy='propagate')
-    return minner.minimize()
+    return ls(_fair_t1_func, np.array([0, np.mean(s0), t1_guess]),
+              bounds=([0, 0, 0], np.inf), args=(s0, np.array(ti)))
 
 
 def _perf_fair_fit(s0, t1_blood, ti, t1_guess, picker_sel, picker_nonsel,

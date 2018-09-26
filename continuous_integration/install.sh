@@ -38,7 +38,7 @@ print_conda_requirements() {
     #   - for scikit-learn, SCIKIT_LEARN_VERSION is used
     TO_INSTALL_ALWAYS="pip nose libgfortran=1.0=0 nomkl"
     REQUIREMENTS="$TO_INSTALL_ALWAYS"
-    TO_INSTALL_MAYBE="python numpy scipy matplotlib scikit-learn pandas configparser future traits simplejson networkx packaging funcsigs click tqdm lmfit"
+    TO_INSTALL_MAYBE="python numpy scipy matplotlib scikit-learn pandas configparser future traits simplejson networkx packaging funcsigs click tqdm"
     for PACKAGE in $TO_INSTALL_MAYBE; do
         # Capitalize package name and add _VERSION
         PACKAGE_VERSION_VARNAME="${PACKAGE^^}_VERSION"
@@ -114,7 +114,6 @@ if [[ "$DISTRIB" == "neurodebian" ]]; then
          python-networkx python-configparser python-future python-traits\
          python-simplejson python-funcsigs python-click python-tqdm\
          graphviz
-    sudo pip install lmfit==0.9.4
     travis_retry sudo apt-get install -y -qq  afni fsl
     source /etc/afni/afni.sh
     echo "AFNI plugin path $AFNI_PLUGINPATH."
@@ -143,7 +142,6 @@ elif [[ "$DISTRIB" == "conda" ]]; then
     # Allow nose to ignore unicode in doctest
     pip install doctest-ignore-unicode
     
-    conda install -c conda-forge lmfit=0.9.4 --yes
     conda install -c conda-forge tqdm --yes
 
 else
