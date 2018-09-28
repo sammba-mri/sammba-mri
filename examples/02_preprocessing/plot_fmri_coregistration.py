@@ -32,7 +32,7 @@ print(coregistrator)
 # `Coregistrator` comes with a parameter `mask_clipping_fraction=.2` which
 # sometimes needs to be changed to get a good brain mask. You can check how
 # this parameter impacts the brain segmentation
-from sammba.segmentation import brain_mask_report
+from sammba.segmentation import brain_extraction_report
 
 print(brain_extraction_report(anat_filename,
                               clipping_fractions=[.1, .2, .9, None]))
