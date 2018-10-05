@@ -55,6 +55,7 @@ canica.fit(registered_funcs)
 
 ##############################################################################
 # Retrieve the independent components in brain space.
+# -------
 components_img = canica.masker_.inverse_transform(canica.components_)
 
 ##############################################################################
