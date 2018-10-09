@@ -46,7 +46,8 @@ registered_anats = affine_register.registered
 print(registered_anats)
 
 ##############################################################################
-#Assess the template
+# Assess the template
+# -------------------
 from nilearn import image
 template_img = image.mean_img(registered_anats)
 
@@ -54,7 +55,7 @@ template_img = image.mean_img(registered_anats)
 # Visalize results
 # ----------------
 # We plot the edges of one individual anat on top of the average image
-from nilearn import plotting, image
+from nilearn import plotting
 
 average_img = image.mean_img(registered_anats)
 display = plotting.plot_anat(average_img, dim=-1.6, title='affine register')
