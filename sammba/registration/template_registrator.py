@@ -49,7 +49,7 @@ class TemplateRegistrator(BaseRegistrator):
         If True, brain mask is computed using RATS Mathematical Morphology.
         Otherwise, a histogram-based brain segmentation is used.
 
-    mask_clipping_fraction : float or None, optional
+    clipping_fraction : float or None, optional
         Clip level fraction is passed to
         sammba.externals.nipype.interfaces.afni.Unifize, to tune
         the bias correction step done prior to brain mask segementation.
@@ -76,7 +76,7 @@ class TemplateRegistrator(BaseRegistrator):
                  template_brain_mask=None,
                  dilated_template_mask=None, output_dir=None, caching=False,
                  verbose=True, use_rats_tool=True,
-                 mask_clipping_fraction=.2, convergence=0.005,
+                 clipping_fraction=.2, convergence=0.005,
                  registration_kind='nonlinear'):
         self.template = template
         self.template_brain_mask = template_brain_mask
@@ -86,7 +86,7 @@ class TemplateRegistrator(BaseRegistrator):
         self.use_rats_tool = use_rats_tool
         self.caching = caching
         self.verbose = verbose
-        self.mask_clipping_fraction = mask_clipping_fraction
+        self.clipping_fraction = clipping_fraction
         self.convergence = convergence
         self.registration_kind = registration_kind
 
@@ -98,12 +98,12 @@ class TemplateRegistrator(BaseRegistrator):
         if not isinstance(self.brain_volume, int):
             raise ValueError('`brain_volume` must be an integer')
 
-        if self.mask_clipping_fraction is not None:
-            if (self.mask_clipping_fraction < .1 or
-                    self.mask_clipping_fraction > .9):
-                raise ValueError("'mask_clipping_fraction' must be between 0.1"
+        if self.clipping_fraction is not None:
+            if (self.clipping_fraction < .1 or
+                    self.clipping_fraction > .9):
+                raise ValueError("'clipping_fraction' must be between 0.1"
                                  " and 0.9, you provided {}"
-                                 "".format(self.mask_clipping_fraction))
+                                 "".format(self.clipping_fraction))
 
     def _check_anat_fitted(self):
         if not hasattr(self, '_normalization_transforms'):
