@@ -55,7 +55,7 @@ registered_anat_filename = coregistrator.anat_in_func_space_
 # ---------------------
 from nilearn import plotting, image
 
-display = plotting.plot_epi(image.mean_img(coregistrator.undistorted_func_),
+display = plotting.plot_epi(image.mean_img(registered_func_filename),
                             title='coreg anat edges on top of mean coreg EPI')
-display.add_edges(coregistrator.anat_in_func_space_)
+display.add_edges(registered_anat_filename)
 plotting.show()
