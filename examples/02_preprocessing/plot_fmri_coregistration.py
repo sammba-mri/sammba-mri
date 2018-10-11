@@ -34,7 +34,7 @@ print(coregistrator)
 # this parameter impacts the brain segmentation
 from sammba.segmentation import brain_extraction_report
 
-print(brain_extraction_report(anat_filename,
+print(brain_extraction_report(anat_filename, brain_volume=400,
                               clipping_fractions=[.1, .2, .9, None]))
 
 ##############################################################################
