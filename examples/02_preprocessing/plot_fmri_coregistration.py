@@ -29,7 +29,7 @@ coregistrator = Coregistrator(output_dir='animal_1366', brain_volume=400,
 print(coregistrator)
 
 ##############################################################################
-# `Coregistrator` comes with a parameter `mask_clipping_fraction=.2` which
+# `Coregistrator` comes with a parameter `clipping_fraction=.2` which
 # sometimes needs to be changed to get a good brain mask. You can check how
 # this parameter impacts the brain segmentation
 from sammba.segmentation import brain_extraction_report
@@ -42,15 +42,20 @@ print(brain_extraction_report(anat_filename,
 # -------------------------------------
 coregistrator.fit_anat(anat_filename)
 coregistrator.fit_modality(func_filename, 'func',
-                           slice_timing=False,
                            prior_rigid_body_registration=True)
+
+##############################################################################
+# The paths to the registered functional and anatomical images are accessible
+# through the `coregistrator` attributes
+registered_func_filename = coregistrator.undistorted_func_
+registered_anat_filename = coregistrator.anat_in_func_space_
 
 ###############################################################################
 # Check out the results
 # ---------------------
 from nilearn import plotting, image
 
-display = plotting.plot_epi(image.mean_img(coregistrator.undistorted_func_),
+display = plotting.plot_epi(image.mean_img(registered_func_filename),
                             title='coreg anat edges on top of mean coreg EPI')
-display.add_edges(coregistrator.anat_in_func_space_)
+display.add_edges(registered_anat_filename)
 plotting.show()
