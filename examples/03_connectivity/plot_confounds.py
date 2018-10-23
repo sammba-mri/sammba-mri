@@ -2,8 +2,8 @@
 Confounds exploration
 =====================
 
-Here we show how to regress out confound signals, in particular statistical
-CompCor.
+Here we show how to regress out confound signals, in particular using 
+statistical CompCor.
 
    * Y. Behzadi et al. `A Component Based Noise Correction Method (CompCor) for BOLD and Perfusion Based fMRI
      <https://www.ncbi.nlm.nih.gov/pmc/articles/PMC2214855/>`_,
@@ -11,15 +11,15 @@ CompCor.
 """
 
 ##############################################################################
-# Retrieve the data
+# Statistical CompCor
+# ----------------------------------------------
+# Retrieve the data from one subject
 from sammba import data_fetchers
 
 test_retest = data_fetchers.fetch_zurich_test_retest(subjects=[1])
 fmri_filename = test_retest.func[0]
 
 ###############################################################################
-# Statistical CompCor
-# ----------------------------------------------
 # We perform a PCA to extract the 98% most variant components.
 # This is done by the function **nilearn.image.high_variance_confounds**,
 from nilearn import image
@@ -30,12 +30,10 @@ print('Computed {0} confounds array.'.format(hv_array.shape))
 ###############################################################################
 # Do my counfounds model noise properly? Voxel-to-voxel connectivity tells!
 # -------------------------------------------------------------------------
-#
 # Check the relevance of chosen confounds: The distribution of voxel-to-voxel
 # correlations should be tight and approximately centered to zero.
 #
-# Compute voxel-wise time series with and without confounds removal,
-# using NiftiMasker.
+# Compute voxel-wise time series without confounds removal, using NiftiMasker.
 from nilearn.input_data import NiftiMasker
 
 brain_masker = NiftiMasker(detrend=True, memory='nilearn_cache', verbose=1)
