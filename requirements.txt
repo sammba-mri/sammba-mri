@@ -6,7 +6,7 @@ numpy >= 1.11
 setuptools >= 3.3
 scikit-learn >= 0.18
 nilearn >= 0.4
-pandas >= 0.12
+pandas >= 0.18
 scipy >= 0.17
 numpydoc >= 0.5
 ipython
@@ -21,4 +21,4 @@ simplejson >= 3.8.0
 prov == 1.5.0
 funcsigs
 click
-
+patsy >= 0.4.1
