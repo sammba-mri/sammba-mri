@@ -36,7 +36,7 @@ class Coregistrator(BaseRegistrator):
     clipping_fraction : float or None, optional
         Clip level fraction is passed to
         sammba.externals.nipype.interfaces.afni.Unifize, to tune
-        the bias correction step done prior to brain mask segementation.
+        the bias correction step done prior to brain mask segmentation.
         Only values between 0.1 and 0.9 are accepted. Smaller fractions tend to
         make the mask larger. If None, no unifization is done for brain mask
         computation.
