@@ -27,9 +27,11 @@ matrix:
            FUTURE_VERSION="0.16.0" TRAITS_VERSION="4.6"
            SIMPLEJSON_VERSION="3.8.0" PROV_VERSION="1.5.0"
            FUNCSIGS_VERSION="*" CLICK_VERSION="6.6.0" TQDM_VERSION="4.19.5"
-    # Neurodebian on Ubuntu 14.04
-    - dist: trusty
-      env: DISTRIB="neurodebian" PYTHON_VERSION="2.7"
+    # Oldest supported versions (with neurodebian)
+    - env: DISTRIB="conda" PYTHON_VERSION="2.7"
+           NUMPY_VERSION="1.11.2" SCIPY_VERSION="0.17"
+           SCIKIT_LEARN_VERSION="0.18" MATPLOTLIB_VERSION="1.5.1"
+	   PANDAS_VERSION="0.18.0" NIBABEL_VERSION="2.0.2" COVERAGE="true"
     # Trying to get as close to the minimum required versions while
     # still having the package version available through conda
     - env: DISTRIB="conda" PYTHON_VERSION="2.7"
