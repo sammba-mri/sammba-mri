@@ -40,6 +40,46 @@ def brain_extraction_report(head_file, brain_volume, write_dir=None,
                             clipping_fractions=[.2, None], use_rats_tool=True,
                             caching=False, verbose=False,
                             terminal_output='allatonce', digits=2):
+    """
+    Parameters
+    ----------
+    head_file : str
+        Path to the image to mask.
+ 
+    brain_volume : int
+        Volume of the brain used for brain extraction.
+        Typically 400 for mouse and 1800 for rat.
+
+    write_dir : str or None, optional
+        Path to the folder to save the output file to. If None, the folder
+        of the head file is used.
+
+    clipping_fractions : list. Elements can be floats between 0. and .9
+        or None, optional
+        Clip level fractions to explore. Each value is passed to
+        sammba.externals.nipype.interfaces.afni.Unifize, to tune
+        the bias correction step done prior to brain mask segmentation.
+        Smaller fractions tend to  make the mask larger. If None,
+        no unifization is done for brain mask computation.
+    
+    caching : bool, optional
+        Wether or not to use caching.
+
+    terminal_output : one of {'stream', 'allatonce', 'file', 'none'}
+        Control terminal output :
+            'stream' : displays to terminal immediately,
+            'allatonce' : waits till command is finished to display output,
+            'file' : writes output to file
+            'none' : output is ignored
+
+    digits : int
+        Number of digits for formating output floating point values.
+
+    Returns
+    -------
+    path to brain extracted image.
+
+    """
     if use_rats_tool:
         compute_brain_mask = compute_morpho_brain_mask
     else:
