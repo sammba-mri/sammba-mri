@@ -72,7 +72,7 @@ def brain_extraction_report(head_file, brain_volume, write_dir=None,
             'file' : writes output to file
             'none' : output is ignored
 
-    digits : int
+    digits : int, optional
         Number of digits for formating output floating point values.
 
     Returns
