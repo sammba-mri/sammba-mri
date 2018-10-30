@@ -33,7 +33,7 @@ class Coregistrator(BaseRegistrator):
         If True, brain mask is computed using RATS Mathematical Morphology.
         Otherwise, a histogram-based brain segmentation is used.
 
-    mask_clipping_fraction : float or None, optional
+    clipping_fraction : float or None, optional
         Clip level fraction is passed to
         sammba.externals.nipype.interfaces.afni.Unifize, to tune
         the bias correction step done prior to brain mask segmentation.
@@ -44,21 +44,21 @@ class Coregistrator(BaseRegistrator):
     def __init__(self, brain_volume=None,
                  output_dir=None, caching=False,
                  verbose=True, use_rats_tool=True,
-                 mask_clipping_fraction=.2):
+                 clipping_fraction=.2):
         self.brain_volume = brain_volume
         self.output_dir = output_dir
         self.use_rats_tool = use_rats_tool
         self.caching = caching
         self.verbose = verbose
-        self.mask_clipping_fraction = mask_clipping_fraction
+        self.clipping_fraction = clipping_fraction
 
     def _check_inputs(self):
-        if self.mask_clipping_fraction is not None:
-            if (self.mask_clipping_fraction < .1 or
-                    self.mask_clipping_fraction > .9):
-                raise ValueError("'mask_clipping_fraction' must be between 0.1"
+        if self.clipping_fraction is not None:
+            if (self.clipping_fraction < .1 or
+                    self.clipping_fraction > .9):
+                raise ValueError("'clipping_fraction' must be between 0.1"
                                  "and 0.9, you provided {}"
-                                 "".format(self.mask_clipping_fraction))
+                                 "".format(self.clipping_fraction))
 
     def fit_anat(self, anat_file, brain_mask_file=None):
         self._fit()
