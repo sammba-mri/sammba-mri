@@ -17,7 +17,7 @@ class Coregistrator(BaseRegistrator):
     Parameters
     ----------
     brain_volume : int or None, optional
-        Volume of the brain used for brain extraction. Typically 400 for mouse
+        Volume of the brain in mm3 used for brain extraction. Typically 400 for mouse
         and 1650 for rat. Used only if prior rigid body registration is needed.
 
     output_dir : str or None, optional

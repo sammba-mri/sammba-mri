@@ -26,7 +26,7 @@ def anats_to_common(anat_filenames, write_dir, brain_volume,
     write_dir : str
         Path to an existant directory to save output files to.
     brain_volume : int
-        Volume of the brain used for brain extraction.
+        Volume of the brain in mm3 used for brain extraction.
         Typically 400 for mouse and 1800 for rat.
     registration_kind : one of {'rigid', 'affine', 'nonlinear'}, optional
         The allowed transform kind.
@@ -861,7 +861,7 @@ def anats_to_template(anat_filenames, head_template_filename, write_dir,
     write_dir : str
         Path to an existant directory to save output files to.
     brain_volume : int
-        Volume of the brain used for brain extraction.
+        Volume of the brain in mm3 used for brain extraction.
         Typically 400 for mouse and 1800 for rat.
     use_rats_tool : bool, optional
         If True, brain mask is computed using RATS Mathematical Morphology.

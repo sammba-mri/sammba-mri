@@ -47,7 +47,7 @@ def brain_extraction_report(head_file, brain_volume, write_dir=None,
         Path to the image to mask.
  
     brain_volume : int
-        Volume of the brain used for brain extraction.
+        Volume of the brain in mm3 used for brain extraction.
         Typically 400 for mouse and 1800 for rat.
 
     write_dir : str or None, optional
@@ -133,7 +133,7 @@ def compute_morpho_brain_mask(head_file, brain_volume, write_dir=None,
     Parameters
     ----------
     brain_volume : int
-        Volume of the brain used for brain extraction.
+        Volume of the brain in mm3 used for brain extraction.
         Typically 400 for mouse and 1800 for rat.
 
     unifize : bool, optional
@@ -225,7 +225,7 @@ def compute_histo_brain_mask(head_file, brain_volume, write_dir=None,
     Parameters
     ----------
     brain_volume : int
-        Volume of the brain used for brain extraction.
+        Volume of the brain in mm3 used for brain extraction.
         Typically 400 for mouse and 1800 for rat.
 
     caching : bool, optional
