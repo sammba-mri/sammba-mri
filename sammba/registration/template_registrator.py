@@ -22,7 +22,7 @@ class TemplateRegistrator(BaseRegistrator):
         Path to the head template image.
 
     brain_volume : int
-        Volume of the brain used for brain extraction.
+        Volume of the brain in mm3 used for brain extraction.
         Typically 400 for mouse and 1650 for rat.
 
     template_brain_mask : str or None, optional
