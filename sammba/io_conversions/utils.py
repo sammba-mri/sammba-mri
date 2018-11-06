@@ -2,6 +2,7 @@
 # License: CeCILL-B
 
 import numpy as np
+import math
 
 
 def _rotate_affine(angle, axis):
@@ -25,8 +26,8 @@ def _rotate_affine(angle, axis):
         Rotation matrix
     """
     a = angle * np.pi / 180
-    s = np.sin(a)
-    c = np.cos(a)
+    s = math.sin(a)
+    c = math.cos(a)
 
     if axis == 'x':
         matrix = np.matrix([[1,  0,  0,  0],
@@ -46,7 +47,7 @@ def _rotate_affine(angle, axis):
 
     else:
         raise ValueError("axis must be one of {'x', 'y', 'z'}, you entered "
-                         "".format(axis))
+                         "{}".format(axis))
     return matrix
 
 
