@@ -85,3 +85,4 @@ after_success:
     # coveralls need to be run from the git checkout
     # so we need to copy the coverage results from TEST_RUN_FOLDER
 - if [[ "$COVERAGE" == "true" ]]; then cp "$TEST_RUN_FOLDER/.coverage" .; coveralls || echo "failed"; fi
+
