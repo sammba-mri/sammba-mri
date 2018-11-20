@@ -12,7 +12,7 @@ from ..preprocessing import afni_unifize
 def _get_volume(mask_img):
     affine_det = np.abs(np.linalg.det(mask_img.affine[:3, :3]))
     mask_data = mask_img.get_data()
-    n_voxels_mask = np.sum(mask_data > 0).astype(float)
+    n_voxels_mask = np.sum(mask_data > 0)
     return n_voxels_mask * affine_det
 
 
