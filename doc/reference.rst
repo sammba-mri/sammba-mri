@@ -46,6 +46,9 @@ sammba-MRI API Reference
 
    fetch_zurich_test_retest
    fetch_zurich_anesthesiant
+   fetch_atlas_dorr_2008
+   fetch_atlas_waxholm_rat_2014
+   fetch_masks_dorr_2008
 
 .. _registration_ref:
 
@@ -70,6 +73,7 @@ sammba-MRI API Reference
    coregister_fmri_session
    create_pipeline_graph
 
+
 **Classes**:
 
 .. currentmodule:: sammba.registration
@@ -79,6 +83,39 @@ sammba-MRI API Reference
    :template: class.rst
 
    FMRISession
+   TemplateRegistrator
+   Coregistrator
+
+.. _segmentation_ref:
+
+:mod:`sammba.segmentation`: Segmentation utilities
+==================================================
+
+.. automodule:: sammba.segmentation
+   :no-members:
+   :no-inherited-members:
+
+**Functions**:
+
+.. currentmodule:: sammba.segmentation
+
+.. autosummary::
+   :toctree: generated/
+   :template: function.rst
+
+   brain_extraction_report
+
+
+**Classes**:
+
+.. currentmodule:: sammba.segmentation
+
+.. autosummary::
+   :toctree: generated/
+   :template: class.rst
+
+   MathMorphoMask
+   HistogramMask
 
 .. _interfaces_ref:
 
