@@ -33,7 +33,7 @@ dorr_masks.brain.to_filename(template_brain_mask)
 from sammba.registration import TemplateRegistrator
 
 registrator = TemplateRegistrator(brain_volume=400, caching=True,
-                                  template=template,
+                                  template=template, use_rats_tool=False,
                                   template_brain_mask=template_brain_mask)
 
 registered_funcs = []
