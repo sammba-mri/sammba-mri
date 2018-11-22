@@ -37,7 +37,8 @@ if not os.path.exists(write_dir):
 # -------------------
 from sammba.registration import anats_to_common
 
-affine_register = anats_to_common(retest.anat, write_dir, 400, caching=True)
+affine_register = anats_to_common(retest.anat, write_dir, 400,
+                                  use_rats_tool=False, caching=True)
 
 ##############################################################################
 # We set caching to True, so that the computations are not restarted.
