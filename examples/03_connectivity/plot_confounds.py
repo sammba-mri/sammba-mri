@@ -25,7 +25,7 @@ fmri_filename = test_retest.func[0]
 from nilearn import image
 
 hv_array = image.high_variance_confounds(fmri_filename)
-print('Computed {0} confounds array.'.format(hv_array.shape))
+print('Computed {0} confounds array.'.format(hv_array.shape[1]))
 
 ###############################################################################
 # Do my counfounds model noise properly? Voxel-to-voxel connectivity tells!
