@@ -143,13 +143,13 @@ class Coregistrator(BaseRegistrator):
                 compute_brain_mask = compute_histo_brain_mask               
 
             if brain_mask_file is None:
-                if self.mask_clipping_fraction:
+                if self.clipping_fraction:
                     brain_mask_file = compute_brain_mask(
                         to_coregister_file, self.brain_volume,
                         write_dir=self.output_dir,
                         caching=self.caching,
                         terminal_output=self.terminal_output,
-                        cl_frac=self.mask_clipping_fraction,
+                        cl_frac=self.clipping_fraction,
                         verbose=self.verbose)
                 else:
                     brain_mask_file = compute_brain_mask(
