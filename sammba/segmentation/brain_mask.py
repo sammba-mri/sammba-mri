@@ -101,7 +101,6 @@ def brain_extraction_report(head_file, brain_volume, write_dir=None,
                                              verbose=verbose,
                                              terminal_output=terminal_output,
                                              **unifize_kwargs)
-        print(brain_mask_file)
         masks_measures.append(_get_mask_measures(brain_mask_file))
 
     target_names = ['fraction {0:0.2f}'.format(cl_frac) if cl_frac is not None
