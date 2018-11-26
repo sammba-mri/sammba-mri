@@ -555,9 +555,8 @@ def anats_to_common(anat_filenames, write_dir, brain_volume,
         nonlinear_levels = [1, 2, 3]
     if nonlinear_minimal_patches is None:
        nonlinear_minimal_patches = []
-    levels_minpatches = nonlinear_levels + nonlinear_minimal_patches
 
-    for n_iter, level_or_minpatch in enumerate(levels_minpatches):
+    for n_iter, maxlev in enumerate(nonlinear_levels):
         
         if n_iter == 0:
             previous_warp_files = affine_transform_files
@@ -583,7 +582,7 @@ def anats_to_common(anat_filenames, write_dir, brain_volume,
                     weight=nonlinear_weight_file,
                     iniwarp=[out_nwarp_cat.outputs.out_file],
                     inilev=0,
-                    maxlev=level_or_minpatch,
+                    maxlev=nonlinear_levels,
                     out_file=out_file,
                     **verbosity_quietness_kwargs)
                 
@@ -595,12 +594,28 @@ def anats_to_common(anat_filenames, write_dir, brain_volume,
                     iwarp=True,
                     weight=nonlinear_weight_file,
                     iniwarp=[warp_file],
-                    inilev=levels_minpatches[n_iter - 1] + 1,
-                    maxlev=level_or_minpatch,
+                    inilev=nonlinear_levels[n_iter - 1] + 1,
+                    maxlev=nonlinear_levels[n_iter],
                     out_file=out_file,
                     **verbosity_quietness_kwargs)
-                    
-            else:
+
+           warped_files.append(out_qwarp.outputs.warped_source)
+           warp_files.append(out_qwarp.outputs.source_warp)
+           previous_warp_files = warp_files
+  
+    for n_iter, minpatch in enumerate(nonlinear_minimal_patches):
+        
+        if n_iter == 0:
+            previous_warp_files = affine_transform_files
+        warped_files = []
+        warp_files = []
+    
+        for warp_file, centered_head_file in zip(previous_warp_files, 
+                                                 centered_head_files):
+            
+            out_file = fname_presuffix(centered_head_file,
+                                       suffix='_warped{}'.format(n_iter)) 
+            
                 out_qwarp = qwarp2(
                     in_file=centered_head_file,
                     base_file=nwarp_adjusted_mean,
@@ -609,7 +624,7 @@ def anats_to_common(anat_filenames, write_dir, brain_volume,
                     weight=nonlinear_weight_file,
                     iniwarp=[warp_file],
                     inilev=nonlinear_levels[-1] + 1, # not ideal
-                    minpatch=level_or_minpatch,
+                    minpatch=nonlinear_minimal_patches,
                     out_file=out_file)
                     
             warped_files.append(out_qwarp.outputs.warped_source)
