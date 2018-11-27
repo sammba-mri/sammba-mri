@@ -1,6 +1,7 @@
 """
 Functional and anatomical coregistration
 ========================================
+
 Standard functional preprocessing and registration of functional image to the
 anatomical.
 """
