@@ -28,7 +28,8 @@ from sammba.registration import TemplateRegistrator
 
 registrator = TemplateRegistrator(brain_volume=400, caching=True,
                                   template=dorr.t2, use_rats_tool=False,
-                                  template_brain_mask=dorr_masks.brain)
+                                  template_brain_mask=dorr_masks.brain,
+                                  registration_kind='affine')
 
 registered_funcs = []
 for anat, func in zip(retest.anat, retest.func):
