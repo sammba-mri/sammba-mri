@@ -102,10 +102,10 @@ def test_fetch_masks_dorr_2008():
     dummy_atlas_img.to_filename(dorr_atlas.maps)
 
     dorr_masks = atlas.fetch_masks_dorr_2008(data_dir=tst.tmpdir, verbose=0)
-    assert_true(isinstance(dorr_masks.brain, nibabel.Nifti1Image))
-    assert_true(isinstance(dorr_masks.gm, nibabel.Nifti1Image))
-    assert_true(isinstance(dorr_masks.cc, nibabel.Nifti1Image))
-    assert_true(isinstance(dorr_masks.ventricles, nibabel.Nifti1Image))
+    assert_true(os.path.isfile(dorr_masks.brain))
+    assert_true(os.path.isfile(dorr_masks.gm))
+    assert_true(os.path.isfile(dorr_masks.cc))
+    assert_true(os.path.isfile(dorr_masks.ventricles))
 
 
 @with_setup(setup_mock, teardown_mock)

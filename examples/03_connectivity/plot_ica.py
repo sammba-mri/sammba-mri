@@ -13,28 +13,23 @@ retest = data_fetchers.fetch_zurich_test_retest(subjects=range(5),
                                                 correct_headers=True)
 
 ##############################################################################
-# Load the template
-# -------------------
+# Load the template and its brain mask
+# ------------------------------------
 dorr = data_fetchers.fetch_atlas_dorr_2008(downsample='100')
-template = dorr.t2
-
-##############################################################################
-# Load the brain mask of the template
-# -----------------------------------
-import os
-
 dorr_masks = data_fetchers.fetch_masks_dorr_2008(downsample='100')
-template_brain_mask = os.path.join('dorr_100_mask.nii.gz')
-dorr_masks.brain.to_filename(template_brain_mask)
+print('Path to template is {} and to the brain mask is {}'.format(dorr.t2,
+      dorr_masks.brain))
 
 ##############################################################################
 # Register to the template
 # ------------------------
+import os
 from sammba.registration import TemplateRegistrator
 
 registrator = TemplateRegistrator(brain_volume=400, caching=True,
-                                  template=template, use_rats_tool=False,
-                                  template_brain_mask=template_brain_mask)
+                                  template=dorr.t2, use_rats_tool=False,
+                                  template_brain_mask=dorr_masks.brain,
+                                  registration_kind='affine')
 
 registered_funcs = []
 for anat, func in zip(retest.anat, retest.func):

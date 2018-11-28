@@ -192,51 +192,86 @@ def fetch_masks_dorr_2008(image_format='nifti', downsample='30',
     sammba.data_fetchers.fetch_atlas_dorr_2008: for details regarding
         the DORR 2008 atlas.
     """
-    # Fetching DORR 2008 atlas
-    dorr = fetch_atlas_dorr_2008(
-        image_format=image_format, downsample=downsample, data_dir=data_dir,
-        resume=resume, verbose=verbose)
-    maps, names, labels = dorr['maps'], dorr['names'], dorr['labels']
-    atlas_img = check_niimg(maps)
-    atlas_data = niimg._safe_get_data(atlas_img).astype(int)
+    masks_dir = _get_dataset_dir('dorr_2008', data_dir=data_dir,
+                                 verbose=verbose)
+    if image_format == 'nifti':
+        ext = '.nii.gz'
+    elif image_format == 'minc':
+        ext = '.minc'
+    else:
+        raise ValueError("Images format must be 'nifti' or 'minc', you "
+                         "entered {0}".format(image_format))
 
-    brain_mask = (atlas_data > 0)
-    brain_mask = ndimage.binary_closing(brain_mask, iterations=2)
-    brain_mask_img = image.new_img_like(atlas_img, brain_mask)
+    brain_mask_file = os.path.join(
+        masks_dir,
+        'dorr_2008_brain_mask_{}{}'.format(downsample, ext))
+    gm_mask_file = os.path.join(
+        masks_dir, 'dorr_2008_gm_mask_{}{}'.format(downsample, ext))
+    cc_mask_file = os.path.join(
+        masks_dir, 'dorr_2008_cc_mask_{}{}'.format(downsample, ext))
+    ventricles_mask_file = os.path.join(
+        masks_dir, 'dorr_2008_ventricles_mask_{}{}'.format(downsample, ext))
+    existing_mask_files = [os.path.isfile(f) for f in [brain_mask_file,
+                           gm_mask_file, cc_mask_file, ventricles_mask_file]]
+    if not np.all(existing_mask_files):
+        # Fetching DORR 2008 atlas
+        dorr = fetch_atlas_dorr_2008(
+            image_format=image_format, downsample=downsample,
+            data_dir=data_dir,
+            resume=resume, verbose=verbose)
+        atlas_img = check_niimg(dorr.maps)
+        atlas_data = niimg._safe_get_data(atlas_img).astype(int)
+    
+    if not os.path.isfile(brain_mask_file):
+        brain_mask = (atlas_data > 0)
+        brain_mask = ndimage.binary_closing(brain_mask, iterations=2)
+        brain_mask_img = image.new_img_like(atlas_img, brain_mask)
+        brain_mask_img.to_filename(brain_mask_file)
 
-    corpus_callosum_labels = labels[
-        np.in1d(names.astype(str), ['R corpus callosum', 'L corpus callosum'])]
-    print(np.in1d(names.astype(str), ['R corpus callosum', 'L corpus callosum']))
-    print(corpus_callosum_labels)
-    print(np.unique(atlas_data))
-    corpus_callosum_mask = np.max(
-        [atlas_data == value for value in corpus_callosum_labels], axis=0)
-    eroded_corpus_callosum_mask = ndimage.binary_erosion(corpus_callosum_mask,
-                                                         iterations=2)
-    corpus_callosum_mask_img = image.new_img_like(atlas_img,
-                                                  eroded_corpus_callosum_mask)
 
-    ventricles_names = ['R lateral ventricle', 'L lateral ventricle',
-                        'third ventricle', 'fourth ventricle']
-    ventricles_labels = labels[np.in1d(names.astype(str), ventricles_names)]
-    ventricles_mask = np.max(
-        [atlas_data == value for value in ventricles_labels], axis=0)
-    eroded_ventricles_mask = ndimage.binary_erosion(ventricles_mask,
-                                                    iterations=2)
-    ventricles_mask_img = image.new_img_like(atlas_img, eroded_ventricles_mask)
+    if not os.path.isfile(cc_mask_file):
+        cc_labels = dorr.labels[
+            np.in1d(dorr.names.astype(str), ['R corpus callosum',
+                                            'L corpus callosum'])]
+        cc_mask = np.max(
+            [atlas_data == value for value in cc_labels], axis=0)
+        eroded_cc_mask = ndimage.binary_erosion(cc_mask, iterations=2)
+        cc_mask_img = image.new_img_like(atlas_img, eroded_cc_mask)
+        cc_mask_img.to_filename(cc_mask_file)
 
-    gm_mask = (atlas_data > 0)
-    gm_mask[ventricles_mask] = 0
-    gm_mask[corpus_callosum_mask] = 0
-    gm_mask = ndimage.binary_closing(gm_mask, iterations=2)
-    gm_mask_img = image.new_img_like(atlas_img, gm_mask)
+    if not os.path.isfile(ventricles_mask_file):
+        ventricles_names = ['R lateral ventricle', 'L lateral ventricle',
+                            'third ventricle', 'fourth ventricle']
+        ventricles_labels = dorr.labels[np.in1d(dorr.names.astype(str),
+                                                ventricles_names)]
+        ventricles_mask = np.max(
+            [atlas_data == value for value in ventricles_labels], axis=0)
+        eroded_ventricles_mask = ndimage.binary_erosion(ventricles_mask,
+                                                        iterations=2)
+        ventricles_mask_img = image.new_img_like(atlas_img,
+                                                 eroded_ventricles_mask)
+        ventricles_mask_img.to_filename(ventricles_mask_file)
 
-    mask_imgs = {'brain': brain_mask_img,
-                 'gm': gm_mask_img,
-                 'cc': corpus_callosum_mask_img,
-                 'ventricles': ventricles_mask_img}
+    if not os.path.isfile(gm_mask_file):
+        gm_mask_img = image.math_img(
+            'np.logical_not(np.logical_or(ventricles_mask_img, cc_mask_img))',
+            ventricles_mask_img=ventricles_mask_img,
+            cc_mask_img=cc_mask_img)
+        gm_mask_img = image.math_img(
+            'np.logical_and(brain_mask_img, gm_mask_img)',
+            brain_mask_img=brain_mask_img,
+            gm_mask_img=gm_mask_img)
+        gm_mask_closed_data = ndimage.binary_closing(gm_mask_img.get_data(),
+                                                     iterations=2)
+        gm_mask_img = image.new_img_like(gm_mask_img, gm_mask_closed_data)
+        gm_mask_img.to_filename(gm_mask_file)
 
-    return Bunch(**mask_imgs)
+    mask_files = {'brain': brain_mask_file,
+                  'gm': gm_mask_file,
+                  'cc': cc_mask_file,
+                  'ventricles': ventricles_mask_file}
+
+    return Bunch(**mask_files)
 
 
 def fetch_atlas_waxholm_rat_2014(data_dir=None, url=None, resume=True,
