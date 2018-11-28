@@ -21,6 +21,7 @@ modality_processors     --- Functions for processing raw data of various MRI
                             modalities that are not BOLD fMRI, such as perfusion
 interfaces              --- nipype-like interfaces for small animals tools
 """
+
 import gzip
 
 from .version import _check_module_dependencies, __version__
