@@ -4,6 +4,7 @@
 #
 # Retry command until success or pre-specified number of failures
 #
+# Copy pasted from https://github.com/nipy/nipype/blob/master/tools/retry_cmd.sh
 # 2018 Chris Markiewicz
 # Released into public domain
 
