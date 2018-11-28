@@ -582,7 +582,7 @@ def anats_to_common(anat_filenames, write_dir, brain_volume,
                     weight=nonlinear_weight_file,
                     iniwarp=[out_nwarp_cat.outputs.out_file],
                     inilev=0,
-                    maxlev=nonlinear_levels,
+                    maxlev=maxlev,
                     out_file=out_file,
                     **verbosity_quietness_kwargs)
                 
@@ -595,7 +595,7 @@ def anats_to_common(anat_filenames, write_dir, brain_volume,
                     weight=nonlinear_weight_file,
                     iniwarp=[warp_file],
                     inilev=nonlinear_levels[n_iter - 1] + 1,
-                    maxlev=nonlinear_levels[n_iter],
+                    maxlev=maxlev,
                     out_file=out_file,
                     **verbosity_quietness_kwargs)
 
@@ -616,16 +616,16 @@ def anats_to_common(anat_filenames, write_dir, brain_volume,
             out_file = fname_presuffix(centered_head_file,
                                        suffix='_warped{}'.format(n_iter)) 
             
-                out_qwarp = qwarp2(
-                    in_file=centered_head_file,
-                    base_file=nwarp_adjusted_mean,
-                    noneg=True,
-                    iwarp=True,
-                    weight=nonlinear_weight_file,
-                    iniwarp=[warp_file],
-                    inilev=nonlinear_levels[-1] + 1, # not ideal
-                    minpatch=nonlinear_minimal_patches,
-                    out_file=out_file)
+            out_qwarp = qwarp2(
+                in_file=centered_head_file,
+                base_file=nwarp_adjusted_mean,
+                noneg=True,
+                iwarp=True,
+                weight=nonlinear_weight_file,
+                iniwarp=[warp_file],
+                inilev=nonlinear_levels[-1] + 1, # not ideal
+                minpatch=minpatch,
+                out_file=out_file)
                     
             warped_files.append(out_qwarp.outputs.warped_source)
             warp_files.append(out_qwarp.outputs.source_warp)
