@@ -1,0 +1,101 @@
+version: 2
+
+jobs:
+  build:
+    docker:
+      - image: circleci/python:3.6
+    environment:
+      DISTRIB: "conda"
+      PYTHON_VERSION: "3.6"
+      NUMPY_VERSION: "*"
+      SCIPY_VERSION: "*"
+      SCIKIT_LEARN_VERSION: "*"
+      MATPLOTLIB_VERSION: "*"
+      NILEARN_VERSION: "*"
+      PANDAS_VERSION: "*"
+      NETWORKX_VERSION: "*"
+      FUTURE_VERSION: "0.16.0"
+      PACKAGING_VERSION: "*"
+      TRAITS_VERSION: "4.6"
+      SIMPLEJSON_VERSION: "3.8.0"
+      PROV_VERSION: "1.5.0"
+      FUNCSIGS_VERSION: "*"
+      CLICK_VERSION: "6.6.0"
+      TQDM_VERSION: "4.19.5
+    steps:
+      - checkout
+        # Get rid of existing virtualenvs on circle ci as they conflict with conda.
+        # Trick found here:
+        # https://discuss.circleci.com/t/disable-autodetection-of-project-or-application-of-python-venv/235/10
+      - run: cd && rm -rf ~/.pyenv && rm -rf ~/virtualenvs
+        # We need to remove conflicting texlive packages.
+      - run: sudo -E apt-get -yq remove texlive-binaries --purge
+        # Installing required packages for `make -C doc check command` to work.
+      - run: sudo -E apt-get -yq update
+      - run: sudo -E apt-get -yq --no-install-suggests --no-install-recommends --force-yes install dvipng texlive-latex-base texlive-latex-extra
+      - restore_cache:
+          key: v1-packages+datasets-{{ .Branch }}
+      - run: wget https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh -O ~/miniconda.sh
+      - run: chmod +x ~/miniconda.sh && ~/miniconda.sh -b
+      - run:
+          name: Setup conda path in env variables
+          command: |
+            echo 'export PATH="$HOME/miniconda3/bin:$PATH"'  >> $BASH_ENV
+      - run:
+          name: Create conda env
+          command: |
+            conda create -n testenv python=3.6 numpy scipy scikit-learn matplotlib nilearn pandas \
+	    networkx future packaging traits simplejson prov funcsigs click tqdm \
+            lxml mkl sphinx pillow pandas -yq
+            conda install -n testenv nibabel -c conda-forge -yq
+      - run:
+          name: Add the NeuroDebian repository
+          command: |
+            bash <(wget -q -O- http://neuro.debian.net/_files/neurodebian-travis.sh)
+            wget -O- http://neuro.debian.net/lists/trusty.us-nh.full | sudo tee /etc/apt/sources.list.d/neurodebian.sources.list
+            sudo apt-key adv --recv-keys --keyserver pool.sks-keyservers.net 2649A5A9 \
+            || { wget -q -O- http://neuro.debian.net/_static/neuro.debian.net.asc | sudo apt-key add -; }
+            sudo apt-get update -qq
+            sudo apt-cache policy  # provide a summary over which repositories are currently available
+      - run:
+          name: Install graphviz, AFNI, FSL and ANTS
+          command: |
+            tools/retry_cmd.sh -n 5 -s 15 
+              sudo apt-get install -y -qq graphviz afni fsl
+            source /etc/afni/afni.sh
+            echo "AFNI plugin path $AFNI_PLUGINPATH."
+            echo "AFNI binaries installed in $(which afni)"
+            source /etc/fsl/fsl.sh
+            export FSLOUTPUTTYPE=NIFTI_GZ
+            tools/retry_cmd.sh -n 5 -s 15 
+              sudo apt-get install -y -qq  ants
+            export ANTSPATH=${ANTSPATH:="/usr/lib/ants"}
+            export PATH=${PATH}:/usr/bin/ANTS
+            export PATH=${PATH}:/usr/lib/ants
+            echo "ANTS path $ANTSPATH."
+            echo "ANTS binaries installed in $(which ANTS)"
+      - run:
+          name: Running CircleCI test (make html)
+          command: |
+            source activate testenv
+            pip install -e .
+            set -o pipefail && cd doc && make html-strict 2>&1 | tee ~/log.txt
+          no_output_timeout: 5h
+      - save_cache:
+          key: v1-packages+datasets-{{ .Branch }}
+          paths:
+          - $HOME/nilearn_data
+          - $HOME/miniconda3
+
+      - store_artifacts:
+          path: doc/_build/html
+      - store_artifacts:
+          path: coverage
+      - store_artifacts:
+          path: $HOME/log.txt
+          destination: log.txt
+
+
+
+
+
