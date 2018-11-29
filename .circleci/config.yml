@@ -45,10 +45,12 @@ jobs:
       - run:
           name: Create conda env
           command: |
-            conda create -n testenv python=3.6 numpy scipy scikit-learn matplotlib nilearn pandas \
-            networkx future packaging traits simplejson prov funcsigs click tqdm \
+            conda create -n testenv python=3.6 numpy scipy scikit-learn matplotlib pandas \
+	    networkx future packaging traits simplejson funcsigs click tqdm \
             lxml mkl sphinx pillow pandas -yq
             conda install -n testenv nibabel -c conda-forge -yq
+            pip install prov
+            pip install nilearn
       - run:
           name: Add the NeuroDebian repository
           command: |
