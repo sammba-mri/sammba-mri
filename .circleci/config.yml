@@ -62,6 +62,7 @@ jobs:
       - run:
           name: Install graphviz, AFNI, FSL and ANTS
           command: |
+            chmod +x tools/retry_cmd.sh
             tools/retry_cmd.sh -n 5 -s 15 
               sudo apt-get install -y -qq graphviz afni fsl
             source /etc/afni/afni.sh
