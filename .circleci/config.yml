@@ -64,7 +64,14 @@ jobs:
           command: |
             chmod +x tools/retry_cmd.sh
             tools/retry_cmd.sh -n 5 -s 15 
-              sudo apt-get install -y -qq graphviz afni fsl
+              sudo apt-get install -y -qq graphviz
+            echo "graphviz OK"
+            tools/retry_cmd.sh -n 5 -s 15 
+              sudo apt-get install -y -qq fsl
+            echo "FSL OK"
+            tools/retry_cmd.sh -n 5 -s 15 
+              sudo apt-get install -y -qq afni
+            echo "afni OK"
             source /etc/afni/afni.sh
             echo "AFNI plugin path $AFNI_PLUGINPATH."
             echo "AFNI binaries installed in $(which afni)"
