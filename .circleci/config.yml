@@ -64,6 +64,7 @@ jobs:
           name: Install AFNI, FSL and ANTS
           command: |
             chmod +x tools/retry_cmd.sh
+            lsb_release -d
             tools/retry_cmd.sh -n 5 -s 15 
               sudo apt-get install -y -qq afni
             echo "afni OK"
