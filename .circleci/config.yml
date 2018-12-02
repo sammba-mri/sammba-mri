@@ -55,7 +55,13 @@ jobs:
       - run:
           name: Add the NeuroDebian repository
           command: |
-            wget -O- http://neuro.debian.net/lists/trusty.us-nh.full | sudo tee /etc/apt/sources.list.d/neurodebian.sources.list
+          # Figure out what Ubuntu release travis environment is based on
+          sudo apt-get install lsb-release
+          cat /etc/lsb-release
+          source /etc/lsb-release
+
+          # Fetch the apt sources for the currently preferred mirror
+            wget -O- http://neuro.debian.net/lists/${DISTRIB_CODENAME}.us-nh.full | sudo tee /etc/apt/sources.list.d/neurodebian.sources.list
             sudo apt-key adv --recv-keys --keyserver pool.sks-keyservers.net 2649A5A9 \
             || { wget -q -O- http://neuro.debian.net/_static/neuro.debian.net.asc | sudo apt-key add -; }
             sudo apt-get update -qq
@@ -64,8 +70,6 @@ jobs:
           name: Install AFNI, FSL and ANTS
           command: |
             chmod +x tools/retry_cmd.sh
-            sudo apt-get install lsb-release
-            lsb_release -d
             tools/retry_cmd.sh -n 5 -s 15 
               sudo apt-get install -y -qq afni
             echo "afni OK"
