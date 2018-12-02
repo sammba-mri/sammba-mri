@@ -56,9 +56,9 @@ jobs:
           name: Add the NeuroDebian repository
           command: |
           # Figure out what Ubuntu release travis environment is based on
-          sudo apt-get install lsb-release
-          cat /etc/lsb-release
-          source /etc/lsb-release
+            sudo apt-get install lsb-release
+            cat /etc/lsb-release
+            source /etc/lsb-release
 
           # Fetch the apt sources for the currently preferred mirror
             wget -O- http://neuro.debian.net/lists/${DISTRIB_CODENAME}.us-nh.full | sudo tee /etc/apt/sources.list.d/neurodebian.sources.list
