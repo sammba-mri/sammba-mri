@@ -49,6 +49,7 @@ jobs:
             networkx future packaging traits simplejson funcsigs click tqdm \
             lxml mkl sphinx pillow pandas -yq
             conda install -n testenv nibabel -c conda-forge -yq
+            conda install -c anaconda graphviz
             pip install prov
             pip install nilearn
       - run:
@@ -60,21 +61,18 @@ jobs:
             sudo apt-get update -qq
             sudo apt-cache policy  # provide a summary over which repositories are currently available
       - run:
-          name: Install graphviz, AFNI, FSL and ANTS
+          name: Install AFNI, FSL and ANTS
           command: |
             chmod +x tools/retry_cmd.sh
-            tools/retry_cmd.sh -n 5 -s 15 
-              sudo apt-get install -y -qq graphviz
-            echo "graphviz OK"
-            tools/retry_cmd.sh -n 5 -s 15 
-              sudo apt-get install -y -qq fsl
-            echo "FSL OK"
             tools/retry_cmd.sh -n 5 -s 15 
               sudo apt-get install -y -qq afni
             echo "afni OK"
             source /etc/afni/afni.sh
             echo "AFNI plugin path $AFNI_PLUGINPATH."
             echo "AFNI binaries installed in $(which afni)"
+            tools/retry_cmd.sh -n 5 -s 15 
+              sudo apt-get install -y -qq fsl
+            echo "FSL OK"
             source /etc/fsl/fsl.sh
             export FSLOUTPUTTYPE=NIFTI_GZ
             tools/retry_cmd.sh -n 5 -s 15 
