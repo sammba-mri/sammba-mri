@@ -55,7 +55,6 @@ jobs:
       - run:
           name: Add the NeuroDebian repository
           command: |
-          # Figure out what Ubuntu release travis environment is based on
             sudo apt-get install lsb-release
             cat /etc/lsb-release
             source /etc/lsb-release
