@@ -201,6 +201,11 @@ pseudoxml:
 	@echo
 	@echo "Build finished. The pseudo-XML files are in $(BUILDDIR)/pseudoxml."
 
+check:
+	rm -rf _build/doctrees
+	rm -rf $(BUILDDIR)/html/_images
+	$(SPHINXBUILD) -W -T -n -b html $(ALLSPHINXOPTS) $(BUILDDIR)/html
+
 install:
 	rm -rf _build/doctrees _build/sammba-mri.github.io/sammba-mri
 	# first clone the nilearn.github.io repo because it may ask
