@@ -49,9 +49,7 @@ jobs:
             networkx future packaging traits simplejson funcsigs click tqdm \
             lxml mkl sphinx pillow pandas -yq
             conda install -n testenv nibabel -c conda-forge -yq
-            conda install -c anaconda graphviz
-            pip install prov
-            pip install nilearn
+            conda install -n testenv graphviz -c anaconda -yq
       - run:
           name: Add the NeuroDebian repository
           command: |
@@ -88,6 +86,8 @@ jobs:
           name: Running CircleCI test (make html)
           command: |
             source activate testenv
+            pip install prov
+            pip install nilearn
             pip install -e .
             set -o pipefail && cd doc && make html-strict 2>&1 | tee ~/log.txt
           no_output_timeout: 5h
