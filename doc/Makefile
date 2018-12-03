@@ -51,6 +51,16 @@ clean:
 	rm -rf auto_examples/
 	rm -rf generated/*
 	rm -rf modules/generated/*
+
+
+sym_links:
+	# Make sym-links to share the cache across various example
+	# directories
+	-cd ../examples/ && mkdir -p nilearn_cache
+	-cd ../examples/01_template/ && ln -sf ../nilearn_cache
+	-cd ../examples/02_preprocessing/ && ln -sf ../nilearn_cache
+	-cd ../examples/03_connectivity/ && ln -sf ../nilearn_cache
+	
 html:
 	$(SPHINXBUILD) -b html $(ALLSPHINXOPTS) $(BUILDDIR)/html
 	@echo
