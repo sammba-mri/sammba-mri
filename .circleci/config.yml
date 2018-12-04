@@ -66,8 +66,12 @@ jobs:
             tools/retry_cmd.sh -n 5 -s 15 
               sudo apt-get install -y -qq afni
             source /etc/afni/afni.sh
+            echo $AFNI_INSTALLDIR
+            echo "AFNI plugin path $AFNI_PLUGINPATH."
+            echo "AFNI binaries installed in $(which afni)"
             tools/retry_cmd.sh -n 5 -s 15 
               sudo apt-get install -y -qq fsl
+            echo "FSL OK"
             source /etc/fsl/fsl.sh
             export FSLOUTPUTTYPE=NIFTI_GZ
             tools/retry_cmd.sh -n 5 -s 15 
@@ -75,6 +79,8 @@ jobs:
             export ANTSPATH=${ANTSPATH:="/usr/lib/ants"}
             export PATH=${PATH}:/usr/bin/ANTS
             export PATH=${PATH}:/usr/lib/ants
+            echo "ANTS path $ANTSPATH."
+            echo "ANTS binaries installed in $(which ANTS)"
       - run:
           name: Running CircleCI test (make html)
           command: |
