@@ -70,7 +70,7 @@ jobs:
             echo "AFNI plugin path $AFNI_PLUGINPATH."
             echo "AFNI binaries installed in $(which afni)"
             export PATH=${PATH}:/usr/lib/afni/bin
-            echo $(ls /usr/lib/afni/)
+            echo $(ls /usr/lib/afni/bin/3dUnifize)
             tools/retry_cmd.sh -n 5 -s 15 
               sudo apt-get install -y -qq fsl
             echo "FSL OK"
