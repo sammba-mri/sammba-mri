@@ -312,6 +312,7 @@ sphinx_gallery_conf = {
     # Your documented modules. In this case sphinx_gallery and numpy
     # in a tuple of strings.
     'doc_module': 'sammba',
+    'backreferences_dir': os.path.join('modules', 'generated'),
     'reference_url': {
         # The module you locally document uses a None
         'sammba': None,
