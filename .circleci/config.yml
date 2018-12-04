@@ -70,20 +70,22 @@ jobs:
             tools/retry_cmd.sh -n 5 -s 15 
               sudo apt-get install -y -qq  ants
       - run:
-          name: Set AFNI, FSL and ANTS binaries in env variables
+          name: Pip install prov and nilearn
           command: |
             source activate testenv
+            pip install --progress-bar off prov
+            pip install --progress-bar off nilearn
+      - run:
+          name: Set AFNI, FSL and ANTS binaries in env variables
+          command: |
+            pip install --progress-bar off prov
+            pip install --progress-bar off nilearn
             source /etc/afni/afni.sh
             source /etc/fsl/fsl.sh
             export FSLOUTPUTTYPE=NIFTI_GZ
             export ANTSPATH=${ANTSPATH:="/usr/lib/ants"}
             export PATH=${PATH}:/usr/bin/ANTS
             export PATH=${PATH}:/usr/lib/ants
-      - run:
-          name: Pip install prov and nilearn
-          command: |
-            pip install --progress-bar off prov
-            pip install --progress-bar off nilearn
       - run:
           name: Running CircleCI test (make html)
           command: |
