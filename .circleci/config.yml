@@ -70,25 +70,17 @@ jobs:
             tools/retry_cmd.sh -n 5 -s 15 
               sudo apt-get install -y -qq  ants
       - run:
-          name: Pip install prov and nilearn
+          name: Running CircleCI test (make html)
           command: |
             source activate testenv
-            pip install --progress-bar off prov
-            pip install --progress-bar off nilearn
-      - run:
-          name: Set AFNI, FSL and ANTS binaries in env variables
-          command: |
-            pip install --progress-bar off prov
-            pip install --progress-bar off nilearn
+            pip install off prov
+            pip install nilearn
             source /etc/afni/afni.sh
             source /etc/fsl/fsl.sh
             export FSLOUTPUTTYPE=NIFTI_GZ
             export ANTSPATH=${ANTSPATH:="/usr/lib/ants"}
             export PATH=${PATH}:/usr/bin/ANTS
             export PATH=${PATH}:/usr/lib/ants
-      - run:
-          name: Running CircleCI test (make html)
-          command: |
             pip install -e .
             set -o pipefail && cd doc && make html-strict 2>&1 | tee ~/log.txt
           no_output_timeout: 5h
