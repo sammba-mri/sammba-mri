@@ -73,8 +73,8 @@ jobs:
           name: Running CircleCI test (make html)
           command: |
             source activate testenv
-            pip install prov
-            pip install nilearn
+            pip install -q prov
+            pip install -q nilearn
             source /etc/afni/afni.sh
             source /etc/fsl/fsl.sh
             export FSLOUTPUTTYPE=NIFTI_GZ
