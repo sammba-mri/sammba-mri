@@ -65,35 +65,28 @@ jobs:
             chmod +x tools/retry_cmd.sh
             tools/retry_cmd.sh -n 5 -s 15 
               sudo apt-get install -y -qq afni
-            source /etc/afni/afni.sh
-            echo $AFNI_INSTALLDIR
-            echo "AFNI plugin path $AFNI_PLUGINPATH."
-            echo "AFNI binaries installed in $(which afni)"
-            export PATH=${PATH}:/usr/lib/afni/bin
-            echo $(ls /usr/lib/afni/bin/3dUnifize)
             tools/retry_cmd.sh -n 5 -s 15 
               sudo apt-get install -y -qq fsl
-            echo "FSL OK"
-            source /etc/fsl/fsl.sh
-            export FSLOUTPUTTYPE=NIFTI_GZ
             tools/retry_cmd.sh -n 5 -s 15 
               sudo apt-get install -y -qq  ants
+      - run:
+          name: Set AFNI, FSL and ANTS binaries in env variables
+          command: |
+            source activate testenv
+            source /etc/afni/afni.sh
+            source /etc/fsl/fsl.sh
+            export FSLOUTPUTTYPE=NIFTI_GZ
             export ANTSPATH=${ANTSPATH:="/usr/lib/ants"}
             export PATH=${PATH}:/usr/bin/ANTS
             export PATH=${PATH}:/usr/lib/ants
-            echo "ANTS path $ANTSPATH."
-            echo "ANTS binaries installed in $(which ANTS)"
+      - run:
+          name: Pip install prov and nilearn
+          command: |
+            pip install --progress-bar off prov
+            pip install --progress-bar off nilearn
       - run:
           name: Running CircleCI test (make html)
           command: |
-            source activate testenv
-            pip install prov
-            pip install nilearn
-            source /etc/afni/afni.sh
-            source /etc/fsl/fsl.sh
-            export ANTSPATH=${ANTSPATH:="/usr/lib/ants"}
-            export PATH=${PATH}:/usr/bin/ANTS
-            export PATH=${PATH}:/usr/lib/ants
             pip install -e .
             set -o pipefail && cd doc && make html-strict 2>&1 | tee ~/log.txt
           no_output_timeout: 5h

@@ -21,14 +21,16 @@ Step 2 - Align the Atlas on the raw MR images thanks to the deformation evaluate
 ============================================================================================
 
     So far we did not develop any Sammba procedure to perform this task
-	We recommend to use the > 3dNwarpApply funtion from AFNI
-3dNwarpApply -nwarp Saved_Registered_dir/Aal1_WARP.nii.gz Saved_Registered_dir/Aal1_masked_shr.aff12.1D -iwarp -source Atlas_Directory/Atlas.nii.gz -master Images-to-Register/Aal1.nii.gz -ainterp NN -prefix Measures/Aal1_atlas.nii.gz	
+	We recommend to use the > 3dNwarpApply funtion from AFNI::
+
+    3dNwarpApply -nwarp Saved_Registered_dir/Aal1_WARP.nii.gz Saved_Registered_dir/Aal1_masked_shr.aff12.1D -iwarp -source Atlas_Directory/Atlas.nii.gz -master Images-to-Register/Aal1.nii.gz -ainterp NN -prefix Measures/Aal1_atlas.nii.gz	
 	
 	
 Step 3 - Measure of the volume of each registered ROI of the atlas
 ==================================================================
 	So far we did not develop any Sammba procedure to perform this task
-	We recommend to use the > 3dhistog from AFNI
+	We recommend to use the > 3dhistog from AFNI::
+
 	3dhistog -int Measures/Aal1_atlas.nii.gz > Measures/Aal1-Measured-volumes.txt
 
 	

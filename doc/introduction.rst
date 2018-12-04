@@ -93,7 +93,7 @@ Interfaces configuration
     # AFNI
     export PATH=/usr/lib/afni/bin:$PATH
 
-**Configuring AFNI**: To be able to run ANTS make sure to add the following lines of code to your .bashrc file::
+**Configuring ANTS**: To be able to run ANTS make sure to add the following lines of code to your .bashrc file::
 
-    #ANTs
+    # ANTs
     export PATH=/usr/local/antsbin/bin:$PATH
