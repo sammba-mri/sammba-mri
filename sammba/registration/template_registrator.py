@@ -182,7 +182,7 @@ class TemplateRegistrator(BaseRegistrator):
                                'triquintic', 'wsinc5'}, optional
             The interpolation method used for the transformed file.
 
-        Retruns
+        Returns
         -------
         transformed_file: str
             Path to the transformed file, in template space.
@@ -348,7 +348,7 @@ class TemplateRegistrator(BaseRegistrator):
             The target voxels size. If None, the final voxels size will match
             the template.
 
-        Retruns
+        Returns
         -------
         transformed_file : str
             Path to the transformed file, in template space.
@@ -382,14 +382,14 @@ class TemplateRegistrator(BaseRegistrator):
             Path to the file in the same space as the modality image.
 
         interpolation : one of {'nearestneighbour', 'trilinear', 'tricubic',
-                               'triquintic', 'wsinc5'}, optional
+                                'triquintic', 'wsinc5'}, optional
             The interpolation method used for the transformed file.
 
         voxel_size : 3-tuple or None, optional
             The target voxels size. If None, the final voxels size will match
             the template.
 
-        Retruns
+        Returns
         -------
         transformed_file : str
             Path to the transformed file, in template space.
