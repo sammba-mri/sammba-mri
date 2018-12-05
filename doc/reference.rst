@@ -125,5 +125,5 @@ External tools wrapped in python
 .. toctree::
    :maxdepth: 2
 
-   interfaces/generated/sammba.interfaces.preproc_tools.rst
+   interfaces/generated/sammba.interfaces.segmentation.rst
 
