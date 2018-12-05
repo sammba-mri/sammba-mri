@@ -106,19 +106,6 @@ sammba-MRI API Reference
    brain_extraction_report
 
 
-**Classes**:
-
-.. currentmodule:: sammba.segmentation
-
-.. autosummary::
-   :toctree: generated/
-   :template: class.rst
-
-   MathMorphoMask
-   HistogramMask
-
-.. _interfaces_ref:
-
 External tools wrapped in python
 ================================
 
