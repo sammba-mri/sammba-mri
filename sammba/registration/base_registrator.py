@@ -25,7 +25,9 @@ class BaseRegistrator(BaseEstimator, TransformerMixin):
             os.makedirs(self.output_dir)
 
     def segment(self, in_file):
-        """ Bias field correction and brain extraction
+        """
+        Bias field correction and brain extraction
+
         """
         self._fit()
         unifized_file = afni_unifize(

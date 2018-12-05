@@ -37,8 +37,6 @@ extensions = ['sphinx.ext.autodoc',
     'sphinx.ext.intersphinx',
     'sphinx.ext.mathjax',
     'numpydoc.numpydoc',
-    'IPython.sphinxext.ipython_directive',
-    'IPython.sphinxext.ipython_console_highlighting',
     'sphinx_gallery.gen_gallery']
 
 numpydoc_show_class_members = False
@@ -312,6 +310,7 @@ sphinx_gallery_conf = {
     # Your documented modules. In this case sphinx_gallery and numpy
     # in a tuple of strings.
     'doc_module': 'sammba',
+    'backreferences_dir': os.path.join('modules', 'generated'),
     'reference_url': {
         # The module you locally document uses a None
         'sammba': None,

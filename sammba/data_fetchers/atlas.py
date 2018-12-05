@@ -173,10 +173,10 @@ def fetch_masks_dorr_2008(image_format='nifti', downsample='30',
 
         - 'gm' : nibabel.nifti1.Nifti1Image grey matter mask image.
 
-        - 'cc' : nibabel.nifti1.Nifti1Image eroded corpus callosum image.
+        - 'cc' : nibabel.nifti1.Nifti1Image eroded corpus callosum mask image.
 
         - 'ventricles' : nibabel.nifti1.Nifti1Image eroded ventricles mask
-        image.
+                         image.
 
     Notes
     -----

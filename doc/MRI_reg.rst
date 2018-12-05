@@ -8,7 +8,7 @@ Registering several MRI images and creating a template
 
 
 Registering several raw MRI images
-==============================
+==================================
 
     Sammba-MRI allows to register several MR images.
 		° First it creates a template from multiple anatomical scans, then register all of them to it. 

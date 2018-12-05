@@ -51,8 +51,31 @@ clean:
 	rm -rf auto_examples/
 	rm -rf generated/*
 	rm -rf modules/generated/*
+
+
+sym_links:
+	# Make sym-links to share the cache across various example
+	# directories
+	-cd ../examples/ && mkdir -p nilearn_cache
+	-cd ../examples/01_template/ && ln -sf ../nilearn_cache
+	-cd ../examples/02_preprocessing/ && ln -sf ../nilearn_cache
+	-cd ../examples/03_connectivity/ && ln -sf ../nilearn_cache
+	
 html:
 	$(SPHINXBUILD) -b html $(ALLSPHINXOPTS) $(BUILDDIR)/html
+	@echo
+	@echo "Build finished. The HTML pages are in $(BUILDDIR)/html."
+
+html-strict:	sym_links
+	# Build html documentation using a strict mode: Warnings are
+	# considered as errors.
+	make check
+	touch $(BUILDDIR)/html/.nojekyll
+	@echo
+	@echo "Build finished. The HTML pages are in $(BUILDDIR)/html."
+
+html-noplot:
+	$(SPHINXBUILD) -D plot_gallery=0 -b html $(ALLSPHINXOPTS) $(BUILDDIR)/html
 	@echo
 	@echo "Build finished. The HTML pages are in $(BUILDDIR)/html."
 
@@ -178,10 +201,10 @@ pseudoxml:
 	@echo
 	@echo "Build finished. The pseudo-XML files are in $(BUILDDIR)/pseudoxml."
 
-html-noplot:
-	$(SPHINXBUILD) -D plot_gallery=0 -b html $(ALLSPHINXOPTS) $(BUILDDIR)/html
-	@echo
-	@echo "Build finished. The HTML pages are in $(BUILDDIR)/html."
+check:
+	rm -rf _build/doctrees
+	rm -rf $(BUILDDIR)/html/_images
+	$(SPHINXBUILD) -W -T -n -b html $(ALLSPHINXOPTS) $(BUILDDIR)/html
 
 install:
 	rm -rf _build/doctrees _build/sammba-mri.github.io/sammba-mri
