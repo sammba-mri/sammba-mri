@@ -37,8 +37,6 @@ extensions = ['sphinx.ext.autodoc',
     'sphinx.ext.intersphinx',
     'sphinx.ext.mathjax',
     'numpydoc.numpydoc',
-#    'IPython.sphinxext.ipython_directive',
-#    'IPython.sphinxext.ipython_console_highlighting',
     'sphinx_gallery.gen_gallery']
 
 numpydoc_show_class_members = False
