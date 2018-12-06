@@ -396,7 +396,7 @@ def coregister_fmri_session(session_data, t_r, write_dir, brain_volume,
         allineate = afni.Allineate(terminal_output=terminal_output).run
         allineate2 = afni.Allineate(terminal_output=terminal_output).run  # TODO: remove after fixed bug
         tstat = afni.TStat(terminal_output=terminal_output).run
-        compute_mask = ComputeMask(terminal_output=terminal_output).run
+        compute_mask = ComputeMask().run
         calc = afni.Calc(terminal_output=terminal_output).run
         unifize = afni.Unifize(terminal_output=terminal_output).run
         bias_correct = ants.N4BiasFieldCorrection(terminal_output=terminal_output).run

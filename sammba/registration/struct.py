@@ -180,7 +180,7 @@ def anats_to_common(anat_filenames, write_dir, brain_volume,
         copy = afni.Copy(terminal_output=terminal_output).run
         unifize = afni.Unifize(terminal_output=terminal_output).run
         clip_level = afni.ClipLevel().run  # XXX fix nipype bug with 'none'
-        compute_mask = ComputeMask(terminal_output=terminal_output).run
+        compute_mask = ComputeMask().run
         calc = afni.Calc(terminal_output=terminal_output).run
         center_mass = afni.CenterMass().run  # XXX fix nipype bug with 'none'
         refit = afni.Refit(terminal_output=terminal_output).run
@@ -280,8 +280,7 @@ def anats_to_common(anat_filenames, write_dir, brain_volume,
             in_file=brain_masking_in_file,
             out_file=fname_presuffix(brain_masking_in_file, suffix='_mask'),
             volume_threshold=brain_volume,
-            intensity_threshold=int(out_clip_level.outputs.clip_val),
-            terminal_output=terminal_output)
+            intensity_threshold=int(out_clip_level.outputs.clip_val))
         brain_mask_files.append(out_compute_mask.outputs.out_file)
 
     # bias correction for images to be both brain-extracted with the mask 
@@ -1006,7 +1005,7 @@ def anats_to_template(anat_filenames, head_template_filename, write_dir,
     else:
         unifize = afni.Unifize(terminal_output=terminal_output).run
         clip_level = afni.ClipLevel().run
-        compute_mask = ComputeMask(terminal_output=terminal_output).run
+        compute_mask = ComputeMask().run
         calc = afni.Calc(terminal_output=terminal_output).run
         mask_tool = afni.MaskTool(terminal_output=terminal_output).run
         allineate = afni.Allineate(terminal_output=terminal_output).run
