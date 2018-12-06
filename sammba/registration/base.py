@@ -140,7 +140,7 @@ def _warp(to_warp_file, reference_file, write_dir=None, caching=False,
         verbose=verbose, caching=caching,
         caching_dir=write_dir, environ=environ)
 
-    return warped_oblique_file, out_warp.outputs.mat_file
+    return warped_oblique_file, out_warp.outputs.warp_file
 
 
 def _per_slice_qwarp(to_qwarp_file, reference_file,

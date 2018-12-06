@@ -137,7 +137,7 @@ def anats_to_common(anat_filenames, write_dir, brain_volume,
 
     if verbose:
         terminal_output = 'stream'
-        verbosity_kwargs = {'verb': verbose > 1}
+        verbosity_kwargs = {'verbose': verbose > 1}
         quietness_kwargs = {}
         verb_quietness_kwargs = {'verb': verbose > 2}
         verbosity_quietness_kwargs = {'verbose': verbose > 2}
