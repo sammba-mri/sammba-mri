@@ -171,7 +171,7 @@ def anats_to_common(anat_filenames, write_dir, brain_volume,
         nwarp_adjust = memory.cache(afni.NwarpAdjust)
         nwarp_cat = memory.cache(afni.NwarpCat)
         warp_apply = memory.cache(afni.NwarpApply)
-        for step in [copy, unifize, compute_mask, calc, refit, refit2,
+        for step in [copy, unifize, calc, refit, refit2,
                      tcat, tstat, undump, resample, allineate, allineate2,
                      mask_tool, catmatvec, qwarp, nwarp_cat, warp_apply,
                      nwarp_adjust]:
@@ -999,7 +999,7 @@ def anats_to_template(anat_filenames, head_template_filename, write_dir,
         allineate2 = memory.cache(afni.Allineate)
         unifize = memory.cache(afni.Unifize)
         qwarp = memory.cache(afni.Qwarp)
-        for step in [compute_mask,  allineate, allineate2, calc,
+        for step in [allineate, allineate2, calc,
                      mask_tool, unifize, qwarp]:
             step.interface().set_default_terminal_output(terminal_output)
     else:
