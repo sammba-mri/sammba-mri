@@ -82,7 +82,7 @@ def _rigid_body_register(moving_head_file, reference_head_file,
         warp_type='shift_rotate',
         out_file=fname_presuffix(reference_brain_file, suffix='_shr'),
         environ=environ,
-        verb=verbose)
+        verbose=verbose)
     rigid_transform_file = out_allineate.outputs.out_matrix
     output_files.append(out_allineate.outputs.out_file)
 
