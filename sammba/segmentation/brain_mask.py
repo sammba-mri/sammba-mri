@@ -311,11 +311,9 @@ def compute_histo_brain_mask(head_file, brain_volume, write_dir=None,
         memory = Memory(write_dir)
         clip_level = memory.cache(afni.ClipLevel)
         compute_mask = memory.cache(interfaces.HistogramMask)
-        compute_mask.interface().set_default_terminal_output(terminal_output)
     else:
         clip_level = afni.ClipLevel().run
-        compute_mask = interfaces.HistogramMask(
-            terminal_output=terminal_output).run
+        compute_mask = interfaces.HistogramMask().run
 
     if unifize:
         unifization_options = ['{}_{}'.format(k, v) for (k, v) in unifize_kwargs.items()]
