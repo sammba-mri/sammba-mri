@@ -6,6 +6,9 @@
 .. image:: https://coveralls.io/repos/github/sammba-mri/sammba-mri/badge.svg?branch=master
     :target: https://coveralls.io/github/sammba-mri/sammba-mri?branch=master
 
+.. image:: https://circleci.com/gh/sammba-mri/sammba-mri.svg?style=svg
+    :target: https://circleci.com/gh/sammba-mri/sammba-mri
+
 sammba-MRI: small mammals neuroimaging with python
 ==========
 
