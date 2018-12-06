@@ -62,6 +62,10 @@ Inputs::
                 computation. [default: 2]
         out_file: (a file name)
                 Output Image
+        terminal_output: ('stream' or 'allatonce' or 'file' or 'none')
+                Control terminal output: `stream` - displays to terminal immediately
+                (default), `allatonce` - waits till command is finished to display
+                output, `file` - writes output to file, `none` - output is ignored
         upper_cutoff: (a float, nipype default value: 0.85)
                 upper fraction of the histogram to be discarded.[default: 0.85]
         verbose: (a boolean, nipype default value: False)
@@ -128,6 +132,10 @@ Inputs::
         out_file: (a file name)
                 Output Image
                 flag: %s, position: 1
+        terminal_output: (u'stream' or u'allatonce' or u'file' or u'none')
+                Control terminal output: `stream` - displays to terminal immediately
+                (default), `allatonce` - waits till command is finished to display
+                output, `file` - writes output to file, `none` - output is ignored
         volume_threshold: (an integer (int or long))
                 Volume threshold (the parameter V in the paper). [default: 1650]
                 flag: -v %s

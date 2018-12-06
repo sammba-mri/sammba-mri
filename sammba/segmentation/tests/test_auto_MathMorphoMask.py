@@ -24,9 +24,6 @@ def test_MathMorphoMask_inputs():
     name_template='%s_morpho_mask',
     position=1,
     ),
-    terminal_output=dict(deprecated='1.0.0',
-    nohash=True,
-    ),
     volume_threshold=dict(argstr='-v %s',
     ),
     )
