@@ -603,9 +603,9 @@ def anats_to_common(anat_filenames, write_dir, brain_volume,
            warp_files.append(out_qwarp.outputs.source_warp)
            previous_warp_files = warp_files
   
-    for n_iter, minpatch in enumerate(nonlinear_minimal_patches):
+    for minpatch in enumerate(nonlinear_minimal_patches):
         
-        if n_iter == 0:
+        if nonlinear_levels == []:
             previous_warp_files = affine_transform_files
         warped_files = []
         warp_files = []
@@ -623,7 +623,7 @@ def anats_to_common(anat_filenames, write_dir, brain_volume,
                 iwarp=True,
                 weight=nonlinear_weight_file,
                 iniwarp=[warp_file],
-                inilev=nonlinear_levels[-1] + 1, # not ideal
+                inilev=0,
                 minpatch=minpatch,
                 out_file=out_file)
                     
