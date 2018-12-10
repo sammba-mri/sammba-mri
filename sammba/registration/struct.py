@@ -599,10 +599,10 @@ def anats_to_common(anat_filenames, write_dir, brain_volume,
                     out_file=out_file,
                     **verbosity_quietness_kwargs)
 
-           warped_files.append(out_qwarp.outputs.warped_source)
-           warp_files.append(out_qwarp.outputs.source_warp)
-           previous_warp_files = warp_files
-  
+            warped_files.append(out_qwarp.outputs.warped_source)
+            warp_files.append(out_qwarp.outputs.source_warp)
+            previous_warp_files = warp_files
+             
     for minpatch in enumerate(nonlinear_minimal_patches):
         
         if nonlinear_levels == []:
