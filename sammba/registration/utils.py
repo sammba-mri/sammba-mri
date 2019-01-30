@@ -37,7 +37,7 @@ def _reset_affines(in_file, out_file, overwrite=False, axes_to_permute=None,
     if not os.path.isfile(out_file) or overwrite:
         shutil.copy(in_file, out_file)
     else:
-        raise ValueError('{} already existed'.format(in_file))
+        raise ValueError('{} already existed'.format(out_file))
 
     if verbose:
         terminal_output = 'stream'
