@@ -167,7 +167,7 @@ def fetch_zurich_test_retest(subjects=range(15), sessions=[1], data_dir=None,
                                axes_to_permute=[(1, 2)],
                                axes_to_flip=[0],
                                verbose=0)
-                corrected_anat.append(corrected_a)
+            corrected_anat.append(corrected_a)
         corrected_func = []
         for f in func:
             corrected_f = os.path.join(os.path.dirname(f),
@@ -179,7 +179,7 @@ def fetch_zurich_test_retest(subjects=range(15), sessions=[1], data_dir=None,
                                axes_to_permute=[(1, 2)],
                                axes_to_flip=[0],
                                verbose=0)
-                corrected_func.append(corrected_f)
+            corrected_func.append(corrected_f)
         anat = corrected_anat
         func = corrected_func
 
