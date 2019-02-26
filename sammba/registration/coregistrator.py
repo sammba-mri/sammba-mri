@@ -111,8 +111,8 @@ class Coregistrator(BaseRegistrator):
                 if t_r is None:
                     raise ValueError("'t_r' is needed for slice timing "
                                      "correction")
-                func_file = _slice_time(in_file, t_r, self.output_dir,
-                                        caching=self.caching)
+                func_file = _slice_time(in_file, t_r, time_pattern='altplus',
+                                        self.output_dir, caching=self.caching)
             else:
                 func_file = in_file
 

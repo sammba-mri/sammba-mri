@@ -103,8 +103,8 @@ def _realign(func_filename, write_dir, caching=False,
             out_volreg.outputs.oned_file)
 
 
-def _slice_time(func_file, t_r, write_dir, caching=False,
-                terminal_output='allatonce', environ=None):
+def _slice_time(func_file, t_r, write_dir, time_pattern='altplus',
+                caching=False, terminal_output='allatonce', environ=None):
     if environ is None:
         environ = {'AFNI_DECONFLICT': 'OVERWRITE'}
 
@@ -115,11 +115,14 @@ def _slice_time(func_file, t_r, write_dir, caching=False,
     else:
         tshift = afni.TShift(terminal_output=terminal_output).run
 
+    time_pattern = ['altplus', 'alt+z2', 'altminus', 'alt-z2', 'seqplus',
+                'seqminus']
+                
     out_tshift = tshift(
         in_file=func_file,
         out_file=fname_presuffix(func_file, suffix='_tshifted',
                                  newpath=write_dir),
-        tpattern='altplus',
+        tpattern=time_pattern,
         tr=str(t_r),
         environ=environ)
     return out_tshift.outputs.out_file
@@ -424,7 +427,7 @@ def coregister_fmri_session(session_data, t_r, write_dir, brain_volume,
     if slice_timing:
         out_tshift = tshift(in_file=func_filename,
                             outputtype='NIFTI_GZ',
-                            tpattern='altplus',
+                            tpattern=time_pattern,
                             tr=str(t_r),
                             environ=environ)
         func_filename = out_tshift.outputs.out_file
