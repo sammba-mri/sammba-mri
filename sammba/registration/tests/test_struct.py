@@ -8,7 +8,6 @@ from nilearn.image import math_img
 from nilearn.datasets.tests import test_utils as tst
 from sammba.registration import struct
 from nilearn._utils.niimg_conversions import _check_same_fov
-from sammba.registration.utils import _check_same_obliquity
 from sammba import testing_data
 
 

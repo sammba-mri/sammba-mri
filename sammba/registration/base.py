@@ -3,7 +3,7 @@ import nibabel
 from ..externals.nipype.caching import Memory
 from ..externals.nipype.interfaces import afni, fsl
 from ..externals.nipype.utils.filemanip import fname_presuffix
-from .utils import fix_obliquity
+from ..orientation import fix_obliquity
 
 
 def _delete_orientation(in_file, write_dir=None, min_zoom=.1, caching=False,

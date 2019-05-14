@@ -5,7 +5,7 @@ from sammba.externals.nipype.caching import Memory
 from sklearn.datasets.base import Bunch
 from sklearn.utils import deprecated
 from sammba import segmentation
-from .utils import fix_obliquity
+from ..orientation import fix_obliquity
 
 
 def anats_to_common(anat_filenames, write_dir, brain_volume,

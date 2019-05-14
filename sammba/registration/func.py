@@ -7,7 +7,7 @@ from sammba.externals.nipype.caching import Memory
 from sammba.externals.nipype.interfaces import afni, ants, fsl
 from sammba.externals.nipype.utils.filemanip import fname_presuffix
 from sammba import segmentation
-from .utils import fix_obliquity
+from ..orientation import fix_obliquity
 from .fmri_session import FMRISession
 from .struct import anats_to_template
 from .base import (_rigid_body_register, _warp, _per_slice_qwarp)
