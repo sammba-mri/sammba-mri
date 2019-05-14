@@ -7,6 +7,7 @@ from ..externals.nipype.interfaces import afni, fsl
 from ..externals.nipype.utils.filemanip import fname_presuffix
 from . import interfaces
 from ..preprocessing import afni_unifize
+from ..orientation import _check_same_geometry
 
 
 def _get_volume(mask_img):
@@ -168,13 +169,19 @@ def compute_morpho_brain_mask(head_file, brain_volume, write_dir=None,
         clip_level = memory.cache(afni.ClipLevel)
         compute_mask = memory.cache(interfaces.MathMorphoMask)
         compute_mask.interface().set_default_terminal_output(terminal_output)
+        copy = memory.cache(afni.Copy)
+        copy.interface().set_default_terminal_output(terminal_output)
+        copy_geom = memory.cache(fsl.CopyGeom)
     else:
         clip_level = afni.ClipLevel().run
         compute_mask = interfaces.MathMorphoMask(
             terminal_output=terminal_output).run
+        copy = afni.Copy(terminal_output=terminal_output).run
+        copy_geom = fsl.CopyGeom(terminal_output=terminal_output).run
 
     if unifize:
-        unifization_options = ['{}_{}'.format(k, v) for (k, v) in unifize_kwargs.items()]
+        unifization_options = ['{}_{}'.format(k, v)
+                               for (k, v) in unifize_kwargs.items()]
         suffix = 'unifized_' + '_'.join(unifization_options)
 
         file_to_mask = afni_unifize(
@@ -198,11 +205,29 @@ def compute_morpho_brain_mask(head_file, brain_volume, write_dir=None,
         volume_threshold=brain_volume,
         intensity_threshold=int(out_clip_level.outputs.clip_val))
 
+    # RATS sometimes slightly modifies the affine
+    same_geom = _check_same_geometry(out_compute_mask.outputs.out_file,
+                                     head_file)
+    if not same_geom:
+        mask_file = fname_presuffix(out_compute_mask.outputs.out_file,
+                                    suffix='_rough_geom',
+                                    newpath=write_dir)
+        out_copy = copy(
+            in_file=out_compute_mask.outputs.out_file,
+            out_file=mask_file,
+            environ=environ)
+        _ = copy_geom(dest_file=out_copy.outputs.out_file,
+                      in_file=head_file)
+    else:
+        mask_file = out_compute_mask.outputs.out_file            
+
     # Remove intermediate output
     if not caching and unifize:
         os.remove(file_to_mask)
+        if not same_geom:
+            os.remove(out_compute_mask.outputs.out_file)
 
-    return out_compute_mask.outputs.out_file
+    return mask_file
 
 
 def compute_histo_brain_mask(head_file, brain_volume, write_dir=None,
