@@ -12,8 +12,7 @@ from nilearn._utils.niimg_conversions import _check_same_fov
 def test_ants_n4():
     in_file = os.path.join(os.path.dirname(testing_data.__file__),
                            'func.nii.gz')
-    unbiased_file = bias_correction.ants_n4(in_file, write_dir=tst.tmpdir,
-                                            verbose=False)
+    unbiased_file = bias_correction.ants_n4(in_file, write_dir=tst.tmpdir)
     assert_true(_check_same_fov(nibabel.load(unbiased_file),
                                 nibabel.load(in_file)))
 
