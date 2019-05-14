@@ -2,7 +2,7 @@ import os
 import numpy as np
 import warnings
 import json
-from ..registration.utils import _reset_affines
+from ..orientation import _reset_affines
 from sklearn.datasets.base import Bunch
 from nilearn.datasets.utils import _fetch_files, _fetch_file, _get_dataset_dir
 from .utils import _get_dataset_descr
