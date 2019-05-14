@@ -88,8 +88,9 @@ def coregister(unifized_anat_file,
         allineated_anat_file, rigid_transform_file = \
             _rigid_body_register(unifized_anat_file,
                                  unbiased_m0_file,
-                                 write_dir, anat_brain_file,
-                                 m0_brain_file, 
+                                 anat_brain_file,
+                                 m0_brain_file,
+                                 write_dir,
                                  caching=caching,
                                  terminal_output=terminal_output,
                                  environ=environ)
