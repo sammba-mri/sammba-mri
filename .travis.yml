@@ -51,7 +51,7 @@ matrix:
            FUTURE_VERSION="*" PACKAGING_VERSION="*"
            TRAITS_VERSION="*" SIMPLEJSON_VERSION="*"
            PROV_VERSION="*" FUNCSIGS_VERSION="*"
-           CLICK_VERSION="*" TQDM_VERSION="*"
+           CLICK_VERSION="6.7" TQDM_VERSION="*"
 
 install: source continuous_integration/install.sh
 
