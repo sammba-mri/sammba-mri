@@ -27,7 +27,7 @@ def test_brain_extraction_report():
     expected_report = u"""\
                 x extent  y extend  z extend    volume
 
-fraction 0.20      10.52     14.10      5.57    381.32
+fraction 0.20      10.52     14.10      5.57    379.38
   no fraction      12.29     17.10      5.89   1141.34
 
 """
