@@ -7,7 +7,7 @@ from nilearn._utils.testing import assert_raises_regex
 from nilearn._utils.niimg_conversions import _check_same_fov
 from nilearn.image import mean_img
 from sammba.registration import FMRISession, func
-from sammba.registration.utils import _check_same_obliquity
+from sammba.orientation import _check_same_obliquity
 from sammba import testing_data
 
 

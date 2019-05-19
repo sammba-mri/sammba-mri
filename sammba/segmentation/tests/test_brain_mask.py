@@ -25,10 +25,10 @@ def test_brain_extraction_report():
     head_file = os.path.join(os.path.dirname(testing_data.__file__),
                              'anat.nii.gz')
     expected_report = u"""\
-                    x extent  y extend  z extend    volume
+                x extent  y extend  z extend    volume
 
-    fraction 0.20      10.52     14.10      5.57    381.32
-      no fraction      12.29     17.10      5.89   1141.34
+fraction 0.20      10.52     14.10      5.57    379.38
+  no fraction      12.29     17.10      5.89   1141.34
 
 """
     report = brain_mask.brain_extraction_report(head_file, 400,
