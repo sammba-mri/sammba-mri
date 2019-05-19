@@ -71,7 +71,6 @@ sammba-MRI API Reference
    anats_to_template
    fmri_sessions_to_template
    coregister_fmri_session
-   create_pipeline_graph
 
 
 **Classes**:
@@ -104,6 +103,26 @@ sammba-MRI API Reference
    :template: function.rst
 
    brain_extraction_report
+
+
+.. _graphs_ref:
+
+:mod:`sammba.graphs`: Pipelines graphs
+==================================================
+
+.. automodule:: sammba.graphs
+   :no-members:
+   :no-inherited-members:
+
+**Functions**:
+
+.. currentmodule:: sammba.graphs
+
+.. autosummary::
+   :toctree: generated/
+   :template: function.rst
+
+   create_pipeline_graph
 
 
 External tools wrapped in python

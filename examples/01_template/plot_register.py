@@ -66,7 +66,7 @@ plotting.show()
 ##############################################################################
 # Visualize pipeline steps
 # -------------------------
-from sammba.registration import create_pipeline_graph
+from sammba.graphs import create_pipeline_graph
 
 graph_file = os.path.join(write_dir, 'affine_registration_graph')
 create_pipeline_graph('anats_to_common_affine', graph_file)

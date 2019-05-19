@@ -2799,27 +2799,28 @@ class Warp(AFNICommand):
 
         if self.inputs.save_matfile:
             import numpy as np
-            matfile = fname_presuffix(self.inputs.in_file,
-                                      suffix='_warp.mat', use_ext=False)
+            matfile = self._list_outputs()['mat_file']
             np.savetxt(matfile, [runtime.stdout], fmt=str('%s'))
         return runtime
 
     def _list_outputs(self):
-        outputs = self.output_spec().get()
+        outputs = super(Warp, self)._list_outputs()
         if self.inputs.save_matfile:
-            outputs['mat_file'] = fname_presuffix(self.inputs.in_file,
-                                                  suffix='_warp.mat',
+            outputs['mat_file'] = fname_presuffix(outputs['out_file'],
+                                                  suffix='_transform.mat',
                                                   use_ext=False)
-        if not self.inputs.out_file:
-            fname, ext = os.path.splitext(self.inputs.in_file)
-            if '.gz' in ext:
-                _, ext2 = os.path.splitext(fname)
-                ext = ext2 + ext
-            out_file = self._gen_fname(self.inputs.in_file, suffix='_warp',
-                                       ext=ext)
-            outputs['out_file'] = os.path.abspath(out_file)
-        else:
-            outputs['out_file'] = os.path.abspath(self.inputs.out_file)
+        if False:
+            if not self.inputs.out_file:
+                fname, ext = os.path.splitext(self.inputs.in_file)
+                if '.gz' in ext:
+                    _, ext2 = os.path.splitext(fname)
+                    ext = ext2 + ext
+                out_file = self._gen_fname(self.inputs.in_file,
+                                           suffix='_transform',
+                                           ext=ext)
+                outputs['out_file'] = os.path.abspath(out_file)
+            else:
+                outputs['out_file'] = os.path.abspath(self.inputs.out_file)
         return outputs
 
 

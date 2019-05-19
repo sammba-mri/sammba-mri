@@ -1,7 +1,8 @@
-dist: trusty
+dist: xenial
 sudo: required
 
 language: python
+python: "3.5"
 
 virtualenv:
   system_site_packages: true
@@ -16,47 +17,17 @@ matrix:
   fast_finish: true
   allow_failures:
     # allow_failures seems to be keyed on the python version
-    - python: 2.7
+    - python: 3.5
   include:
-    # Ubuntu 14.04 version without matplotlib
-    - env: DISTRIB="conda" PYTHON_VERSION="2.7"
-           NUMPY_VERSION="1.11.2" SCIPY_VERSION="0.17"
+    # without matplotlib
+    - env: DISTRIB="conda" PYTHON_VERSION="3.5"
+           NUMPY_VERSION="1.11" SCIPY_VERSION="0.17"
            SCIKIT_LEARN_VERSION="0.18" COVERAGE="true"
-           PANDAS_VERSION="0.18" NETWORKX_VERSION="*"
-           PACKAGING_VERSION="*" CONFIGPARSER_VERSION="*"
-           FUTURE_VERSION="0.16.0" TRAITS_VERSION="4.6"
-           SIMPLEJSON_VERSION="3.8.0" PROV_VERSION="1.5.0"
-           FUNCSIGS_VERSION="*" CLICK_VERSION="6.6.0" TQDM_VERSION="4.19.5"
-    # Oldest supported versions (with neurodebian)
-    - env: DISTRIB="conda" PYTHON_VERSION="2.7"
-           NUMPY_VERSION="1.11.2" SCIPY_VERSION="0.17"
-           SCIKIT_LEARN_VERSION="0.18" MATPLOTLIB_VERSION="1.5.1"
-           PANDAS_VERSION="0.18.0" NIBABEL_VERSION="2.0.2" COVERAGE="true"
-           PACKAGING_VERSION="*" CONFIGPARSER_VERSION="*"
-           FUTURE_VERSION="0.16.0" TRAITS_VERSION="4.6"
-           SIMPLEJSON_VERSION="3.8.0" PROV_VERSION="1.5.0"
-           FUNCSIGS_VERSION="*" CLICK_VERSION="6.6.0" TQDM_VERSION="4.19.5"
-    # Trying to get as close to the minimum required versions while
-    # still having the package version available through conda
-    - env: DISTRIB="conda" PYTHON_VERSION="2.7"
-           NUMPY_VERSION="1.11.2" SCIPY_VERSION="0.17"
-           SCIKIT_LEARN_VERSION="0.18" MATPLOTLIB_VERSION="1.5.1"
-           NIBABEL_VERSION="1.2.0" PANDAS_VERSION="0.18"
-           NETWORKX_VERSION="*" COVERAGE="true"
-           PACKAGING_VERSION="*" CONFIGPARSER_VERSION="*"
-           FUTURE_VERSION="0.16.0" TRAITS_VERSION="4.6"
-           SIMPLEJSON_VERSION="3.8.0" PROV_VERSION="1.5.0"
-           FUNCSIGS_VERSION="*" CLICK_VERSION="6.6.0" TQDM_VERSION="4.19.5"
-    # Python 3.4 with intermediary versions
-    - env: DISTRIB="conda" PYTHON_VERSION="3.4"
-           NUMPY_VERSION="1.11.2" SCIPY_VERSION="0.17"
-           SCIKIT_LEARN_VERSION="0.18" MATPLOTLIB_VERSION="1.5.1"
-           PANDAS_VERSION="*" PATSY_VERSION="*" NETWORKX_VERSION="*"
+           PANDAS_VERSION="*" NETWORKX_VERSION="*"
            FUTURE_VERSION="0.16.0" PACKAGING_VERSION="*"
            TRAITS_VERSION="4.6" SIMPLEJSON_VERSION="3.8.0"
-           PROV_VERSION=="1.5.0" FUNCSIGS_VERSION="*"
-           CLICK_VERSION="6.6.0"
-    # Most recent versions (Python 3)
+           PROV_VERSION="1.5.0" FUNCSIGS_VERSION="*"
+           CLICK_VERSION="6.6.0" TQDM_VERSION="4.19.5"
     - env: DISTRIB="conda" PYTHON_VERSION="3.5"
            NUMPY_VERSION="*" SCIPY_VERSION="*"
            SCIKIT_LEARN_VERSION="*" MATPLOTLIB_VERSION="*" COVERAGE="true"
@@ -65,30 +36,27 @@ matrix:
            TRAITS_VERSION="4.6" SIMPLEJSON_VERSION="3.8.0"
            PROV_VERSION="1.5.0" FUNCSIGS_VERSION="*"
            CLICK_VERSION="6.6.0" TQDM_VERSION="4.19.5"
+    - env: DISTRIB="conda" PYTHON_VERSION="3.6"
+           NUMPY_VERSION="*" SCIPY_VERSION="*"
+           SCIKIT_LEARN_VERSION="*" MATPLOTLIB_VERSION="*" COVERAGE="true"
+           PANDAS_VERSION="*" NETWORKX_VERSION="*"
+           FUTURE_VERSION="*" PACKAGING_VERSION="*"
+           TRAITS_VERSION="*" SIMPLEJSON_VERSION="*"
+           PROV_VERSION="*" FUNCSIGS_VERSION="*"
+           CLICK_VERSION="*" TQDM_VERSION="*"
+    - env: DISTRIB="conda" PYTHON_VERSION="3.7"
+           NUMPY_VERSION="*" SCIPY_VERSION="*"
+           SCIKIT_LEARN_VERSION="*" MATPLOTLIB_VERSION="*" COVERAGE="true"
+           PANDAS_VERSION="*" NETWORKX_VERSION="*"
+           FUTURE_VERSION="*" PACKAGING_VERSION="*"
+           TRAITS_VERSION="*" SIMPLEJSON_VERSION="*"
+           PROV_VERSION="*" FUNCSIGS_VERSION="*"
+           CLICK_VERSION="6.7" TQDM_VERSION="*"
 
-install:
-    - source continuous_integration/install.sh
+install: source continuous_integration/install.sh
 
-before_script:
-    - make clean
+before_script: make clean
 
-script:
-    - python continuous_integration/show-python-packages-versions.py
-    # Copy setup.cfg to TEST_RUN_FOLDER where we are going to run the tests from
-    # Mainly for nose config settings
-    - cp setup.cfg "$TEST_RUN_FOLDER"
-    # We want to back out of the current working directory to make
-    # sure we are using sammba installed in site-packages rather
-    # than the one from the current working directory
-    # Parentheses (run in a subshell) are used to leave
-    # the current directory unchanged
-    - (cd "$TEST_RUN_FOLDER" && make -f $OLDPWD/Makefile test-code)
+script: source continuous_integration/test_script.sh
 
-after_success:
-    # Ignore coveralls failures as the coveralls server is not very reliable
-    # but we don't want travis to report a failure in the github UI just
-    # because the coverage report failed to be published.
-    # coveralls need to be run from the git checkout
-    # so we need to copy the coverage results from TEST_RUN_FOLDER
-- if [[ "$COVERAGE" == "true" ]]; then cp "$TEST_RUN_FOLDER/.coverage" .; coveralls || echo "failed"; fi
-
+after_success: source continuous_integration/after_success.sh
