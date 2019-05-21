@@ -1,6 +1,6 @@
 import os
 import numpy as np
-from scipy import ndimage
+from scipy import ndimage, stats
 import nibabel
 from nilearn.image.resampling import (coord_transform,
                                       resample_img)
@@ -41,9 +41,7 @@ def _get_mask_measures(mask_file):
     inertia_matrix = -positions.T.dot(positions) / float(len(positions))
     total_sum = -np.diag(inertia_matrix).sum()
     inertia_matrix += np.eye(3) * total_sum
-    eigvals, eigvecs = np.linalg.eigh(inertia_matrix)
-    length_ap, length_rl, length_is = np.sqrt(
-        (np.trace(inertia_matrix) / 2. - eigvals) * 5.)
+    _, eigvecs = np.linalg.eigh(inertia_matrix)
     axis_ap, axis_rl, axis_is = eigvecs.T
 
     # Translation to image centroid
@@ -54,17 +52,16 @@ def _get_mask_measures(mask_file):
     reorientation[:3, 0] = axis_rl
     reorientation[:3, 1] = axis_ap
     reorientation[:3, 2] = axis_is
-    affine = np.linalg.inv(translation).dot(reorientation).dot(translation)
-    i, j, k = voxels_coords.T
-    reoriented_voxels = np.array(coord_transform(i, j, k, affine)).T
+    affine = np.linalg.inv(translation).dot(reorientation).dot(
+        translation).dot(mask_img.affine)
     reoriented_img = resample_img(mask_img, affine, interpolation='nearest')
     zooms = reoriented_img.header.get_zooms()
     reoriented_data = reoriented_img.get_data()
     reoriented_center = ndimage.center_of_mass(reoriented_data)
     reoriented_center = np.array(reoriented_center, dtype=int)
-    length_ap = zooms[0] * reoriented_data[:, reoriented_center[1],
+    length_rl = zooms[0] * reoriented_data[:, reoriented_center[1],
                                            reoriented_center[2]].sum()
-    length_rl = zooms[1] * reoriented_data[reoriented_center[0], :,
+    length_ap = zooms[1] * reoriented_data[reoriented_center[0], :,
                                            reoriented_center[2]].sum()
     length_is = zooms[2] * reoriented_data[reoriented_center[0],
                                            reoriented_center[1]].sum()
@@ -72,17 +69,15 @@ def _get_mask_measures(mask_file):
     # Reflection along the RL axis
     reflection = np.eye(4)
     reflection[0, 0] = -1
-    affine = np.linalg.inv(translation).dot(reorientation).dot(reflection).dot(translation)
-    reoriented_reflected_voxels = np.array(coord_transform(i, j, k, affine)).T
-    reoriented_reflected_voxels[:, 0] *= -1
-    reflection_error_rl, reflection_error_ap, reflection_error_is = \
-        np.linalg.norm(
-            np.sort(reoriented_voxels, axis=0) -
-            np.sort(reoriented_reflected_voxels, axis=0),
-            axis=0) / len(positions)
-    return (length_ap, length_rl, length_is,
-            reflection_error_ap, reflection_error_rl, reflection_error_is,
-            volume)
+    affine = np.linalg.inv(translation).dot(reorientation).dot(
+            reflection).dot(translation).dot(mask_img.affine)
+    reflected_reoriented_img = resample_img(mask_img, target_affine=affine,
+                                            target_shape=reoriented_data.shape,
+                                            interpolation='nearest')
+    reflected_reoriented_data = reflected_reoriented_img.get_data()
+    symmetry = stats.pearsonr(reoriented_data.ravel(),
+                              reflected_reoriented_data.ravel())[0]
+    return (length_ap, length_rl, length_is, symmetry, volume)
 
 
 def brain_extraction_report(head_file, brain_volume, write_dir=None,
@@ -160,19 +155,15 @@ def brain_extraction_report(head_file, brain_volume, write_dir=None,
     # medial-lateral width, dorsal-ventral height, rostral-caudal length 
     # AP anteroposterior, RL right-left, IS inferior-superior
     headers = ["AP length", "RL length", "IS length",
-               "AP sym err", "RL sym err", "IS sym err",
-               "volume"]
+               "symmetry", "volume"]
     head_fmt = u'{:>{width}s} ' + u' {:>11}' * len(headers)
     report = head_fmt.format(u'', *headers, width=width)
     report += u'\n\n'
 
-    row_fmt = u'{:>{width}s} ' + u' {:>11.{digits}f}' * 3 + \
-        u' {:>11.{digits}g}' * 3 + u' {:>11.{digits}f}' + u'\n'
-    (length_ap, length_rl, length_is, reflection_error_ap,
-     reflection_error_rl, reflection_error_is, volume) = zip(*masks_measures)
+    row_fmt = u'{:>{width}s} ' + u' {:>11.{digits}f}' * 5 + u'\n'
+    (length_ap, length_rl, length_is, symmetry, volume) = zip(*masks_measures)
     rows = zip(target_names, length_ap, length_rl, length_is,
-               reflection_error_ap, reflection_error_rl, reflection_error_is,
-               volume)
+               symmetry, volume)
     for row in rows:
         report += row_fmt.format(*row, width=width, digits=digits)
 
