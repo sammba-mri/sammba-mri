@@ -3060,22 +3060,11 @@ class Warp(AFNICommand):
 
     def _list_outputs(self):
         outputs = super(Warp, self)._list_outputs()
-        if self.inputs.save_matfile:
-            outputs['mat_file'] = fname_presuffix(outputs['out_file'],
-                                                  suffix='_transform.mat',
-                                                  use_ext=False)
-        if False:
-            if not self.inputs.out_file:
-                fname, ext = os.path.splitext(self.inputs.in_file)
-                if '.gz' in ext:
-                    _, ext2 = os.path.splitext(fname)
-                    ext = ext2 + ext
-                out_file = self._gen_fname(self.inputs.in_file,
-                                           suffix='_transform',
-                                           ext=ext)
-                outputs['out_file'] = os.path.abspath(out_file)
-            else:
-                outputs['out_file'] = os.path.abspath(self.inputs.out_file)
+        if self.inputs.save_warp:
+            outputs['warp_file'] = fname_presuffix(outputs['out_file'],
+                                                   suffix='_transform.mat',
+                                                   use_ext=False)
+
         return outputs
 
 
