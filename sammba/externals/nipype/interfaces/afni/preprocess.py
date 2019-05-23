@@ -3148,46 +3148,6 @@ class QwarpPlusMinusOutputSpec(TraitedSpec):
         exists=True)
 
 
-class QwarpPlusMinus(CommandLine):
-    """A version of 3dQwarp for performing field susceptibility correction
-    using two images with opposing phase encoding directions.
-
-    For complete details, see the `3dQwarp Documentation.
-    <https://afni.nimh.nih.gov/pub/dist/doc/program_help/3dQwarp.html>`_
-
-    Examples
-    ========
-
-    >>> from nipype.interfaces import afni
-    >>> qwarp = afni.QwarpPlusMinus()
-    >>> qwarp.inputs.source_file = 'sub-01_dir-LR_epi.nii.gz'
-    >>> qwarp.inputs.nopadWARP = True
-    >>> qwarp.inputs.base_file = 'sub-01_dir-RL_epi.nii.gz'
-    >>> qwarp.cmdline
-    '3dQwarp -prefix Qwarp.nii.gz -plusminus -base sub-01_dir-RL_epi.nii.gz -nopadWARP -source sub-01_dir-LR_epi.nii.gz'
-    >>> res = warp.run()  # doctest: +SKIP
-
-    """
-    _cmd = '3dQwarp -prefix Qwarp.nii.gz -plusminus'
-    input_spec = QwarpPlusMinusInputSpec
-    output_spec = QwarpPlusMinusOutputSpec
-
-    def _list_outputs(self):
-        outputs = self.output_spec().get()
-        outputs['warped_source'] = os.path.abspath("Qwarp_PLUS.nii.gz")
-        outputs['warped_base'] = os.path.abspath("Qwarp_MINUS.nii.gz")
-        outputs['source_warp'] = os.path.abspath("Qwarp_PLUS_WARP.nii.gz")
-        outputs['base_warp'] = os.path.abspath("Qwarp_MINUS_WARP.nii.gz")
-=======
-        if self.inputs.save_warp:
-            outputs['warp_file'] = fname_presuffix(outputs['out_file'],
-                                                   suffix='_transform.mat',
-                                                   use_ext=False)
->>>>>>> try last version nipype files
-
-        return outputs
-
-
 class QwarpInputSpec(AFNICommandInputSpec):
     in_file = File(
         desc=
