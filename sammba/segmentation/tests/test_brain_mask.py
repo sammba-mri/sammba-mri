@@ -65,7 +65,7 @@ def test_brain_extraction_report():
     head_file = os.path.join(os.path.dirname(testing_data.__file__),
                              'anat.nii.gz')
     expected_report = u"""\
-                 AP length   RL length   IS length    symmetry      volume
+                 AP length   RL width   IS height    symmetry      volume
 
 fraction 0.20        13.50        9.90        4.50        0.91      381.32
   no fraction        17.40       12.30        5.40        1.00     1141.34

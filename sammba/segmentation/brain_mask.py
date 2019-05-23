@@ -152,9 +152,8 @@ def brain_extraction_report(head_file, brain_volume, write_dir=None,
     name_width = max(len(cn) for cn in target_names)
     width = max(name_width, digits)
 
-    # medial-lateral width, dorsal-ventral height, rostral-caudal length 
     # AP anteroposterior, RL right-left, IS inferior-superior
-    headers = ["AP length", "RL length", "IS length",
+    headers = ["AP length", "RL width", "IS height",
                "symmetry", "volume"]
     head_fmt = u'{:>{width}s} ' + u' {:>11}' * len(headers)
     report = head_fmt.format(u'', *headers, width=width)
