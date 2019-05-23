@@ -82,8 +82,7 @@ def _get_mask_measures(mask_file):
 
 def brain_extraction_report(head_file, brain_volume, write_dir=None,
                             clipping_fractions=[.2, None], use_rats_tool=True,
-                            caching=False, verbose=False,
-                            terminal_output='allatonce', digits=2):
+                            caching=False, verbose=False, digits=2):
     """
     Parameters
     ----------
@@ -108,13 +107,6 @@ def brain_extraction_report(head_file, brain_volume, write_dir=None,
     
     caching : bool, optional
         Wether or not to use caching.
-
-    terminal_output : one of {'stream', 'allatonce', 'file', 'none'}
-        Control terminal output :
-            'stream' : displays to terminal immediately,
-            'allatonce' : waits till command is finished to display output,
-            'file' : writes output to file
-            'none' : output is ignored
 
     digits : int, optional
         Number of digits for formating output floating point values.
@@ -143,7 +135,6 @@ def brain_extraction_report(head_file, brain_volume, write_dir=None,
                                              write_dir=write_dir,
                                              caching=caching,
                                              verbose=verbose,
-                                             terminal_output=terminal_output,
                                              **unifize_kwargs)
         masks_measures.append(_get_mask_measures(brain_mask_file))
 
