@@ -1,7 +1,9 @@
 import os
 import numpy as np
+from scipy import ndimage, stats
 import nibabel
-from nilearn.image.resampling import coord_transform
+from nilearn.image.resampling import (coord_transform,
+                                      resample_img)
 from ..externals.nipype.caching import Memory
 from ..externals.nipype.interfaces import afni, fsl
 from ..externals.nipype.utils.filemanip import fname_presuffix
@@ -25,16 +27,57 @@ def _get_mask_measures(mask_file):
     mask_file : str
         Path to the mask image
     """
-    # TODO: symmetry, length and width
     mask_img = nibabel.load(mask_file)
     volume = _get_volume(mask_img)
 
     mask_data = mask_img.get_data()
     i, j, k = np.where(mask_data != 0)
     voxels_coords = np.array(coord_transform(i, j, k, mask_img.affine)).T
-    x_range, y_range, z_range = voxels_coords.max(axis=0) - \
-        voxels_coords.min(axis=0)
-    return x_range, y_range, z_range, volume
+    positions = np.vstack((i, j, k)).T
+    center = ndimage.center_of_mass(mask_data)
+    center_coords = np.array(coord_transform(center[0], center[1], center[2],
+                                             mask_img.affine)).T
+    positions = voxels_coords - center_coords  # TODO: check why not voxels_coords.mean(axis=0)
+    inertia_matrix = -positions.T.dot(positions) / float(len(positions))
+    total_sum = -np.diag(inertia_matrix).sum()
+    inertia_matrix += np.eye(3) * total_sum
+    _, eigvecs = np.linalg.eigh(inertia_matrix)
+    axis_ap, axis_rl, axis_is = eigvecs.T
+
+    # Translation to image centroid
+    translation = np.eye(4)
+    translation[:3, 3] = - center_coords #voxels_coords.mean(axis=0)
+    # Reorientation with respect to the principal axes
+    reorientation = np.eye(4)
+    reorientation[:3, 0] = axis_rl
+    reorientation[:3, 1] = axis_ap
+    reorientation[:3, 2] = axis_is
+    affine = np.linalg.inv(translation).dot(reorientation).dot(
+        translation).dot(mask_img.affine)
+    reoriented_img = resample_img(mask_img, affine, interpolation='nearest')
+    zooms = reoriented_img.header.get_zooms()
+    reoriented_data = reoriented_img.get_data()
+    reoriented_center = ndimage.center_of_mass(reoriented_data)
+    reoriented_center = np.array(reoriented_center, dtype=int)
+    length_rl = zooms[0] * reoriented_data[:, reoriented_center[1],
+                                           reoriented_center[2]].sum()
+    length_ap = zooms[1] * reoriented_data[reoriented_center[0], :,
+                                           reoriented_center[2]].sum()
+    length_is = zooms[2] * reoriented_data[reoriented_center[0],
+                                           reoriented_center[1]].sum()
+    
+    # Reflection along the RL axis
+    reflection = np.eye(4)
+    reflection[0, 0] = -1
+    affine = np.linalg.inv(translation).dot(reorientation).dot(
+            reflection).dot(translation).dot(mask_img.affine)
+    reflected_reoriented_img = resample_img(mask_img, target_affine=affine,
+                                            target_shape=reoriented_data.shape,
+                                            interpolation='nearest')
+    reflected_reoriented_data = reflected_reoriented_img.get_data()
+    symmetry = stats.pearsonr(reoriented_data.ravel(),
+                              reflected_reoriented_data.ravel())[0]
+    return (length_ap, length_rl, length_is, symmetry, volume)
 
 
 def brain_extraction_report(head_file, brain_volume, write_dir=None,
@@ -109,14 +152,17 @@ def brain_extraction_report(head_file, brain_volume, write_dir=None,
     name_width = max(len(cn) for cn in target_names)
     width = max(name_width, digits)
 
-    headers = ["x extent", "y extend", "z extend", "volume"]
-    head_fmt = u'{:>{width}s} ' + u' {:>9}' * len(headers)
+    # AP anteroposterior, RL right-left, IS inferior-superior
+    headers = ["AP length", "RL width", "IS height",
+               "symmetry", "volume"]
+    head_fmt = u'{:>{width}s} ' + u' {:>11}' * len(headers)
     report = head_fmt.format(u'', *headers, width=width)
     report += u'\n\n'
 
-    row_fmt = u'{:>{width}s} ' + u' {:>9.{digits}f}' * 4 + u'\n'
-    x_extent, y_extent, z_extent, volume = zip(*masks_measures)
-    rows = zip(target_names, x_extent, y_extent, z_extent, volume)
+    row_fmt = u'{:>{width}s} ' + u' {:>11.{digits}f}' * 5 + u'\n'
+    (length_ap, length_rl, length_is, symmetry, volume) = zip(*masks_measures)
+    rows = zip(target_names, length_ap, length_rl, length_is,
+               symmetry, volume)
     for row in rows:
         report += row_fmt.format(*row, width=width, digits=digits)
 
