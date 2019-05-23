@@ -67,7 +67,7 @@ def test_brain_extraction_report():
     expected_report = u"""\
                  AP length   RL width   IS height    symmetry      volume
 
-fraction 0.20        13.50        9.90        4.50        0.91      381.32
+fraction 0.20        13.50        9.90        4.50        0.91      381.38
   no fraction        17.40       12.30        5.40        1.00     1141.34
 
 """
