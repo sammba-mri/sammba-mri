@@ -602,11 +602,12 @@ def anats_to_common(anat_filenames, write_dir, brain_volume,
             warped_files.append(out_qwarp.outputs.warped_source)
             warp_files.append(out_qwarp.outputs.source_warp)
             previous_warp_files = warp_files
+            
+    if nonlinear_levels == []:
+        previous_warp_files = affine_transform_files        
              
     for minpatch in enumerate(nonlinear_minimal_patches):
         
-        if nonlinear_levels == []:
-            previous_warp_files = affine_transform_files
         warped_files = []
         warp_files = []
     
