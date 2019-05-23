@@ -139,11 +139,13 @@ def anats_to_common(anat_filenames, write_dir, brain_volume,
         terminal_output = 'stream'
         verbosity_kwargs = {'verb': verbose > 1}
         quietness_kwargs = {}
-        verbosity_quietness_kwargs = {'verb': verbose > 2}
+        verb_quietness_kwargs = {'verb': verbose > 2}
+        verbosity_quietness_kwargs = {'verbose': verbose > 2}
     else:
         terminal_output = 'none'
         verbosity_kwargs = {}
         quietness_kwargs = {'quiet': True}
+        verb_quietness_kwargs = {'quiet': True}
         verbosity_quietness_kwargs = {'quiet': True}
 
     if caching:
@@ -584,7 +586,7 @@ def anats_to_common(anat_filenames, write_dir, brain_volume,
                     inilev=0,
                     maxlev=maxlev,
                     out_file=out_file,
-                    **verbosity_quietness_kwargs)
+                    **verb_quietness_kwargs)
                 
             elif n_iter < len(nonlinear_levels):
                 out_qwarp = qwarp(
@@ -597,6 +599,7 @@ def anats_to_common(anat_filenames, write_dir, brain_volume,
                     inilev=nonlinear_levels[n_iter - 1] + 1,
                     maxlev=maxlev,
                     out_file=out_file,
+<<<<<<< HEAD
                     **verbosity_quietness_kwargs)
 
             warped_files.append(out_qwarp.outputs.warped_source)
@@ -664,7 +667,7 @@ def anats_to_common(anat_filenames, write_dir, brain_volume,
             warp=warp_file,
             master=out_tstat_warp_head.outputs.out_file,
             out_file=out_file,
-            **verbosity_quietness_kwargs)
+            **verb_quietness_kwargs)
         warped_files.append(out_warp_apply.outputs.out_file)
 
     os.chdir(current_dir)
@@ -742,11 +745,11 @@ def anat_to_template(anat_filename, brain_filename,
         environ = {'AFNI_DECONFLICT': 'OVERWRITE'}
     if verbose:
         terminal_output = 'stream'
-        quietness_kwargs = {}
-        verbosity_quietness_kwargs = {'verb': verbose > 2}
+        verb_quietness_kwargs = {'verb': verbose > 2}
+        verbosity_quietness_kwargs = {'verbose': verbose > 2}
     else:
         terminal_output = 'none'
-        quietness_kwargs = {'quiet': True}
+        verb_quietness_kwargs = {'quiet': True}
         verbosity_quietness_kwargs = {'quiet': True}
 
     if write_dir is None:
@@ -844,7 +847,7 @@ def anat_to_template(anat_filename, brain_filename,
                 maxlev=maxlev,
                 out_file=fname_presuffix(allineated_filename, suffix='_warped'),
                 environ=environ,
-                **verbosity_quietness_kwargs)
+                **verb_quietness_kwargs)
         else:
             out_qwarp = qwarp(
                 in_file=allineated_filename,
@@ -855,7 +858,7 @@ def anat_to_template(anat_filename, brain_filename,
                 blur=[0],
                 out_file=fname_presuffix(allineated_filename, suffix='_warped'),
                 environ=environ,
-                **verbosity_quietness_kwargs)
+                **verb_quietness_kwargs)
         registered = fix_obliquity(out_qwarp.outputs.warped_source,
                                    head_template_filename,
                                    caching=caching,
@@ -971,10 +974,12 @@ def anats_to_template(anat_filenames, head_template_filename, write_dir,
     if verbose:
         terminal_output = 'stream'
         quietness_kwargs = {}
-        verbosity_quietness_kwargs = {'verb': verbose > 2}
+        verb_quietness_kwargs = {'verb': verbose > 2}
+        verbosity_quietness_kwargs = {'verbose': verbose > 2}
     else:
         terminal_output = 'none'
         quietness_kwargs = {'quiet': True}
+        verb_quietness_kwargs = {'quiet': True}
         verbosity_quietness_kwargs = {'quiet': True}
 
     if use_rats_tool:
@@ -1149,7 +1154,7 @@ def anats_to_template(anat_filenames, head_template_filename, write_dir,
                     out_file=fname_presuffix(allineated_filename,
                                              suffix='_warped'),
                     environ=environ,
-                    **verbosity_quietness_kwargs)
+                    **verb_quietness_kwargs)
             else:
                 out_qwarp = qwarp(
                     in_file=allineated_filename,
@@ -1161,7 +1166,7 @@ def anats_to_template(anat_filenames, head_template_filename, write_dir,
                     out_file=fname_presuffix(allineated_filename,
                                              suffix='_warped'),
                     environ=environ,
-                    **verbosity_quietness_kwargs)
+                    **verb_quietness_kwargs)
     
             registered.append(out_qwarp.outputs.warped_source)
             warp_transforms.append(out_qwarp.outputs.source_warp)

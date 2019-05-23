@@ -131,7 +131,7 @@ def _warp(to_warp_file, reference_file, write_dir=None, caching=False,
                     out_file=fname_presuffix(to_warp_file, suffix='_warped',
                                              newpath=write_dir),
                     verbose=True,
-                    save_matfile=True,
+                    save_warp=True,
                     environ=environ)
 
     # 3dWarp doesn't put the obliquity in the header, so do it manually
