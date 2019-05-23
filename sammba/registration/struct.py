@@ -598,7 +598,6 @@ def anats_to_common(anat_filenames, write_dir, brain_volume,
                     inilev=nonlinear_levels[n_iter - 1] + 1,
                     maxlev=maxlev,
                     out_file=out_file,
-<<<<<<< HEAD
                     **verbosity_quietness_kwargs)
 
             warped_files.append(out_qwarp.outputs.warped_source)
