@@ -46,7 +46,7 @@ matrix:
            TRAITS_VERSION="*" SIMPLEJSON_VERSION="*"
            PROV_VERSION="*" FUNCSIGS_VERSION="*"
            CLICK_VERSION="*" TQDM_VERSION="*"
-           NIPYPE="1.0.4"
+           NIPYPE="*"
     - env: DISTRIB="conda" PYTHON_VERSION="3.7"
            NUMPY_VERSION="*" SCIPY_VERSION="*"
            SCIKIT_LEARN_VERSION="*" MATPLOTLIB_VERSION="*" COVERAGE="true"
@@ -55,7 +55,7 @@ matrix:
            TRAITS_VERSION="*" SIMPLEJSON_VERSION="*"
            PROV_VERSION="*" FUNCSIGS_VERSION="*"
            CLICK_VERSION="6.7" TQDM_VERSION="*"
-           NIPYPE="1.0.4"
+           NIPYPE="*"
 
 install: source continuous_integration/install.sh
 
