@@ -85,7 +85,7 @@ def _rigid_body_register(moving_head_file, reference_head_file,
         warp_type='shift_rotate',
         out_file=fname_presuffix(reference_brain_file, suffix='_shr'),
         environ=environ,
-        verb=verbose)
+        verbose=verbose)
     rigid_transform_file = out_allineate.outputs.out_matrix
     output_files.append(out_allineate.outputs.out_file)
 
@@ -134,7 +134,7 @@ def _warp(to_warp_file, reference_file, write_dir=None, caching=False,
                     out_file=fname_presuffix(to_warp_file, suffix='_warped',
                                              newpath=write_dir),
                     verbose=True,
-                    save_matfile=True,
+                    save_warp=True,
                     environ=environ)
 
     # 3dWarp doesn't put the obliquity in the header, so do it manually
@@ -143,7 +143,7 @@ def _warp(to_warp_file, reference_file, write_dir=None, caching=False,
         verbose=verbose, caching=caching,
         caching_dir=write_dir, environ=environ)
 
-    return warped_oblique_file, out_warp.outputs.mat_file
+    return warped_oblique_file, out_warp.outputs.warp_file
 
 
 def _get_fsl_slice_output_files(out_base_name, output_type):
