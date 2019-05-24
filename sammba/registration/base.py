@@ -1,8 +1,11 @@
 import os
+import fnmatch
+import glob
 import nibabel
 from ..externals.nipype.caching import Memory
 from ..externals.nipype.interfaces import afni, fsl
 from ..externals.nipype.utils.filemanip import fname_presuffix
+from ..externals.nipype.interfaces.fsl.base import Info
 from ..orientation import fix_obliquity
 
 
@@ -82,7 +85,7 @@ def _rigid_body_register(moving_head_file, reference_head_file,
         warp_type='shift_rotate',
         out_file=fname_presuffix(reference_brain_file, suffix='_shr'),
         environ=environ,
-        verbose=verbose)
+        verb=verbose)
     rigid_transform_file = out_allineate.outputs.out_matrix
     output_files.append(out_allineate.outputs.out_file)
 
@@ -131,7 +134,7 @@ def _warp(to_warp_file, reference_file, write_dir=None, caching=False,
                     out_file=fname_presuffix(to_warp_file, suffix='_warped',
                                              newpath=write_dir),
                     verbose=True,
-                    save_warp=True,
+                    save_matfile=True,
                     environ=environ)
 
     # 3dWarp doesn't put the obliquity in the header, so do it manually
@@ -140,7 +143,20 @@ def _warp(to_warp_file, reference_file, write_dir=None, caching=False,
         verbose=verbose, caching=caching,
         caching_dir=write_dir, environ=environ)
 
-    return warped_oblique_file, out_warp.outputs.warp_file
+    return warped_oblique_file, out_warp.outputs.mat_file
+
+
+def _get_fsl_slice_output_files(out_base_name, output_type):
+    ext = Info.output_type_to_ext(output_type)
+    suffix = '_slice_*' + ext
+    exact_pattern = '_slice_[0-9][0-9][0-9][0-9]' + ext
+    fname_template = os.path.abspath(
+        out_base_name + suffix)
+    fname_exact_pattern = os.path.abspath(
+        out_base_name + exact_pattern)
+    sliced_files = fnmatch.filter(sorted(glob.glob(fname_template)),
+                                  fname_exact_pattern)
+    return sliced_files
 
 
 def _per_slice_qwarp(to_qwarp_file, reference_file,
@@ -180,14 +196,18 @@ def _per_slice_qwarp(to_qwarp_file, reference_file,
                         out_base_name=fname_presuffix(reference_file,
                                                       newpath=per_slice_dir,
                                                       use_ext=False))
-    sliced_reference_files = out_slicer.outputs.out_files
+    # XXX: workaround for nipype globbing to find slicer outputs
+    # Use out_slicer.outputs.out_files once fixed
+    sliced_reference_files = _get_fsl_slice_output_files(
+        out_slicer.inputs['out_base_name'], out_slicer.inputs['output_type'])
 
     # Slice mean functional
     out_slicer = slicer(in_file=to_qwarp_file,
                         out_base_name=fname_presuffix(to_qwarp_file,
                                                       newpath=per_slice_dir,
                                                       use_ext=False))
-    sliced_to_qwarp_files = out_slicer.outputs.out_files
+    sliced_to_qwarp_files = _get_fsl_slice_output_files(
+        out_slicer.inputs['out_base_name'], out_slicer.inputs['output_type'])
 
     # Below line is to deal with slices where there is no signal (for example
     # rostral end of some anatomicals)
@@ -313,7 +333,9 @@ def _per_slice_qwarp(to_qwarp_file, reference_file,
                             out_base_name=fname_presuffix(apply_to_file,
                                                           newpath=per_slice_dir,
                                                           use_ext=False))
-        sliced_apply_to_files = out_slicer.outputs.out_files
+        sliced_apply_to_files = _get_fsl_slice_output_files(
+                out_slicer.inputs['out_base_name'],
+                out_slicer.inputs['output_type'])
         warped_apply_to_slices = []
         sliced_apply_to_files_to_remove = []
         for (sliced_apply_to_file, warp_file) in zip(
@@ -419,7 +441,8 @@ def _apply_perslice_warp(apply_to_file, warp_files,
                         out_base_name=fname_presuffix(apply_to_file,
                                                       newpath=per_slice_dir,
                                                       use_ext=False))
-    sliced_apply_to_files = out_slicer.outputs.out_files
+    sliced_apply_to_files = _get_fsl_slice_output_files(
+        out_slicer.inputs['out_base_name'], out_slicer.inputs['output_type'])
 
     warped_apply_to_slices = []
     sliced_apply_to_files_to_remove = []
