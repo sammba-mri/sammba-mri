@@ -415,3 +415,67 @@ def fetch_atlas_waxholm_rat_2014(data_dir=None, url=None, resume=True,
                   description=fdescr)
 
     return Bunch(**params)
+
+
+def fetch_atlas_lemur_mircen_2017(data_dir=None, url=None, resume=True,
+                                  verbose=1):
+    """Download and load the MIRCen mouse lemur atlas and average (dated 2017)
+
+    Parameters
+    ----------
+    data_dir : str, optional
+        Path of the data directory. Use to forec data storage in a non-
+        standard location. Default: None (meaning: default)
+
+    url: string, optional
+        Download URL of the dataset. Overwrite the default URL.
+
+    resume : bool
+        whether to resumed download of a partly-downloaded file.
+
+    verbose : int
+        verbosity level (0 means no message).
+
+    Returns
+    -------
+    data: sklearn.datasets.base.Bunch
+        dictionary-like object, contains:
+
+        - 't2' : str, path to nifti file containing the T2 weighted average.
+
+        - 'maps' : str, path to nifti file containing regions definition.
+
+        - 'labels' : numpy.recarray of region ids and names
+
+        - 'description' : description about the atlas and the template.
+
+    Licence: CeCill v2
+    """
+    if url is None:
+        url = 'https://www.nitrc.org/frs/download.php/10273/' \
+              'MIRCen_mouselemur_templateatlas.tar.gz'
+
+    basenames = ('MIRCen_mouselemur_atlas.nii.gz',
+                 'MIRCen_mouselemur_atlas_labels.txt',
+                 'MIRCen_mouselemur_template.nii.gz')
+    opts = {'uncompress': True}
+    filenames = [(f, url, opts) for f in basenames]
+    dataset_name = 'mircen_2017'
+    data_dir = _get_dataset_dir(dataset_name, data_dir=data_dir,
+                                verbose=verbose)
+    files_ = _fetch_files(data_dir, filenames, resume=resume,
+                          verbose=verbose)
+
+    fdescr = _get_dataset_descr(dataset_name)
+
+    names = ('ids', 'red', 'green', 'blue', 'transparency', 'visibility',
+             'mesh', 'names')
+    labels = np.recfromcsv(files_[1], skip_header=15, names=names,
+                           delimiter=(6, 6, 5, 5, 15, 3, 3, 32),
+                           autostrip=True, usecols=(0, 7))
+
+    params = dict(t2=files_[2], maps=files_[0],
+                  labels=labels,
+                  description=fdescr)
+
+    return Bunch(**params)
