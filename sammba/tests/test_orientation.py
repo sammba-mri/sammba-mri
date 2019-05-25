@@ -6,7 +6,7 @@ from nose import with_setup
 import nibabel
 from nilearn.datasets.tests import test_utils as tst
 from nilearn._utils.testing import assert_raises_regex
-from sammba.externals.nipype.interfaces import afni
+from nipype.interfaces import afni
 from sammba import orientation
 from sammba import testing_data
 

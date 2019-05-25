@@ -1,6 +1,6 @@
 import os
-from sammba.externals.nipype.interfaces import afni
-import sammba.externals.nipype.pipeline.engine as pe
+from nipype.interfaces import afni
+import nipype.pipeline.engine as pe
 from sammba.segmentation import interfaces
 
 
@@ -19,7 +19,7 @@ def create_pipeline_graph(pipeline_name, graph_file,
 
     graph_kind : one of {'orig', 'hierarchical', 'flat', 'exec', 'colored'}, optional.
         The kind of the graph, passed to
-        sammba.externals.nipype.pipeline.workflows.Workflow().write_graph
+        nipype.pipeline.workflows.Workflow().write_graph
     """
     pipeline_names = ['anats_to_common_rigid', 'anats_to_common_affine',
                       'anats_to_common_nonlinear']

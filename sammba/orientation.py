@@ -4,9 +4,9 @@ import tempfile
 import numpy as np
 import nibabel
 from nilearn import image
-from sammba.externals.nipype.caching import Memory
-from sammba.externals.nipype.utils.filemanip import fname_presuffix
-from sammba.externals.nipype.interfaces import afni
+from nipype.caching import Memory
+from nipype.utils.filemanip import fname_presuffix
+from nipype.interfaces import afni
 
 
 def _get_afni_output_type(in_file):

@@ -16,15 +16,15 @@ from scipy.ndimage.morphology import (generate_binary_structure,
                                       binary_closing,
                                       binary_fill_holes,
                                       grey_dilation)
-from sammba.externals.nipype.interfaces.base import (TraitedSpec,
-                                                     BaseInterfaceInputSpec,
-                                                     BaseInterface,
-                                                     CommandLine,
-                                                     CommandLineInputSpec,
-                                                     traits,
-                                                     isdefined)
-from sammba.externals.nipype.utils.filemanip import fname_presuffix
-from sammba.externals.nipype import logging
+from nipype.interfaces.base import (TraitedSpec,
+                                    BaseInterfaceInputSpec,
+                                    BaseInterface,
+                                    CommandLine,
+                                    CommandLineInputSpec,
+                                    traits,
+                                    isdefined)
+from nipype.utils.filemanip import fname_presuffix
+from nipype import logging
 
 
 LOGGER = logging.getLogger('interface')
@@ -54,8 +54,7 @@ class Info(object):
         """
         try:
             clout = CommandLine(command='RATS_MM --version',
-                                resource_monitor=False,
-                                terminal_output='allatonce').run()
+                                resource_monitor=False).run()
         except IOError:
             # If rats_vcheck is not present, return None
             LOGGER.warn('RATS_MM executable not found.')
@@ -88,16 +87,6 @@ class HistogramMaskInputSpec(BaseInterfaceInputSpec):
     intensity_threshold = traits.Int(
         desc="Intensity threshold. "
              "[default: 500]")
-    terminal_output = traits.Enum(
-        'stream', 'allatonce', 'file', 'none',
-        deprecated='1.0.0',
-        desc=('Control terminal output: `stream` - '
-              'displays to terminal immediately (default), '
-              '`allatonce` - waits till command is '
-              'finished to display output, `file` - '
-              'writes output to file, `none` - output'
-              ' is ignored'),
-        nohash=True)
     lower_cutoff = traits.Float(
         .2,
         desc="lower fraction of the histogram to be discarded. In case of "
@@ -159,48 +148,6 @@ class HistogramMask(BaseInterface):
     """
     input_spec = HistogramMaskInputSpec
     output_spec = HistogramMaskOutputSpec
-    _terminal_output = 'stream'
-
-    @classmethod
-    def set_default_terminal_output(cls, output_type):
-        """Set the default terminal output for CommandLine Interfaces.
-
-        This method is used to set default terminal output for
-        CommandLine Interfaces.  However, setting this will not
-        update the output type for any existing instances.  For these,
-        assign the <instance>.terminal_output.
-        """
-
-        if output_type in VALID_TERMINAL_OUTPUT:
-            cls._terminal_output = output_type
-        else:
-            raise AttributeError('Invalid terminal output_type: %s' %
-                                 output_type)
-
-    def __init__(self, terminal_output=None, **inputs):
-        super(HistogramMask, self).__init__(**inputs)
-        if terminal_output is not None:
-            self.terminal_output = terminal_output
-
-        # Attach terminal_output callback for backwards compatibility
-        self.inputs.on_trait_change(self._terminal_output_update,
-                                    'terminal_output')
-
-    @property
-    def terminal_output(self):
-        return self._terminal_output
-
-    @terminal_output.setter
-    def terminal_output(self, value):
-        if value not in VALID_TERMINAL_OUTPUT:
-            raise RuntimeError(
-                'Setting invalid value "%s" for terminal_output. Valid values '
-                'are %s.' % (value, ', '.join(['"%s"' % v for v in
-                                               VALID_TERMINAL_OUTPUT])))
-        self._terminal_output = value
-
-    def _terminal_output_update(self):
-        self.terminal_output = self.terminal_output
 
     def _run_interface(self, runtime):
         if isdefined(self.inputs.intensity_threshold):

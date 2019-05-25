@@ -57,6 +57,10 @@ REQUIRED_MODULE_METADATA = (
         'min_version': '4.11.2',
         'required_at_installation': True,
         'install_info': _SAMMBA_INSTALL_MSG}),
+    ('nipype', {
+        'min_version': '1.0.4',
+        'required_at_installation': True,
+        'install_info': _SAMMBA_INSTALL_MSG})
     )
     
 OPTIONAL_MATPLOTLIB_MIN_VERSION = '1.5.1'

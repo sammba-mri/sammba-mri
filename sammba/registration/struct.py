@@ -1,7 +1,7 @@
 import os
-from sammba.externals.nipype.interfaces import afni, fsl
-from sammba.externals.nipype.utils.filemanip import fname_presuffix
-from sammba.externals.nipype.caching import Memory
+from nipype.interfaces import afni, fsl
+from nipype.utils.filemanip import fname_presuffix
+from nipype.caching import Memory
 from sklearn.datasets.base import Bunch
 from sklearn.utils import deprecated
 from sammba import segmentation
@@ -41,11 +41,11 @@ def anats_to_common(anat_filenames, write_dir, brain_volume,
 
     nonlinear_levels : list of int, optional
         Maximal levels for each nonlinear warping iteration. Passed iteratively
-        to sammba.externals.nipype.interfaces.afni.Qwarp
+        to nipype.interfaces.afni.Qwarp
 
     nonlinear_minimal_patches : list of int, optional
         Minimal patches for the final nonlinear warps, passed to
-        sammba.externals.nipype.interfaces.afni.Qwarp
+        nipype.interfaces.afni.Qwarp
         
     nonlinear_weight_file : str, optional
         Path to a mask used to weight non-linear registration. Ideally should 
@@ -53,11 +53,10 @@ def anats_to_common(anat_filenames, write_dir, brain_volume,
         include some amount of surrounding head tissue.
         
     convergence : float, optional
-        Convergence limit, passed to
-        sammba.externals.nipype.interfaces.afni.Allineate
+        Convergence limit, passed to nipype.interfaces.afni.Allineate
         
     blur_radius_coarse : float, optional
-        Radius passed to sammba.externals.nipype.interfaces.afni.Allineate for
+        Radius passed to nipype.interfaces.afni.Allineate for
         the "-twoblur" option
 
     caching : bool, optional
@@ -68,11 +67,11 @@ def anats_to_common(anat_filenames, write_dir, brain_volume,
         verbosity in any case.
 
     unifize_kwargs : dict, optional
-        Is passed to sammba.externals.nipype.interfaces.afni.Unifize, to
+        Is passed to nipype.interfaces.afni.Unifize, to
         control bias correction of the template.
 
     brain_masking_unifize_kwargs : dict, optional
-        Is passed to sammba.externals.nipype.interfaces.afni.Unifize, to tune
+        Is passed to nipype.interfaces.afni.Unifize, to tune
         the seperate bias correction step done prior to brain masking.
 
     Returns
@@ -137,13 +136,15 @@ def anats_to_common(anat_filenames, write_dir, brain_volume,
 
     if verbose:
         terminal_output = 'stream'
-        verbosity_kwargs = {'verb': verbose > 1}
+        verbosity_kwargs = {'verbose': verbose > 1}
         quietness_kwargs = {}
-        verbosity_quietness_kwargs = {'verb': verbose > 2}
+        verb_quietness_kwargs = {'verb': verbose > 2}
+        verbosity_quietness_kwargs = {'verbose': verbose > 2}
     else:
         terminal_output = 'none'
         verbosity_kwargs = {}
         quietness_kwargs = {'quiet': True}
+        verb_quietness_kwargs = {'quiet': True}
         verbosity_quietness_kwargs = {'quiet': True}
 
     if caching:
@@ -169,7 +170,7 @@ def anats_to_common(anat_filenames, write_dir, brain_volume,
         nwarp_adjust = memory.cache(afni.NwarpAdjust)
         nwarp_cat = memory.cache(afni.NwarpCat)
         warp_apply = memory.cache(afni.NwarpApply)
-        for step in [copy, unifize, compute_mask, calc, refit, refit2,
+        for step in [copy, unifize, calc, refit, refit2,
                      tcat, tstat, undump, resample, allineate, allineate2,
                      mask_tool, catmatvec, qwarp, nwarp_cat, warp_apply,
                      nwarp_adjust]:
@@ -178,7 +179,7 @@ def anats_to_common(anat_filenames, write_dir, brain_volume,
         copy = afni.Copy(terminal_output=terminal_output).run
         unifize = afni.Unifize(terminal_output=terminal_output).run
         clip_level = afni.ClipLevel().run  # XXX fix nipype bug with 'none'
-        compute_mask = ComputeMask(terminal_output=terminal_output).run
+        compute_mask = ComputeMask().run
         calc = afni.Calc(terminal_output=terminal_output).run
         center_mass = afni.CenterMass().run  # XXX fix nipype bug with 'none'
         refit = afni.Refit(terminal_output=terminal_output).run
@@ -278,8 +279,7 @@ def anats_to_common(anat_filenames, write_dir, brain_volume,
             in_file=brain_masking_in_file,
             out_file=fname_presuffix(brain_masking_in_file, suffix='_mask'),
             volume_threshold=brain_volume,
-            intensity_threshold=int(out_clip_level.outputs.clip_val),
-            terminal_output=terminal_output)
+            intensity_threshold=int(out_clip_level.outputs.clip_val))
         brain_mask_files.append(out_compute_mask.outputs.out_file)
 
     # bias correction for images to be both brain-extracted with the mask 
@@ -584,7 +584,7 @@ def anats_to_common(anat_filenames, write_dir, brain_volume,
                     inilev=0,
                     maxlev=maxlev,
                     out_file=out_file,
-                    **verbosity_quietness_kwargs)
+                    **verb_quietness_kwargs)
                 
             elif n_iter < len(nonlinear_levels):
                 out_qwarp = qwarp(
@@ -664,7 +664,7 @@ def anats_to_common(anat_filenames, write_dir, brain_volume,
             warp=warp_file,
             master=out_tstat_warp_head.outputs.out_file,
             out_file=out_file,
-            **verbosity_quietness_kwargs)
+            **verb_quietness_kwargs)
         warped_files.append(out_warp_apply.outputs.out_file)
 
     os.chdir(current_dir)
@@ -701,16 +701,16 @@ def anat_to_template(anat_filename, brain_filename,
         If True, caching is used for all the registration steps.
     convergence : float, optional
         Convergence limit, passed to
-        sammba.externals.nipype.interfaces.afni.Allineate
+        nipype.interfaces.afni.Allineate
     maxlev : int or None, optional
         If not None, maximal level for the nonlinear warping. Passed to
-        sammba.externals.nipype.interfaces.afni.Qwarp.
+        nipype.interfaces.afni.Qwarp.
         Lower implies faster but possibly lower precision.
     verbose : int, optional
         Verbosity level. Note that caching implies some
         verbosity in any case.
     unifize_kwargs : dict, optional
-        Is passed to sammba.externals.nipype.interfaces.afni.Unifize, to
+        Is passed to nipype.interfaces.afni.Unifize, to
         control bias correction of the template.
     Returns
     -------
@@ -742,11 +742,11 @@ def anat_to_template(anat_filename, brain_filename,
         environ = {'AFNI_DECONFLICT': 'OVERWRITE'}
     if verbose:
         terminal_output = 'stream'
-        quietness_kwargs = {}
-        verbosity_quietness_kwargs = {'verb': verbose > 2}
+        verb_quietness_kwargs = {'verb': verbose > 2}
+        verbosity_quietness_kwargs = {'verbose': verbose > 2}
     else:
         terminal_output = 'none'
-        quietness_kwargs = {'quiet': True}
+        verb_quietness_kwargs = {'quiet': True}
         verbosity_quietness_kwargs = {'quiet': True}
 
     if write_dir is None:
@@ -844,7 +844,7 @@ def anat_to_template(anat_filename, brain_filename,
                 maxlev=maxlev,
                 out_file=fname_presuffix(allineated_filename, suffix='_warped'),
                 environ=environ,
-                **verbosity_quietness_kwargs)
+                **verb_quietness_kwargs)
         else:
             out_qwarp = qwarp(
                 in_file=allineated_filename,
@@ -855,7 +855,7 @@ def anat_to_template(anat_filename, brain_filename,
                 blur=[0],
                 out_file=fname_presuffix(allineated_filename, suffix='_warped'),
                 environ=environ,
-                **verbosity_quietness_kwargs)
+                **verb_quietness_kwargs)
         registered = fix_obliquity(out_qwarp.outputs.warped_source,
                                    head_template_filename,
                                    caching=caching,
@@ -922,11 +922,11 @@ def anats_to_template(anat_filenames, head_template_filename, write_dir,
 
     convergence : float, optional
         Convergence limit, passed to
-        sammba.externals.nipype.interfaces.afni.Allineate
+        nipype.interfaces.afni.Allineate
 
     maxlev : int or None, optional
         If not None, maximal level for the nonlinear warping. Passed to
-        sammba.externals.nipype.interfaces.afni.Qwarp.
+        nipype.interfaces.afni.Qwarp.
         Lower implies faster but possibly lower precision.
 
     verbose : int, optional
@@ -934,11 +934,11 @@ def anats_to_template(anat_filenames, head_template_filename, write_dir,
         verbosity in any case.
 
     unifize_kwargs : dict, optional
-        Is passed to sammba.externals.nipype.interfaces.afni.Unifize, to
+        Is passed to nipype.interfaces.afni.Unifize, to
         control bias correction of the template.
 
     brain_masking_unifize_kwargs : dict, optional
-        Is passed to sammba.externals.nipype.interfaces.afni.Unifize, to tune
+        Is passed to nipype.interfaces.afni.Unifize, to tune
         the seperate bias correction step done prior to brain extraction.
 
     Returns
@@ -971,10 +971,12 @@ def anats_to_template(anat_filenames, head_template_filename, write_dir,
     if verbose:
         terminal_output = 'stream'
         quietness_kwargs = {}
-        verbosity_quietness_kwargs = {'verb': verbose > 2}
+        verb_quietness_kwargs = {'verb': verbose > 2}
+        verbosity_quietness_kwargs = {'verbose': verbose > 2}
     else:
         terminal_output = 'none'
         quietness_kwargs = {'quiet': True}
+        verb_quietness_kwargs = {'quiet': True}
         verbosity_quietness_kwargs = {'quiet': True}
 
     if use_rats_tool:
@@ -995,13 +997,13 @@ def anats_to_template(anat_filenames, head_template_filename, write_dir,
         allineate2 = memory.cache(afni.Allineate)
         unifize = memory.cache(afni.Unifize)
         qwarp = memory.cache(afni.Qwarp)
-        for step in [compute_mask,  allineate, allineate2, calc,
+        for step in [allineate, allineate2, calc,
                      mask_tool, unifize, qwarp]:
             step.interface().set_default_terminal_output(terminal_output)
     else:
         unifize = afni.Unifize(terminal_output=terminal_output).run
         clip_level = afni.ClipLevel().run
-        compute_mask = ComputeMask(terminal_output=terminal_output).run
+        compute_mask = ComputeMask().run
         calc = afni.Calc(terminal_output=terminal_output).run
         mask_tool = afni.MaskTool(terminal_output=terminal_output).run
         allineate = afni.Allineate(terminal_output=terminal_output).run
@@ -1149,7 +1151,7 @@ def anats_to_template(anat_filenames, head_template_filename, write_dir,
                     out_file=fname_presuffix(allineated_filename,
                                              suffix='_warped'),
                     environ=environ,
-                    **verbosity_quietness_kwargs)
+                    **verb_quietness_kwargs)
             else:
                 out_qwarp = qwarp(
                     in_file=allineated_filename,
@@ -1161,7 +1163,7 @@ def anats_to_template(anat_filenames, head_template_filename, write_dir,
                     out_file=fname_presuffix(allineated_filename,
                                              suffix='_warped'),
                     environ=environ,
-                    **verbosity_quietness_kwargs)
+                    **verb_quietness_kwargs)
     
             registered.append(out_qwarp.outputs.warped_source)
             warp_transforms.append(out_qwarp.outputs.source_warp)

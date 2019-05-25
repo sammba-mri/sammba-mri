@@ -50,16 +50,14 @@ class TemplateRegistrator(BaseRegistrator):
         Otherwise, a histogram-based brain segmentation is used.
 
     clipping_fraction : float or None, optional
-        Clip level fraction is passed to
-        sammba.externals.nipype.interfaces.afni.Unifize, to tune
-        the bias correction step done prior to brain mask segmentation.
+        Clip level fraction is passed to nipype.interfaces.afni.Unifize, to
+        tune the bias correction step done prior to brain mask segmentation.
         Only values between 0.1 and 0.9 are accepted. Smaller fractions tend to
         make the mask larger.
         If None, no unifization is done for brain mask computation.
 
     convergence : float, optional
-        Convergence limit, passed to
-        sammba.externals.nipype.interfaces.afni.Allineate
+        Convergence limit, passed to nipype.interfaces.afni.Allineate
 
     registration_kind : one of {'rigid', 'affine', 'nonlinear'}, optional
         The allowed transform kind from the anatomical image to the template.

@@ -22,6 +22,7 @@ jobs:
       FUNCSIGS_VERSION: "*"
       CLICK_VERSION: "6.6.0"
       TQDM_VERSION: "4.19.5"
+      NIPYPE_VERSION: "1.0.4"
 
     steps:
       - checkout
@@ -49,6 +50,7 @@ jobs:
             networkx future packaging traits simplejson funcsigs click tqdm patsy graphviz \
             lxml mkl sphinx pillow pandas -yq
             conda install -n testenv nibabel -c conda-forge -yq
+            conda install -n testenv nipype -c conda-forge -yq
       - run:
           name: Add the NeuroDebian repository
           command: |

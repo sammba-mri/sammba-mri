@@ -4,9 +4,9 @@ from scipy import ndimage, stats
 import nibabel
 from nilearn.image.resampling import (coord_transform,
                                       resample_img)
-from ..externals.nipype.caching import Memory
-from ..externals.nipype.interfaces import afni, fsl
-from ..externals.nipype.utils.filemanip import fname_presuffix
+from nipype.caching import Memory
+from nipype.interfaces import afni, fsl
+from nipype.utils.filemanip import fname_presuffix
 from . import interfaces
 from ..preprocessing import afni_unifize
 from ..orientation import _check_same_geometry
@@ -82,8 +82,7 @@ def _get_mask_measures(mask_file):
 
 def brain_extraction_report(head_file, brain_volume, write_dir=None,
                             clipping_fractions=[.2, None], use_rats_tool=True,
-                            caching=False, verbose=False,
-                            terminal_output='allatonce', digits=2):
+                            caching=False, verbose=False, digits=2):
     """
     Parameters
     ----------
@@ -101,20 +100,13 @@ def brain_extraction_report(head_file, brain_volume, write_dir=None,
     clipping_fractions : list. Elements can be floats between 0. and .9
         or None, optional
         Clip level fractions to explore. Each value is passed to
-        sammba.externals.nipype.interfaces.afni.Unifize, to tune
+        nipype.interfaces.afni.Unifize, to tune
         the bias correction step done prior to brain mask segmentation.
         Smaller fractions tend to  make the mask larger. If None,
         no unifization is done for brain mask computation.
     
     caching : bool, optional
         Wether or not to use caching.
-
-    terminal_output : one of {'stream', 'allatonce', 'file', 'none'}
-        Control terminal output :
-            'stream' : displays to terminal immediately,
-            'allatonce' : waits till command is finished to display output,
-            'file' : writes output to file
-            'none' : output is ignored
 
     digits : int, optional
         Number of digits for formating output floating point values.
@@ -143,7 +135,6 @@ def brain_extraction_report(head_file, brain_volume, write_dir=None,
                                              write_dir=write_dir,
                                              caching=caching,
                                              verbose=verbose,
-                                             terminal_output=terminal_output,
                                              **unifize_kwargs)
         masks_measures.append(_get_mask_measures(brain_mask_file))
 
@@ -190,7 +181,7 @@ def compute_morpho_brain_mask(head_file, brain_volume, write_dir=None,
         Wether or not to use caching.
 
     unifize_kwargs : dict, optional
-        Is passed to sammba.externals.nipype.interfaces.afni.Unifize.
+        Is passed to nipype.interfaces.afni.Unifize.
 
     Returns
     -------
@@ -296,7 +287,7 @@ def compute_histo_brain_mask(head_file, brain_volume, write_dir=None,
         Wether or not to use caching.
 
     unifize_kwargs : dict, optional
-        Is passed to sammba.externals.nipype.interfaces.afni.Unifize.
+        Is passed to nipype.interfaces.afni.Unifize.
 
     Returns
     -------
@@ -311,11 +302,9 @@ def compute_histo_brain_mask(head_file, brain_volume, write_dir=None,
         memory = Memory(write_dir)
         clip_level = memory.cache(afni.ClipLevel)
         compute_mask = memory.cache(interfaces.HistogramMask)
-        compute_mask.interface().set_default_terminal_output(terminal_output)
     else:
         clip_level = afni.ClipLevel().run
-        compute_mask = interfaces.HistogramMask(
-            terminal_output=terminal_output).run
+        compute_mask = interfaces.HistogramMask().run
 
     if unifize:
         unifization_options = ['{}_{}'.format(k, v) for (k, v) in unifize_kwargs.items()]

@@ -22,3 +22,4 @@ prov == 1.5.0
 funcsigs
 click
 patsy >= 0.4.1
+nipype >= 1.0.4

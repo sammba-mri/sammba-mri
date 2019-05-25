@@ -1,8 +1,8 @@
 import os
 import nibabel
-from ..externals.nipype.caching import Memory
-from ..externals.nipype.interfaces import afni, ants, fsl
-from ..externals.nipype.utils.filemanip import fname_presuffix
+from nipype.caching import Memory
+from nipype.interfaces import afni, ants, fsl
+from nipype.utils.filemanip import fname_presuffix
 
 def _compute_n4_max_shrink(in_file):
     """ Computes the maximal allowed shrink factor for ANTS
