@@ -48,8 +48,9 @@ jobs:
           command: |
             conda create -n testenv python=3.6 numpy scipy scikit-learn matplotlib pandas \
             networkx future packaging traits simplejson funcsigs click tqdm patsy graphviz \
-            lxml mkl sphinx pillow pandas nipype -yq
+            lxml mkl sphinx pillow pandas -yq
             conda install -n testenv nibabel -c conda-forge -yq
+            conda install -n testenv nipype -c conda-forge -yq
       - run:
           name: Add the NeuroDebian repository
           command: |
