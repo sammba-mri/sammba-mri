@@ -1,7 +1,7 @@
 import os
-from sammba.externals.nipype.interfaces import afni, fsl
-from sammba.externals.nipype.utils.filemanip import fname_presuffix
-from sammba.externals.nipype.caching import Memory
+from nipype.interfaces import afni, fsl
+from nipype.utils.filemanip import fname_presuffix
+from nipype.caching import Memory
 from sklearn.datasets.base import Bunch
 from sklearn.utils import deprecated
 from sammba import segmentation
@@ -41,11 +41,11 @@ def anats_to_common(anat_filenames, write_dir, brain_volume,
 
     nonlinear_levels : list of int, optional
         Maximal levels for each nonlinear warping iteration. Passed iteratively
-        to sammba.externals.nipype.interfaces.afni.Qwarp
+        to nipype.interfaces.afni.Qwarp
 
     nonlinear_minimal_patches : list of int, optional
         Minimal patches for the final nonlinear warps, passed to
-        sammba.externals.nipype.interfaces.afni.Qwarp
+        nipype.interfaces.afni.Qwarp
         
     nonlinear_weight_file : str, optional
         Path to a mask used to weight non-linear registration. Ideally should 
@@ -53,11 +53,10 @@ def anats_to_common(anat_filenames, write_dir, brain_volume,
         include some amount of surrounding head tissue.
         
     convergence : float, optional
-        Convergence limit, passed to
-        sammba.externals.nipype.interfaces.afni.Allineate
+        Convergence limit, passed to nipype.interfaces.afni.Allineate
         
     blur_radius_coarse : float, optional
-        Radius passed to sammba.externals.nipype.interfaces.afni.Allineate for
+        Radius passed to nipype.interfaces.afni.Allineate for
         the "-twoblur" option
 
     caching : bool, optional
@@ -68,11 +67,11 @@ def anats_to_common(anat_filenames, write_dir, brain_volume,
         verbosity in any case.
 
     unifize_kwargs : dict, optional
-        Is passed to sammba.externals.nipype.interfaces.afni.Unifize, to
+        Is passed to nipype.interfaces.afni.Unifize, to
         control bias correction of the template.
 
     brain_masking_unifize_kwargs : dict, optional
-        Is passed to sammba.externals.nipype.interfaces.afni.Unifize, to tune
+        Is passed to nipype.interfaces.afni.Unifize, to tune
         the seperate bias correction step done prior to brain masking.
 
     Returns
@@ -702,16 +701,16 @@ def anat_to_template(anat_filename, brain_filename,
         If True, caching is used for all the registration steps.
     convergence : float, optional
         Convergence limit, passed to
-        sammba.externals.nipype.interfaces.afni.Allineate
+        nipype.interfaces.afni.Allineate
     maxlev : int or None, optional
         If not None, maximal level for the nonlinear warping. Passed to
-        sammba.externals.nipype.interfaces.afni.Qwarp.
+        nipype.interfaces.afni.Qwarp.
         Lower implies faster but possibly lower precision.
     verbose : int, optional
         Verbosity level. Note that caching implies some
         verbosity in any case.
     unifize_kwargs : dict, optional
-        Is passed to sammba.externals.nipype.interfaces.afni.Unifize, to
+        Is passed to nipype.interfaces.afni.Unifize, to
         control bias correction of the template.
     Returns
     -------
@@ -923,11 +922,11 @@ def anats_to_template(anat_filenames, head_template_filename, write_dir,
 
     convergence : float, optional
         Convergence limit, passed to
-        sammba.externals.nipype.interfaces.afni.Allineate
+        nipype.interfaces.afni.Allineate
 
     maxlev : int or None, optional
         If not None, maximal level for the nonlinear warping. Passed to
-        sammba.externals.nipype.interfaces.afni.Qwarp.
+        nipype.interfaces.afni.Qwarp.
         Lower implies faster but possibly lower precision.
 
     verbose : int, optional
@@ -935,11 +934,11 @@ def anats_to_template(anat_filenames, head_template_filename, write_dir,
         verbosity in any case.
 
     unifize_kwargs : dict, optional
-        Is passed to sammba.externals.nipype.interfaces.afni.Unifize, to
+        Is passed to nipype.interfaces.afni.Unifize, to
         control bias correction of the template.
 
     brain_masking_unifize_kwargs : dict, optional
-        Is passed to sammba.externals.nipype.interfaces.afni.Unifize, to tune
+        Is passed to nipype.interfaces.afni.Unifize, to tune
         the seperate bias correction step done prior to brain extraction.
 
     Returns

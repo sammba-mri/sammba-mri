@@ -16,15 +16,15 @@ from scipy.ndimage.morphology import (generate_binary_structure,
                                       binary_closing,
                                       binary_fill_holes,
                                       grey_dilation)
-from sammba.externals.nipype.interfaces.base import (TraitedSpec,
-                                                     BaseInterfaceInputSpec,
-                                                     BaseInterface,
-                                                     CommandLine,
-                                                     CommandLineInputSpec,
-                                                     traits,
-                                                     isdefined)
-from sammba.externals.nipype.utils.filemanip import fname_presuffix
-from sammba.externals.nipype import logging
+from nipype.interfaces.base import (TraitedSpec,
+                                    BaseInterfaceInputSpec,
+                                    BaseInterface,
+                                    CommandLine,
+                                    CommandLineInputSpec,
+                                    traits,
+                                    isdefined)
+from nipype.utils.filemanip import fname_presuffix
+from nipype import logging
 
 
 LOGGER = logging.getLogger('interface')

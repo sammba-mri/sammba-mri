@@ -2,10 +2,10 @@ import os
 import fnmatch
 import glob
 import nibabel
-from ..externals.nipype.caching import Memory
-from ..externals.nipype.interfaces import afni, fsl
-from ..externals.nipype.utils.filemanip import fname_presuffix
-from ..externals.nipype.interfaces.fsl.base import Info
+from nipype.caching import Memory
+from nipype.interfaces import afni, fsl
+from nipype.utils.filemanip import fname_presuffix
+from nipype.interfaces.fsl.base import Info
 from ..orientation import fix_obliquity
 
 

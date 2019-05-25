@@ -3,9 +3,9 @@ import numpy as np
 import nibabel
 from sklearn.datasets.base import Bunch
 from sklearn.utils import deprecated
-from sammba.externals.nipype.caching import Memory
-from sammba.externals.nipype.interfaces import afni, ants, fsl
-from sammba.externals.nipype.utils.filemanip import fname_presuffix
+from nipype.caching import Memory
+from nipype.interfaces import afni, ants, fsl
+from nipype.utils.filemanip import fname_presuffix
 from sammba import segmentation
 from ..orientation import fix_obliquity
 from .fmri_session import FMRISession

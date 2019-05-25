@@ -6,8 +6,8 @@ from scipy import ndimage
 from sklearn.datasets.base import Bunch
 from nilearn import image
 from nilearn.datasets.utils import _get_dataset_dir, _fetch_files
+from nipype.utils.filemanip import fname_presuffix
 from .utils import _get_dataset_descr
-from sammba.externals.nipype.utils.filemanip import fname_presuffix
 from nilearn._utils.niimg_conversions import check_niimg
 from nilearn._utils import niimg
 

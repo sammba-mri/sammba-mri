@@ -4,9 +4,9 @@ from scipy import ndimage, stats
 import nibabel
 from nilearn.image.resampling import (coord_transform,
                                       resample_img)
-from ..externals.nipype.caching import Memory
-from ..externals.nipype.interfaces import afni, fsl
-from ..externals.nipype.utils.filemanip import fname_presuffix
+from nipype.caching import Memory
+from nipype.interfaces import afni, fsl
+from nipype.utils.filemanip import fname_presuffix
 from . import interfaces
 from ..preprocessing import afni_unifize
 from ..orientation import _check_same_geometry
@@ -100,7 +100,7 @@ def brain_extraction_report(head_file, brain_volume, write_dir=None,
     clipping_fractions : list. Elements can be floats between 0. and .9
         or None, optional
         Clip level fractions to explore. Each value is passed to
-        sammba.externals.nipype.interfaces.afni.Unifize, to tune
+        nipype.interfaces.afni.Unifize, to tune
         the bias correction step done prior to brain mask segmentation.
         Smaller fractions tend to  make the mask larger. If None,
         no unifization is done for brain mask computation.
@@ -181,7 +181,7 @@ def compute_morpho_brain_mask(head_file, brain_volume, write_dir=None,
         Wether or not to use caching.
 
     unifize_kwargs : dict, optional
-        Is passed to sammba.externals.nipype.interfaces.afni.Unifize.
+        Is passed to nipype.interfaces.afni.Unifize.
 
     Returns
     -------
@@ -287,7 +287,7 @@ def compute_histo_brain_mask(head_file, brain_volume, write_dir=None,
         Wether or not to use caching.
 
     unifize_kwargs : dict, optional
-        Is passed to sammba.externals.nipype.interfaces.afni.Unifize.
+        Is passed to nipype.interfaces.afni.Unifize.
 
     Returns
     -------
