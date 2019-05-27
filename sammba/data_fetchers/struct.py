@@ -61,30 +61,30 @@ def fetch_lemur_mircen_2019_t2(subjects=[0], data_dir=None, url=None,
             max_subjects))
         subjects = range(max_subjects)
 
-    ids = np.array([
+    subject_ids = np.array([
         'sub-01', 'sub-02', 'sub-03', 'sub-04', 'sub-05', 'sub-06', 'sub-07',
         'sub-08', 'sub-09', 'sub-10', 'sub-11', 'sub-12', 'sub-13', 'sub-14',
         'sub-15', 'sub-16', 'sub-17', 'sub-18', 'sub-19', 'sub-20', 'sub-21',
         'sub-22', 'sub-23', 'sub-24', 'sub-25', 'sub-26', 'sub-27', 'sub-28',
         'sub-29', 'sub-30', 'sub-31', 'sub-32', 'sub-33', 'sub-34'])
-    ids = ids[subjects]
+    subject_ids = subject_ids[subjects]
 
     # Generate the list of urls
     json_urls = [os.path.join(url, '{0}:anat:{0}_T2w.json'.format(subject_id))
-                 for subject_id in ids]
+                 for subject_id in subject_ids]
     anat_urls = [os.path.join(url, '{0}:anat:{0}_T2w.nii.gz'.format(subject_id))
-                 for subject_id in ids]
+                 for subject_id in subject_ids]
 
     # Generate the list of target files
     anat_basenames = ['{0}_anat_{0}_T2w.nii.gz'.format(subject_id)
-                      for subject_id in ids]
+                      for subject_id in subject_ids]
     anat_files = [os.path.join(animal_dir, anat_basename)
-        for (animal_dir, anat_basename) in zip(ids, anat_basenames)]
+        for (animal_dir, anat_basename) in zip(subject_ids, anat_basenames)]
 
     json_basenames = ['{0}_anat_{0}_T2w.json'.format(subject_id)
-                      for subject_id in ids]
+                      for subject_id in subject_ids]
     json_files = [os.path.join(animal_dir, json_basename)
-        for (animal_dir, json_basename) in zip(ids, json_basenames)]
+        for (animal_dir, json_basename) in zip(subject_ids, json_basenames)]
 
     # Call fetch_files once per subject.
     anat = []
@@ -100,12 +100,12 @@ def fetch_lemur_mircen_2019_t2(subjects=[0], data_dir=None, url=None,
 
     pheno_url = os.path.join(url, 'lemur_atlas_list_t2_bids.csv')
     pheno_file = _fetch_file(pheno_url, data_dir, verbose=verbose)
+    phenotypic = np.recfromcsv(pheno_file, delimiter='\t')
     # workaround extra quotes in animal ids when reading the csv
-    phenotypic = np.recfromcsv(
-        ("\t".join(i) for i in csv.reader(open(pheno_file))), delimiter='\t')
-    phenotypic = phenotypic[[
-        np.where(phenotypic['animal_id'] == i)[0][0]
-        for i in ids]]
+    pheno_ids = np.array(
+        [p.replace('"', '') for p in phenotypic['animal_id']])
+    phenotypic = phenotypic[[np.where(pheno_ids == i)[0][0]
+                            for i in subject_ids]]
     fdescr = _get_dataset_descr(dataset_name)
 
     return Bunch(anat=anat, pheno=phenotypic, description=fdescr)

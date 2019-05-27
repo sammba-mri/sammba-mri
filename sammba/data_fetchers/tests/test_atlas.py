@@ -166,7 +166,7 @@ def test_fetch_atlas_waxholm_rat_2014():
 @with_setup(setup_mock, teardown_mock)
 @with_setup(tst.setup_tmpdata, tst.teardown_tmpdata)
 def test_fetch_atlas_lemur_mircen_2019():
-    datadir = os.path.join(tst.tmpdir, 'mircen_2017')
+    datadir = os.path.join(tst.tmpdir, 'mircen2019')
     os.mkdir(datadir)
     dummy = open(os.path.join(
         datadir, 'MIRCen_mouselemur_atlas_labels.txt'), 'w')
