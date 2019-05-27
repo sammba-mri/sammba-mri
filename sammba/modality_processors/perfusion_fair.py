@@ -5,8 +5,6 @@ Created on Sunday 4th March 2018
 @author: Nachiket Nadkarni
 """
 
-import tqdm
-import pandas as pd
 import nibabel as nib
 import numpy as np
 from scipy.optimize import least_squares as ls
@@ -72,10 +70,12 @@ def _perf_fair_read_ptbl(nii_fname):
     # process
     
     bfx = nii_fname.split('_')[-1].split('.')[0] # bfx = bruker folder number
-    ptbl = pd.read_table(nii_fname.replace(bfx + '.nii.gz', bfx + '_ptbl.txt'))
-    ti_list = ptbl.TI[ptbl.slice == 1][ptbl.FC == 'Selective Inversion'].tolist()
-    long_ti_list = ptbl.TI[ptbl.slice == 1].tolist()
-    fc_list = ptbl.FC[ptbl.slice == 1].tolist()
+    ptbl = np.recfromcsv(nii_fname.replace(bfx + '.nii.gz', bfx + '_ptbl.txt'),
+                         delimiter='\t')
+    ti_list = ptbl.ti[np.logical_and(ptbl.slice == 1,
+                                     ptbl.fc == 'Selective Inversion')].tolist()
+    long_ti_list = ptbl.ti[ptbl.slice == 1].tolist()
+    fc_list = ptbl.fc[ptbl.slice == 1].tolist()
     picker_sel = [n for n,x in enumerate(fc_list) if x == 'Selective Inversion']
     picker_nonsel = [n for n,x in enumerate(fc_list) if x == 'Non-selective Inversion']
     return {'TI':ti_list, 'long_TI':long_ti_list, 'FC':fc_list,
@@ -293,8 +293,8 @@ def _perf_fair_fit_mp(all_s0, t1_blood, ti, t1_guess, picker_sel,
                                             picker_nonsel=picker_nonsel,
                                             **kwargs),
                                     all_s0)
-#    return _iterate_and_show_progress(pool_iterator, len(all_s0))
-    return list(tqdm.tqdm(pool_iterator), total=len(all_s0))
+    return _iterate_and_show_progress(pool_iterator, len(all_s0))
+
 
 def perf_fair_nii_proc(nii_in_fname, t1_blood, ti, t1_guess, picker_sel,
                        picker_nonsel, nii_out_fname=None, **kwargs):
