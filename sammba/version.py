@@ -27,7 +27,7 @@ _SAMMBA_INSTALL_MSG = 'See %s for installation information.' % (
 #   in some meaningful order (more => less 'core').
 REQUIRED_MODULE_METADATA = (
     ('numpy', {
-        'min_version': '1.11.2',
+        'min_version': '1.14.0',
         'required_at_installation': True,
         'install_info': _SAMMBA_INSTALL_MSG}),
     ('scipy', {
