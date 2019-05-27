@@ -1,10 +1,9 @@
 import os
 import warnings
-import csv
 import numpy as np
 from sklearn.datasets.base import Bunch
 from nilearn.datasets.utils import _fetch_files, _fetch_file, _get_dataset_dir
-from .utils import _get_dataset_descr
+from .utils import _get_dataset_descr, _parse_date
 
 
 def fetch_lemur_mircen_2019_t2(subjects=[0], data_dir=None, url=None,
@@ -61,14 +60,7 @@ def fetch_lemur_mircen_2019_t2(subjects=[0], data_dir=None, url=None,
             max_subjects))
         subjects = range(max_subjects)
 
-    subject_ids = np.array([
-        '"sub-01"', '"sub-02"', '"sub-03"', '"sub-04"', '"sub-05"',
-        '"sub-06"', '"sub-07"', '"sub-08"', '"sub-09"', '"sub-10"',
-        '"sub-11"', '"sub-12"', '"sub-13"', '"sub-14"', '"sub-15"',
-        '"sub-16"', '"sub-17"', '"sub-18"', '"sub-19"', '"sub-20"',
-        '"sub-21"', '"sub-22"', '"sub-23"', '"sub-24"', '"sub-25"',
-        '"sub-26"', '"sub-27"', '"sub-28"', '"sub-29"', '"sub-30"',
-        '"sub-31"', '"sub-32"', '"sub-33"', '"sub-34"'])
+    subject_ids = np.array(['sub-{0:02d}'.format(i) for i in range(1, 35)])
     subject_ids = subject_ids[subjects]
 
     # Generate the list of urls
@@ -102,9 +94,16 @@ def fetch_lemur_mircen_2019_t2(subjects=[0], data_dir=None, url=None,
 
     pheno_url = os.path.join(url, 'lemur_atlas_list_t2_bids.csv')
     pheno_file = _fetch_file(pheno_url, data_dir, verbose=verbose)
-    phenotypic = np.recfromcsv(pheno_file, delimiter='\t')
-    phenotypic = phenotypic[[np.where(phenotypic['animal_id'] == i)[0][0]
-                            for i in subject_ids]]
+    phenotypic = np.recfromcsv(pheno_file, delimiter='\t', skip_header=True,
+                               names=['animal_id', 'gender', 'birthdate',
+                                      'mri_date'],
+                               dtype=['U8', 'U3', 'datetime64[D]',
+                                      'datetime64[D]'],
+                               converters={2: _parse_date, 3: _parse_date},
+                               encoding='U8')
+    phenotypic = phenotypic[[
+        np.where(phenotypic['animal_id'] == '"' + i + '"')[0][0]
+        for i in subject_ids]]
     fdescr = _get_dataset_descr(dataset_name)
 
     return Bunch(anat=anat, pheno=phenotypic, description=fdescr)

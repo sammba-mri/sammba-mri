@@ -23,9 +23,10 @@ def test_fetch_lemur_mircen_2019_t2():
     lemur_t2_dir = os.path.join(tst.tmpdir, 'mircen2019_t2')
     os.mkdir(lemur_t2_dir)
     ids = ['"sub-{:02d}"'.format(idx) for idx in range(1, 35)]
-    pheno = np.vstack((ids, ['m'] * 34)).T
+    pheno = np.vstack((ids, ['"m"'] * 34, ['13/01/2010'] * 34,
+                       ['17/06/2010'] * 34)).T
     np.savetxt(os.path.join(lemur_t2_dir, 'lemur_atlas_list_t2_bids.csv'),
-               pheno, fmt='%s\t%s', header='animal_id\tgender')
+               pheno, fmt='%s\t%s\t%s\t%s', header='animal_id\tgender')
 
     # By default one subject is loaded
     lemur_t2 = struct.fetch_lemur_mircen_2019_t2(data_dir=tst.tmpdir,
@@ -47,5 +48,5 @@ def test_fetch_lemur_mircen_2019_t2():
     # returned phenotypic data will be an array
     assert_true(isinstance(lemur_t2.pheno, np.recarray))
     np.testing.assert_array_equal(lemur_t2.pheno.animal_id,
-                                  ['"sub-01"', '"sub-11"', '"sub-34"'])
+                                  [b'"sub-01"', b'"sub-11"', b'"sub-34"'])
     assert_not_equal(lemur_t2.description, '')    
