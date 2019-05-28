@@ -49,7 +49,8 @@ sammba-MRI API Reference
    fetch_atlas_dorr_2008
    fetch_atlas_waxholm_rat_2014
    fetch_masks_dorr_2008
-   fetch_atlas_lemur_mircen_2017
+   fetch_atlas_lemur_mircen_2019
+   fetch_lemur_mircen_2019_t2
 
 .. _registration_ref:
 

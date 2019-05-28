@@ -21,8 +21,8 @@ matrix:
   include:
     # without matplotlib
     - env: DISTRIB="conda" PYTHON_VERSION="3.5"
-           NUMPY_VERSION="1.11" SCIPY_VERSION="0.17"
-           SCIKIT_LEARN_VERSION="0.18" COVERAGE="true"
+           NUMPY_VERSION="1.14.0" SCIPY_VERSION="*"
+           SCIKIT_LEARN_VERSION="*" COVERAGE="true"
            PANDAS_VERSION="*" NETWORKX_VERSION="*"
            FUTURE_VERSION="0.16.0" PACKAGING_VERSION="*"
            TRAITS_VERSION="4.6" SIMPLEJSON_VERSION="3.8.0"

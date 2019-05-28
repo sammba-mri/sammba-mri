@@ -16,19 +16,18 @@ variable head tissue.
 # -----------------
 from sammba import data_fetchers
 
-retest = data_fetchers.fetch_zurich_test_retest(subjects=[0, 1, 2],
-                                                correct_headers=True)
+lemur = data_fetchers.fetch_lemur_mircen_2019_t2(subjects=[0, 1, 2])
 
 ##############################################################################
 # retest contains paths to images and data description
-print(retest.anat)
+print(lemur.anat)
 
 ##############################################################################
 # Define the writing directory
 # ----------------------------
 import os
 
-write_dir = os.path.join(os.getcwd(), 'zurich_common')
+write_dir = os.path.join(os.getcwd(), 'lemur_common')
 if not os.path.exists(write_dir):
     os.makedirs(write_dir)
 
@@ -37,7 +36,7 @@ if not os.path.exists(write_dir):
 # -------------------
 from sammba.registration import anats_to_common
 
-affine_register = anats_to_common(retest.anat, write_dir, 400,
+affine_register = anats_to_common(lemur.anat, write_dir, 400,
                                   use_rats_tool=False, caching=True)
 
 ##############################################################################

@@ -2,7 +2,7 @@ matplotlib >= 1.5.1
 nibabel >= 2.0.2
 nose == 1.3.1
 nose-cov
-numpy >= 1.11
+numpy >= 1.14.0
 setuptools >= 3.3
 scikit-learn >= 0.18
 nilearn >= 0.4

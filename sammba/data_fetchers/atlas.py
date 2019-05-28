@@ -417,7 +417,7 @@ def fetch_atlas_waxholm_rat_2014(data_dir=None, url=None, resume=True,
     return Bunch(**params)
 
 
-def fetch_atlas_lemur_mircen_2017(data_dir=None, url=None, resume=True,
+def fetch_atlas_lemur_mircen_2019(data_dir=None, url=None, resume=True,
                                   verbose=1):
     """Download and load the MIRCen mouse lemur atlas and average (dated 2017)
 
@@ -460,7 +460,7 @@ def fetch_atlas_lemur_mircen_2017(data_dir=None, url=None, resume=True,
                  'MIRCen_mouselemur_template.nii.gz')
     opts = {'uncompress': True}
     filenames = [(f, url, opts) for f in basenames]
-    dataset_name = 'mircen_2017'
+    dataset_name = 'mircen2019'
     data_dir = _get_dataset_dir(dataset_name, data_dir=data_dir,
                                 verbose=verbose)
     files_ = _fetch_files(data_dir, filenames, resume=resume,
