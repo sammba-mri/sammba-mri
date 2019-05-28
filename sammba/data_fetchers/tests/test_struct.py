@@ -48,5 +48,5 @@ def test_fetch_lemur_mircen_2019_t2():
     # returned phenotypic data will be an array
     assert_true(isinstance(lemur_t2.pheno, np.recarray))
     np.testing.assert_array_equal(lemur_t2.pheno.animal_id,
-                                  [b'"sub-01"', b'"sub-11"', b'"sub-34"'])
+                                  ['"sub-01"', '"sub-11"', '"sub-34"'])
     assert_not_equal(lemur_t2.description, '')    
