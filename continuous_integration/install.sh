@@ -38,7 +38,7 @@ print_conda_requirements() {
     #   - for scikit-learn, SCIKIT_LEARN_VERSION is used
     TO_INSTALL_ALWAYS="pip nose"
     REQUIREMENTS="$TO_INSTALL_ALWAYS"
-    TO_INSTALL_MAYBE="python numpy scipy matplotlib scikit-learn pandas configparser future traits simplejson networkx packaging funcsigs click tqdm futures nipype"
+    TO_INSTALL_MAYBE="python numpy scipy matplotlib scikit-learn configparser future traits simplejson networkx packaging funcsigs click futures nipype"
     for PACKAGE in $TO_INSTALL_MAYBE; do
         # Capitalize package name and add _VERSION
         PACKAGE_VERSION_VARNAME="${PACKAGE^^}_VERSION"
@@ -110,9 +110,9 @@ if [[ "$DISTRIB" == "neurodebian" ]]; then
     create_new_venv
     bash <(wget -q -O- http://neuro.debian.net/_files/neurodebian-travis.sh)
     sudo apt-get install -y -qq python-scipy python-nose python-nibabel\
-         python-sklearn python-pandas python-nilearn python-patsy\
+         python-sklearn python-nilearn python-patsy\
          python-networkx python-configparser python-future python-traits\
-         python-simplejson python-funcsigs python-click python-tqdm\
+         python-simplejson python-funcsigs python-click\
          graphviz python-futures python-nipype
     travis_retry sudo apt-get install -y -qq  afni fsl
     source /etc/afni/afni.sh
@@ -142,7 +142,6 @@ elif [[ "$DISTRIB" == "conda" ]]; then
     # Allow nose to ignore unicode in doctest
     pip install doctest-ignore-unicode
     
-    conda install --channel conda-forge tqdm --yes
     conda install --channel conda-forge nipype --yes
 else
     echo "Unrecognized distribution ($DISTRIB); cannot setup travis environment."
