@@ -1,3 +1,4 @@
+import warnings
 import os
 import numpy as np
 import nibabel
@@ -6,7 +7,8 @@ from sklearn.utils import deprecated
 from nipype.caching import Memory
 from nipype.interfaces import afni, ants, fsl
 from nipype.utils.filemanip import fname_presuffix
-from sammba import segmentation
+from nilearn._utils.exceptions import VisibleDeprecationWarning
+from . import segmentation
 from ..orientation import fix_obliquity
 from .fmri_session import FMRISession
 from .struct import anats_to_template
@@ -125,11 +127,13 @@ def _slice_time(func_file, t_r, write_dir, caching=False,
     return out_tshift.outputs.out_file
 
 
+
 def coregister(unifized_anat_file, unbiased_mean_func_file, write_dir,
                anat_brain_file=None,
                func_brain_file=None,
                slice_timing=True, t_r=None,
-               prior_rigid_body_registration=False,
+               prior_rigid_body_registration=None,
+               reorient_only=False,
                voxel_size_x=.1, voxel_size_y=.1, caching=False,
                verbose=True, **environ_kwargs):
     """
@@ -148,15 +152,26 @@ def coregister(unifized_anat_file, unbiased_mean_func_file, write_dir,
         If True, a rigid-body registration of the anat to the func is
         performed prior to the warp. Useful if the images headers have
         missing/wrong information.
+        NOTE: prior_rigid_body_registration is deprecated from 0.1 and will be
+        removed in next release. Use `reorient_only` instead.
+
+    reorient_only :  bool, optional
+        If True, the rigid-body registration of the anat to the func is not
+        performed and only reorientation is done.
+
     voxel_size_x : float, optional
         Resampling resolution for the x-axis, in mm.
+
     voxel_size_y : float, optional
         Resampling resolution for the y-axis, in mm.
+
     caching : bool, optional
         Wether or not to use caching.
+
     verbose : bool, optional
         If True, all steps are verbose. Note that caching implies some
         verbosity in any case.
+
     environ_kwargs : extra arguments keywords
         Extra arguments keywords, passed to interfaces environ variable.
     Returns
@@ -176,6 +191,12 @@ def coregister(unifized_anat_file, unbiased_mean_func_file, write_dir,
     and has to be cited. For more information, see
     `RATS <http://www.iibi.uiowa.edu/content/rats-overview/>`_
     """
+    if prior_rigid_body_registration is not None:
+        warn_str = ("The parameter 'prior_rigid_body_registration' is "
+                    "deprecated and will be removed in sammba-mri next "
+                    "release. Use parameter 'reorient_only' instead.")
+        warnings.warn(warn_str, VisibleDeprecationWarning, stacklevel=2)
+        reorient_only = not(prior_rigid_body_registration)
 
     environ = {'AFNI_DECONFLICT': 'OVERWRITE'}
     if verbose:
@@ -197,12 +218,12 @@ def coregister(unifized_anat_file, unbiased_mean_func_file, write_dir,
     #############################################
     # Rigid-body registration anat -> mean func #
     #############################################
-    if prior_rigid_body_registration:
+    if not reorient_only:
         if anat_brain_file is None:
-            raise ValueError("'anat_brain_mask_file' is needed for prior "
+            raise ValueError("'anat_brain_mask_file' is needed for "
                              "rigid-body registration")
         if func_brain_file is None:
-            raise ValueError("'func_brain_mask_file' is needed for prior "
+            raise ValueError("'func_brain_mask_file' is needed for "
                              "rigid-body registration")
         allineated_anat_file, rigid_transform_file = \
             _rigid_body_register(unifized_anat_file,
@@ -231,7 +252,7 @@ def coregister(unifized_anat_file, unbiased_mean_func_file, write_dir,
     transform_file = fname_presuffix(registered_anat_oblique_file,
                                      suffix='_func_to_anat.aff12.1D',
                                      use_ext=False)
-    if prior_rigid_body_registration:
+    if not reorient_only:
         _ = catmatvec(in_file=[(rigid_transform_file, 'ONELINE'),
                                (mat_file, 'ONELINE')],
                       oneline=True,
