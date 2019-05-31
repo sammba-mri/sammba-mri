@@ -1,3 +1,5 @@
+import warnings
+from nilearn._utils.exceptions import VisibleDeprecationWarning
 from ..segmentation.brain_mask import (compute_histo_brain_mask,
                                        compute_morpho_brain_mask,
                                        _apply_mask)
@@ -74,8 +76,8 @@ class Coregistrator(BaseRegistrator):
                 % self.__class__.__name__)
 
     def fit_modality(self, in_file, modality, slice_timing=True,
-                     t_r=None, prior_rigid_body_registration=False,
-                     brain_mask_file=None):
+                     t_r=None, prior_rigid_body_registration=None,
+                     reorient_only=False, brain_mask_file=None):
         """ Prepare and perform coregistration.
 
         Parameters
@@ -96,11 +98,24 @@ class Coregistrator(BaseRegistrator):
             If True, a rigid-body registration of the anat to the modality is
             performed prior to the warp. Useful if the images headers have
             missing/wrong information.
+            NOTE: prior_rigid_body_registration is deprecated from 0.1 and
+            will be removed in next release. Use `reorient_only` instead.
+
+        reorient_only :  bool, optional
+            If True, the rigid-body registration of the anat to the func is
+            not performed and only reorientation is done.
 
         Returns
         -------
         the coregistrator itself
         """
+        if prior_rigid_body_registration is not None:
+            warn_str = ("The parameter 'prior_rigid_body_registration' is "
+                        "deprecated and will be removed in sammba-mri next "
+                        "release. Use parameter 'reorient_only' instead.")
+            warnings.warn(warn_str, VisibleDeprecationWarning, stacklevel=2)
+            reorient_only = not(prior_rigid_body_registration)
+
         self._check_anat_fitted()
 
         if modality == 'perf':
@@ -132,7 +147,14 @@ class Coregistrator(BaseRegistrator):
             terminal_output=self.terminal_output,
             caching=self.caching)
 
-        if prior_rigid_body_registration:
+        if reorient_only:
+            unifized_anat_file = afni_unifize(
+                self.anat_, write_dir=self.output_dir,
+                terminal_output=self.terminal_output, caching=self.caching,
+                verbose=self.verbose)
+            self.anat_brain_ = None
+            modality_brain_file = None
+        else:
             if brain_mask_file is None or self._anat_brain_mask is None:
                 if not isinstance(self.brain_volume, int):
                     raise ValueError('`brain_volume` must be specified to '
@@ -176,13 +198,6 @@ class Coregistrator(BaseRegistrator):
                     write_dir=self.output_dir,
                     caching=self.caching,
                     terminal_output=self.terminal_output)
-        else:
-            unifized_anat_file = afni_unifize(
-                self.anat_, write_dir=self.output_dir,
-                terminal_output=self.terminal_output, caching=self.caching,
-                verbose=self.verbose)
-            self.anat_brain_ = None
-            modality_brain_file = None
 
         if modality == 'func':
             self.func_brain_ = modality_brain_file
@@ -191,7 +206,7 @@ class Coregistrator(BaseRegistrator):
                 self.output_dir,
                 anat_brain_file=self.anat_brain_,
                 func_brain_file=modality_brain_file,
-                prior_rigid_body_registration=prior_rigid_body_registration,
+                reorient_only=reorient_only,
                 caching=self.caching,
                 verbose=self.verbose)
             self._func_undistort_warps = coregistration.coreg_warps_
@@ -207,7 +222,7 @@ class Coregistrator(BaseRegistrator):
                 self.output_dir,
                 anat_brain_file=self.anat_brain_,
                 m0_brain_file=modality_brain_file,
-                prior_rigid_body_registration=prior_rigid_body_registration,
+                reorient_only=reorient_only,
                 caching=self.caching,
                 verbose=self.verbose)
             self.undistorted_perf_ = coregistration.coreg_m0_

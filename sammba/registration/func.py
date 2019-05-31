@@ -8,7 +8,7 @@ from nipype.caching import Memory
 from nipype.interfaces import afni, ants, fsl
 from nipype.utils.filemanip import fname_presuffix
 from nilearn._utils.exceptions import VisibleDeprecationWarning
-from . import segmentation
+from sammba import segmentation
 from ..orientation import fix_obliquity
 from .fmri_session import FMRISession
 from .struct import anats_to_template
@@ -147,33 +147,27 @@ def coregister(unifized_anat_file, unbiased_mean_func_file, write_dir,
     unbiased_mean_func_file : str
         Path to the slice-time corrected, volume registrated, averaged
         and bias field corrected functional file
-
     prior_rigid_body_registration : bool, optional
         If True, a rigid-body registration of the anat to the func is
         performed prior to the warp. Useful if the images headers have
         missing/wrong information.
         NOTE: prior_rigid_body_registration is deprecated from 0.1 and will be
         removed in next release. Use `reorient_only` instead.
-
     reorient_only :  bool, optional
         If True, the rigid-body registration of the anat to the func is not
         performed and only reorientation is done.
-
     voxel_size_x : float, optional
         Resampling resolution for the x-axis, in mm.
-
     voxel_size_y : float, optional
         Resampling resolution for the y-axis, in mm.
-
     caching : bool, optional
         Wether or not to use caching.
-
     verbose : bool, optional
         If True, all steps are verbose. Note that caching implies some
         verbosity in any case.
-
     environ_kwargs : extra arguments keywords
         Extra arguments keywords, passed to interfaces environ variable.
+
     Returns
     -------
     The following attributes are added
@@ -218,7 +212,9 @@ def coregister(unifized_anat_file, unbiased_mean_func_file, write_dir,
     #############################################
     # Rigid-body registration anat -> mean func #
     #############################################
-    if not reorient_only:
+    if reorient_only:
+        allineated_anat_file = unifized_anat_file
+    else:
         if anat_brain_file is None:
             raise ValueError("'anat_brain_mask_file' is needed for "
                              "rigid-body registration")
@@ -236,8 +232,6 @@ def coregister(unifized_anat_file, unbiased_mean_func_file, write_dir,
                                  environ=environ)
         output_files.extend([rigid_transform_file,
                              allineated_anat_file])
-    else:
-        allineated_anat_file = unifized_anat_file
 
     ############################################
     # Nonlinear registration anat -> mean func #
@@ -252,14 +246,14 @@ def coregister(unifized_anat_file, unbiased_mean_func_file, write_dir,
     transform_file = fname_presuffix(registered_anat_oblique_file,
                                      suffix='_func_to_anat.aff12.1D',
                                      use_ext=False)
-    if not reorient_only:
-        _ = catmatvec(in_file=[(rigid_transform_file, 'ONELINE'),
-                               (mat_file, 'ONELINE')],
+    if reorient_only:
+        _ = catmatvec(in_file=[(mat_file, 'ONELINE')],
                       oneline=True,
                       out_file=transform_file,
                       environ=environ)
     else:
-        _ = catmatvec(in_file=[(mat_file, 'ONELINE')],
+        _ = catmatvec(in_file=[(rigid_transform_file, 'ONELINE'),
+                               (mat_file, 'ONELINE')],
                       oneline=True,
                       out_file=transform_file,
                       environ=environ)

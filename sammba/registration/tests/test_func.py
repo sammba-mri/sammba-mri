@@ -21,7 +21,8 @@ def test_coregister():
     mean_img(func_file).to_filename(mean_func_file)
 
     bunch = func.coregister(anat_file, mean_func_file, tst.tmpdir,
-                            slice_timing=False, verbose=False)
+                            slice_timing=False, verbose=False,
+                            reorient_only=True)
     assert_true(_check_same_fov(nibabel.load(bunch.coreg_func_),
                                 nibabel.load(bunch.coreg_anat_)))
     assert_true(_check_same_obliquity(bunch.coreg_anat_,
@@ -37,13 +38,13 @@ def test_coregister():
     assert_raises_regex(RuntimeError,
                         "3dcopy",
                         func.coregister, anat_file, mean_func_file, tst.tmpdir,
-                        slice_timing=False, verbose=False,
+                        slice_timing=False, verbose=False, reorient_only=True,
                         AFNI_DECONFLICT='NO')
 
     # Check caching does not change the paths
     bunch2 = func.coregister(anat_file, mean_func_file, tst.tmpdir,
                              slice_timing=False, verbose=False, caching=True,
-                             AFNI_DECONFLICT='OVERWRITE')
+                             reorient_only=True, AFNI_DECONFLICT='OVERWRITE')
     assert_equal(bunch.coreg_func_, bunch2.coreg_func_)
     assert_equal(bunch.coreg_anat_, bunch2.coreg_anat_)
     assert_equal(bunch.coreg_transform_, bunch2.coreg_transform_)

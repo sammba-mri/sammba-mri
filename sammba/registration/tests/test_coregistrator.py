@@ -41,17 +41,17 @@ def test_coregistrator():
 
     assert_raises_regex(
         ValueError, "Only 'func' and 'perf' ", registrator.fit_modality,
-        func_file, 'diffusion')
+        func_file, 'diffusion', reorient_only=True)
     assert_raises_regex(
         ValueError, "'t_r' is needed for slice ", registrator.fit_modality,
-        func_file, 'func')
+        func_file, 'func', reorient_only=True)
     assert_raises_regex(
         ValueError, '`brain_volume` must be ', registrator.fit_modality,
-        func_file, 'func', slice_timing=False,
-        prior_rigid_body_registration=True)
+        func_file, 'func', slice_timing=False)
 
     # without rigid body registration
-    registrator.fit_modality(func_file, 'func', slice_timing=False)
+    registrator.fit_modality(func_file, 'func', slice_timing=False,
+                              reorient_only=True)
     func_img = nibabel.load(func_file)
     assert_true(_check_same_fov(nibabel.load(registrator.undistorted_func_),
                                 func_img))
@@ -85,7 +85,7 @@ def test_coregistrator():
                                                tst.tmpdir, opening=2)
     
     registrator.fit_modality(func_file, 'func', slice_timing=False,
-                             prior_rigid_body_registration=True,
+                             reorient_only=False,
                              brain_mask_file=func_brain_mask)
     assert_true(_check_same_fov(nibabel.load(registrator.undistorted_func_),
                                 func_img))
@@ -110,7 +110,7 @@ def test_coregistrator():
     m0_img = nibabel.Nifti1Image(func_img.get_data()[..., 0], func_img.affine)
     m0_file = os.path.join(tst.tmpdir, 'm0.nii.gz')
     m0_img.to_filename(m0_file)
-    registrator.fit_modality(m0_file, 'perf')
+    registrator.fit_modality(m0_file, 'perf', reorient_only=True)
     assert_true(_check_same_fov(nibabel.load(registrator.undistorted_perf_),
                                 m0_img))
     assert_true(_check_same_fov(nibabel.load(registrator.anat_in_perf_space_),
