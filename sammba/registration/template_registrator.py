@@ -1,4 +1,6 @@
+import warnings
 import os
+from nilearn._utils.exceptions import VisibleDeprecationWarning
 from ..segmentation.brain_mask import (compute_histo_brain_mask,
                                        compute_morpho_brain_mask,
                                        _apply_mask)
@@ -207,7 +209,8 @@ class TemplateRegistrator(BaseRegistrator):
                              'transform_modality().'.format(self.__class__.__name__, modality))
 
     def fit_modality(self, in_file, modality, slice_timing=True, t_r=None,
-                     prior_rigid_body_registration=False, voxel_size=None):
+                     prior_rigid_body_registration=None, reorient_only=False,
+                     voxel_size=None):
         """Estimates registration from the space of a given modality to
         the template space.
 
@@ -218,7 +221,31 @@ class TemplateRegistrator(BaseRegistrator):
 
         modality : one of {'func', 'perf'}
             Name of the modality.
+
+        slice_timing : bool, optional
+            If True, slice timing correction is performed
+
+        t_r : float, optional
+            Repetition time, only needed for slice timing correction.
+
+        prior_rigid_body_registration : bool, optional
+            If True, a rigid-body registration of the anat to the modality is
+            performed prior to the warp. Useful if the images headers have
+            missing/wrong information.
+            NOTE: prior_rigid_body_registration is deprecated from 0.1 and
+            will be removed in next release. Use `reorient_only` instead.
+
+        reorient_only :  bool, optional
+            If True, the rigid-body registration of the anat to the func is
+            not performed and only reorientation is done.
         """
+        if prior_rigid_body_registration is not None:
+            warn_str = ("The parameter 'prior_rigid_body_registration' is "
+                        "deprecated and will be removed in sammba-mri next "
+                        "release. Use parameter 'reorient_only' instead.")
+            warnings.warn(warn_str, VisibleDeprecationWarning, stacklevel=2)
+            reorient_only = not(prior_rigid_body_registration)
+
         self._check_anat_fitted()
         setattr(self, modality + '_', in_file)
         if modality == 'perf':
@@ -249,7 +276,9 @@ class TemplateRegistrator(BaseRegistrator):
                                       terminal_output=self.terminal_output,
                                       caching=self.caching)
 
-        if prior_rigid_body_registration:
+        if reorient_only:
+            brain_file = None
+        else:
             if self.use_rats_tool:
                 compute_brain_mask = compute_morpho_brain_mask
             else:
@@ -276,8 +305,6 @@ class TemplateRegistrator(BaseRegistrator):
                                      write_dir=self.output_dir,
                                      caching=self.caching,
                                      terminal_output=self.terminal_output)
-        else:
-            brain_file = None
 
         if modality == 'func':
             self.func_brain_ = brain_file
@@ -286,7 +313,7 @@ class TemplateRegistrator(BaseRegistrator):
                 self.output_dir,
                 anat_brain_file=self.anat_brain_,
                 func_brain_file=brain_file,
-                prior_rigid_body_registration=prior_rigid_body_registration,
+                reorient_only=reorient_only,
                 caching=self.caching,
                 verbose=self.verbose)
             self._func_undistort_warps = coregistration.coreg_warps_
@@ -308,7 +335,7 @@ class TemplateRegistrator(BaseRegistrator):
                 self.output_dir,
                 anat_brain_file=self.anat_brain_,
                 m0_brain_file=brain_file,
-                prior_rigid_body_registration=prior_rigid_body_registration,
+                reorient_only=reorient_only,
                 caching=self.caching,
                 verbose=self.verbose)
             self.undistorted_perf_ = coregistration.coreg_m0_

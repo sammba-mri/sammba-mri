@@ -90,13 +90,14 @@ def test_fit_transform_and_inverse_modality_with_func():
         func_file, 'diffusion')
     assert_raises_regex(
         ValueError, "'t_r' is needed for slice ", registrator.fit_modality,
-        func_file, 'func')
+        func_file, 'func', reorient_only=True)
     assert_raises_regex(
         ValueError, 'has not been func fitted',
         registrator.transform_modality_like, func_file, 'func')
 
     # test fit_modality for func
-    registrator.fit_modality(func_file, 'func', slice_timing=False)
+    registrator.fit_modality(func_file, 'func', slice_timing=False,
+                             reorient_only=True)
     registered_func_img = nibabel.load(registrator.registered_func_)
     template_img = nibabel.load(template_file)
     np.testing.assert_array_almost_equal(registered_func_img.affine,
@@ -154,7 +155,7 @@ def test_fit_and_transform_modality_with_perf():
     m0_img.to_filename(m0_file)
 
     # test fit_modality for perf
-    registrator.fit_modality(m0_file, 'perf')
+    registrator.fit_modality(m0_file, 'perf', reorient_only=True)
     assert_true(_check_same_fov(nibabel.load(registrator.registered_perf_),
                                 nibabel.load(template_file)))
 
