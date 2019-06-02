@@ -218,7 +218,7 @@ class Coregistrator(BaseRegistrator):
                 unifized_anat_file, unbiased_file,
                 self.output_dir,
                 anat_brain_file=self.anat_brain_,
-                m0_brain_file=modality_brain_file,
+                epi_brain_file=modality_brain_file,
                 reorient_only=reorient_only,
                 caching=self.caching,
                 verbose=self.verbose)
@@ -234,7 +234,7 @@ class Coregistrator(BaseRegistrator):
                 allineated_file, self._func_undistort_warps, .1, .1,
                 write_dir=self.output_dir, caching=self.caching)
         elif modality == 'perf':
-            self.undistorted_perf_ = coregistration.coreg_m0_
+            self.undistorted_perf_ = coregistration.coreg_epi_
         else:           
             setattr(self, 'unbiased_' + modality, unbiased_file) 
             setattr(self, modality + '_brain_', modality_brain_file)
