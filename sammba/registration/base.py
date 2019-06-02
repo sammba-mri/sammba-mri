@@ -146,6 +146,127 @@ def _warp(to_warp_file, reference_file, write_dir=None, caching=False,
     return warped_oblique_file, out_warp.outputs.warp_file
 
 
+def _reorient(unifized_anat_file, unbiased_modality_file, write_dir,
+              modality_name='modality', terminal_output='allatonce',
+              caching=False, verbose=True, environ=None):
+    """
+    Reorientation of the subject's anatomical image to the modality.
+
+    Parameters
+    ----------
+    modality_name : str, optional
+        Name to be used in the transform filename
+    caching : bool, optional
+        Wether or not to use caching.
+    verbose : bool, optional
+        If True, all steps are verbose. Note that caching implies some
+        verbosity in any case.
+
+    Returns
+    -------
+    2-tuple of str : Path to the reoriented anatomical image and to the
+        transform from anat to modality.
+    """
+    if environ is None:
+        environ = {'AFNI_DECONFLICT': 'OVERWRITE'}
+
+    if caching:
+        memory = Memory(write_dir)
+        catmatvec = memory.cache(afni.CatMatvec)
+    else:
+        catmatvec = afni.CatMatvec().run
+
+    registered_anat_oblique_file, mat_file =\
+        _warp(unifized_anat_file, unbiased_modality_file, write_dir,
+              caching=caching, verbose=verbose,
+              terminal_output=terminal_output,
+              environ=environ)
+    transform_file = fname_presuffix(
+        registered_anat_oblique_file,
+        suffix='_anat_to_{}.aff12.1D'.format(modality_name),
+        use_ext=False)
+    _ = catmatvec(in_file=[(mat_file, 'ONELINE')],
+                  oneline=True,
+                  out_file=transform_file,
+                  environ=environ)
+
+    # Remove the intermediate outputs
+    if not caching:
+        os.remove(mat_file)
+
+    return registered_anat_oblique_file, transform_file
+
+
+def _rigid_body_register_and_reorient(unifized_anat_file,
+                                      unbiased_modality_file, write_dir,
+                                      anat_brain_file, modality_brain_file,
+                                      modality_name='modality',
+                                      terminal_output='allatonce',
+                                      caching=False, verbose=True,
+                                      environ=None):
+    """
+    Rigid body registration of the subject's anatomical image to the modality.
+
+    Parameters
+    ----------
+    modality_name : str, optional
+        Name to be used in the transform filename
+    caching : bool, optional
+        Wether or not to use caching.
+    verbose : bool, optional
+        If True, all steps are verbose. Note that caching implies some
+        verbosity in any case.
+
+    Returns
+    -------
+    2-tuple of str : Path to the registered anatomical image and to the
+        transform from anat to modality.
+    """
+    if environ is None:
+        environ = {'AFNI_DECONFLICT': 'OVERWRITE'}
+
+    if caching:
+        memory = Memory(write_dir)
+        catmatvec = memory.cache(afni.CatMatvec)
+    else:
+        catmatvec = afni.CatMatvec().run
+
+    allineated_anat_file, rigid_transform_file = \
+        _rigid_body_register(unifized_anat_file,
+                             unbiased_modality_file,
+                             anat_brain_file,
+                             modality_brain_file,
+                             write_dir,
+                             caching=caching,
+                             terminal_output=terminal_output,
+                             environ=environ)
+    output_files = [rigid_transform_file, allineated_anat_file]
+
+    registered_anat_oblique_file, mat_file =\
+        _warp(allineated_anat_file, unbiased_modality_file, write_dir,
+              caching=caching, verbose=verbose,
+              terminal_output=terminal_output,
+              environ=environ)
+
+    # Concatenate all the anat to modality tranforms
+    output_files.append(mat_file)
+    transform_file = fname_presuffix(
+        registered_anat_oblique_file,
+        suffix='_anat_to_{}.aff12.1D'.format(modality_name),
+        use_ext=False)
+    _ = catmatvec(in_file=[(mat_file, 'ONELINE')],
+                  oneline=True,
+                  out_file=transform_file,
+                  environ=environ)
+
+    # Remove the intermediate outputs
+    if not caching:
+        for out_file in output_files:
+            os.remove(out_file)
+
+    return registered_anat_oblique_file, transform_file
+
+
 def _get_fsl_slice_output_files(out_base_name, output_type):
     ext = Info.output_type_to_ext(output_type)
     suffix = '_slice_*' + ext
@@ -593,16 +714,18 @@ def _apply_transforms(to_register_filename, target_filename,
     Parameters
     ----------
     to_register_filename : str
-        Path to functional volume, coregistered to a common space with the
-        anatomical volume.
+        Path to the source file to register.
 
-    template_filename : str
-        Template to register the functional to.
+    target_filename : str
+        Reference file to register to.
 
     transforms : list
         List of transforms in order of 3dNWarpApply application: first must
         one must be in the target space and last one must be in
         the source space.
+
+    transformed_filename : str, optional
+        Path to the output registered file
 
     inverse : bool, optional
         If True, after the transforms composition is computed, invert it.
@@ -652,7 +775,7 @@ def _apply_transforms(to_register_filename, target_filename,
             newpath=write_dir)
 
     if voxel_size is None:
-        resampled_template_filename = target_filename
+        resampled_target_filename = target_filename
     else:
         out_resample = resample(in_file=target_filename,
                                 voxel_size=voxel_size,
@@ -660,7 +783,7 @@ def _apply_transforms(to_register_filename, target_filename,
                                                          suffix='_resampled',
                                                          newpath=write_dir),
                                 environ=environ)
-        resampled_template_filename = out_resample.outputs.out_file
+        resampled_target_filename = out_resample.outputs.out_file
     if transforms_kind is not 'nonlinear':
         affine_transform_filename = fname_presuffix(transformed_filename,
                                                     suffix='.aff12.1D',
@@ -681,14 +804,14 @@ def _apply_transforms(to_register_filename, target_filename,
         if interpolation is None:
             _ = allineate(
                 in_file=to_register_filename,
-                master=resampled_template_filename,
+                master=resampled_target_filename,
                 in_matrix=affine_transform_filename,
                 out_file=transformed_filename,
                 environ=environ)
         else:
             _ = allineate(
                 in_file=to_register_filename,
-                master=resampled_template_filename,
+                master=resampled_target_filename,
                 in_matrix=affine_transform_filename,
                 final_interpolation=interpolation,
                 out_file=transformed_filename,
@@ -699,14 +822,14 @@ def _apply_transforms(to_register_filename, target_filename,
         warp += "'"
         if interpolation is None:
             _ = warp_apply(in_file=to_register_filename,
-                           master=resampled_template_filename,
+                           master=resampled_target_filename,
                            warp=warp,
                            inv_warp=inverse,
                            out_file=transformed_filename,
                            environ=environ)
         else:
             _ = warp_apply(in_file=to_register_filename,
-                           master=resampled_template_filename,
+                           master=resampled_target_filename,
                            warp=warp,
                            inv_warp=inverse,
                            interp=interpolation,
@@ -715,7 +838,7 @@ def _apply_transforms(to_register_filename, target_filename,
 
     # XXX obliquity information is lost if resampling is done
     transformed_filename = fix_obliquity(transformed_filename,
-                                         resampled_template_filename,
+                                         resampled_target_filename,
                                          verbose=verbose, caching=caching,
                                          caching_dir=write_dir,
                                          environ=environ)
