@@ -8,7 +8,6 @@ import subprocess
 import itertools
 import warnings
 import numpy as np
-import pandas
 import nibabel
 from .utils import _rotate_affine
 
@@ -282,19 +281,11 @@ def dcm_to_nii(dcmdump_path, dicom_filename, save_directory, siap_fix=True,
         frame_comments = list(itertools.repeat('NA', len(ISPnums)))
 
     # ptbl = parameter table
-    ptbl = pandas.DataFrame(
-        data={'repno': repno, 'slice': ISPnums,
-              'diffdir': diffdir, 'TI': TIs, 'bval': bval, 'bvalXX': bvalXX,
-              'bvalXY': bvalXY, 'bvalXZ': bvalXZ, 'bvalYY': bvalYY,
-              'bvalYZ': bvalYZ, 'bvalZZ': bvalZZ, 'slicepos': IPPs,
-              'FC': frame_comments})
 
-    DIVsdf = pandas.DataFrame({'DIVs': DIVs})
-    DIVsdf = pandas.DataFrame([x[0] for x in DIVsdf.values])
-    DIVsdf = DIVsdf.rename(columns=lambda x: 'DIV' + str(x))
-
-    dfs = [DIVsdf, ptbl]
-    ptbl = pandas.concat(dfs, axis=1)
+    IPPs_str = [str(ipps) for ipps in IPPs]
+    ptbl_data = np.hstack((np.array([repno, ISPnums, diffdir, TIs, bval, bvalXX,
+                                bvalXY, bvalXZ, bvalYY, bvalYZ, bvalZZ, IPPs_str]).T,
+                                np.atleast_2d(frame_comments).T, DIVs))
 
     slices = max(ISPnums)  # maybe a bit dangerous
 
@@ -313,8 +304,8 @@ def dcm_to_nii(dcmdump_path, dicom_filename, save_directory, siap_fix=True,
     rawarray = np.transpose(rawarray, (3, 2, 1, 0))
 
     # fsp = first slice position, lsp = last slice position
-    fsp = np.array(ptbl.slicepos[ptbl.slice == 1].tolist()[0])
-    lsp = np.array(ptbl.slicepos[ptbl.slice == slices].tolist()[0])
+    fsp = np.array(np.array(IPPs)[np.array(ISPnums) == 1].tolist()[0])
+    lsp = np.array(np.array(IPPs)[np.array(ISPnums) == slices].tolist()[0])
 
     # https://en.wikipedia.org/wiki/Euclidean_distance
     # not used yet
@@ -389,8 +380,14 @@ def dcm_to_nii(dcmdump_path, dicom_filename, save_directory, siap_fix=True,
     nii_filename = os.path.join(save_directory, nii_basename)
     img.to_filename(nii_filename)
     txt_basename = basename_no_ext + '_ptbl.txt'
-    ptbl.to_csv(path_or_buf=os.path.join(save_directory, txt_basename),
-                sep='\t', index=0)
+    names = ['repno', 'slice', 'diffdir', 'TI', 'bval', 'bvalXX',
+              'bvalXY', 'bvalXZ', 'bvalYY', 'bvalYZ', 'bvalZZ', 'slicepos', 'FC']
+    divs_names = ['DIV{}'.format(n) for n in range(np.shape(DIVs)[-1])]
+    names = names + divs_names
+    header = '\t'.join(names)
+    fmt = '\t'.join(['%s' for name in names])
+    np.savetxt(os.path.join(save_directory, txt_basename),
+               ptbl_data, fmt=fmt, header=header)
     return nii_filename
 
 
