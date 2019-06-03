@@ -40,9 +40,6 @@ def test_coregistrator():
     assert_true(registrator._anat_brain_mask is None)
 
     assert_raises_regex(
-        ValueError, "Only 'func' and 'perf' ", registrator.fit_modality,
-        func_file, 'diffusion', reorient_only=True)
-    assert_raises_regex(
         ValueError, "'t_r' is needed for slice ", registrator.fit_modality,
         func_file, 'func', reorient_only=True)
     assert_raises_regex(
@@ -123,3 +120,5 @@ def test_coregistrator():
                                                            'perf')
     transformed_img = nibabel.load(transformed_file)
     assert_true(_check_same_fov(transformed_img, m0_img))
+    
+    # TODO: add tests for t1 modality

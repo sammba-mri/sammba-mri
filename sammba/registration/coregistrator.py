@@ -4,10 +4,10 @@ from ..segmentation.brain_mask import (compute_histo_brain_mask,
                                        compute_morpho_brain_mask,
                                        _apply_mask)
 from ..preprocessing.bias_correction import ants_n4, afni_unifize
-from .base import _apply_perslice_warp
-from .perfusion import coregister as coregister_perf
+from .base import _apply_perslice_warp, _apply_transforms
+from .epi import _coregister_epi
+from .nonepi import _coregister_nonepi
 from .func import _realign, _slice_time
-from .func import coregister as coregister_func
 from .base_registrator import BaseRegistrator
 
 
@@ -118,9 +118,7 @@ class Coregistrator(BaseRegistrator):
 
         self._check_anat_fitted()
 
-        if modality == 'perf':
-            to_coregister_file = in_file
-        elif modality == 'func':
+        if modality == 'func':
             if slice_timing:
                 # Correct functional for slice timing
                 if t_r is None:
@@ -138,8 +136,7 @@ class Coregistrator(BaseRegistrator):
                          terminal_output=self.terminal_output)
             to_coregister_file = mean_aligned_file
         else:
-            raise ValueError("Only 'func' and 'perf' modalities are "
-                             "implemented")
+            to_coregister_file = in_file
 
         unbiased_file = ants_n4(
             to_coregister_file,
@@ -199,56 +196,78 @@ class Coregistrator(BaseRegistrator):
                     caching=self.caching,
                     terminal_output=self.terminal_output)
 
-        if modality == 'func':
-            self.func_brain_ = modality_brain_file
-            coregistration = coregister_func(
+        if modality in ['func', 'perf']:
+            coregistration = _coregister_epi(
                 unifized_anat_file, unbiased_file,
                 self.output_dir,
                 anat_brain_file=self.anat_brain_,
-                func_brain_file=modality_brain_file,
+                epi_brain_file=modality_brain_file,
                 reorient_only=reorient_only,
                 caching=self.caching,
                 verbose=self.verbose)
-            self._func_undistort_warps = coregistration.coreg_warps_
-            self.anat_in_func_space_ = coregistration.coreg_anat_
-            self._func_to_anat_transform = coregistration.coreg_transform_
+            setattr(self, '_{}_undistort_warps'.format(modality),
+                    coregistration.coreg_warps_)
+            if modality == 'func':
+                self.undistorted_func_ = _apply_perslice_warp(
+                    allineated_file, self._func_undistort_warps, .1, .1,
+                    write_dir=self.output_dir, caching=self.caching)
+            elif modality == 'perf':
+                self.undistorted_perf_ = coregistration.coreg_epi_
+        else:
+            coregistration = _coregister_nonepi(
+                unifized_anat_file, unbiased_file,
+                self.output_dir,
+                anat_brain_file=self.anat_brain_,
+                epi_brain_file=modality_brain_file,
+                reorient_only=reorient_only,
+                caching=self.caching,
+                verbose=self.verbose)
+
+        setattr(self, modality + '_brain_', modality_brain_file) 
+        setattr(self, 'anat_in_{}_space_'.format(modality),
+                coregistration.coreg_anat_) 
+        setattr(self, '_{}_to_anat_transform'.format(modality),
+                coregistration.coreg_transform_) 
+        
+        if modality == 'func':
             self.undistorted_func_ = _apply_perslice_warp(
                 allineated_file, self._func_undistort_warps, .1, .1,
                 write_dir=self.output_dir, caching=self.caching)
         elif modality == 'perf':
-            self.perf_brain_ = modality_brain_file
-            coregistration = coregister_perf(
-                unifized_anat_file, unbiased_file,
-                self.output_dir,
-                anat_brain_file=self.anat_brain_,
-                m0_brain_file=modality_brain_file,
-                reorient_only=reorient_only,
-                caching=self.caching,
-                verbose=self.verbose)
-            self.undistorted_perf_ = coregistration.coreg_m0_
-            self._perf_undistort_warps = coregistration.coreg_warps_
-            self.anat_in_perf_space_ = coregistration.coreg_anat_
-            self._perf_to_anat_transform = coregistration.coreg_transform_
+            self.undistorted_perf_ = coregistration.coreg_epi_
+        else:           
+            setattr(self, 'unbiased_' + modality, unbiased_file) 
+            setattr(self, modality + '_brain_', modality_brain_file)
+            setattr(self, 'anat_in_{}_space_'.format(modality),
+                    coregistration.coreg_anat_)
+            setattr(self, '_{}_to_anat_transform'.format(modality),
+                    coregistration.coreg_transform_)
 
         return self
 
     def transform_modality_like(self, apply_to_file, modality):
         """ Applies modality coregristration to a file in the modality space.
         """
-        if modality not in ['perf', 'func']:
-            raise ValueError("Only 'func' and 'perf' modalities are "
-                             "implemented")
-
         self._check_anat_fitted()
-        modality_undistort_warps = '_{}_undistort_warps'.format(modality)
-        if not hasattr(self, modality_undistort_warps):
-            raise ValueError('It seems that {0} has not been {1} fitted. '
-                             'You must call fit_modality() before calling '
-                             'transform_modality().'.format(
-                                     self.__class__.__name__, modality))
+        if modality in ['perf', 'func']:
+            modality_undistort_warps = '_{}_undistort_warps'.format(modality)
+            if not hasattr(self, modality_undistort_warps):
+                raise ValueError('It seems that {0} has not been {1} fitted. '
+                                 'You must call fit_modality() before calling '
+                                 'transform_modality().'.format(
+                                         self.__class__.__name__, modality))
 
-        coreg_apply_to_file = _apply_perslice_warp(
-            apply_to_file, self.__getattribute__(modality_undistort_warps),
-            .1, .1, write_dir=self.output_dir, caching=self.caching,
-            verbose=self.verbose)
+            coreg_apply_to_file = _apply_perslice_warp(
+                apply_to_file, self.__getattribute__(modality_undistort_warps),
+                .1, .1, write_dir=self.output_dir, caching=self.caching,
+                verbose=self.verbose)
+        else:
+            transforms = [
+                self.get_params()['_{}_to_anat_transform'.format(modality)]]
+            target_filename = self.get_params()['unbiased_' + modality]
+            _apply_transforms(apply_to_file, target_filename,
+                      self.output_dir,
+                      transforms,
+                      transforms_kind='rigid',
+                      caching=self.caching, verbose=self.verbose)
         return coreg_apply_to_file
