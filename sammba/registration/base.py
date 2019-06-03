@@ -74,18 +74,21 @@ def _rigid_body_register(moving_head_file, reference_head_file,
 
     # Compute the transformation from functional to anatomical brain
     # XXX: why in this sense
+    # XXX: caching does not work if out_matrix
+    # path is absolute
+    out_matrix = fname_presuffix(
+        reference_brain_file, suffix='_shr.aff12.1D', use_ext=False)
+    out_matrix = os.path.basename(out_matrix)    
     out_allineate = allineate2(
         in_file=reference_brain_file,
         reference=moving_brain_file,
-        out_matrix=fname_presuffix(reference_brain_file,
-                                   suffix='_shr.aff12.1D',
-                                   use_ext=False,
-                                   newpath=write_dir),
+        out_matrix=out_matrix,
         center_of_mass='',
         warp_type='shift_rotate',
-        out_file=fname_presuffix(reference_brain_file, suffix='_shr'),
+        out_file='%s_shr',
         environ=environ,
-        verbose=verbose)
+        verbose=verbose,
+        outputtype='NIFTI_GZ')
     rigid_transform_file = out_allineate.outputs.out_matrix
     output_files.append(out_allineate.outputs.out_file)
 
