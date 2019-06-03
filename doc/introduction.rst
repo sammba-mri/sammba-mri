@@ -51,7 +51,6 @@ as well as the python packages:
 * Nilearn >= 0.1.3
 * Matplotlib >= 1.1.1
 * NetworkX >= 1.7
-* Pandas >= 0.12
 * packaging
 * configparser
 * future >= 0.16.0
@@ -74,7 +73,7 @@ First install Anaconda and nilearn as explained in `nilearn installation page <h
 
 Next install the remaining python dependencies using conda::
 
-    conda install pandas configparser future traits simplejson networkx funcsigs
+    conda install configparser future traits simplejson networkx funcsigs
 
 Some dependencies are only available through pip::
 

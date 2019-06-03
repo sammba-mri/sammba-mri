@@ -5,14 +5,12 @@ Created on Sunday 4th March 2018
 @author: Nachiket Nadkarni
 """
 
-
-import pandas as pd
 import nibabel as nib
 import numpy as np
 from scipy.optimize import least_squares as ls
 from multiprocessing import cpu_count, Pool
 from functools import partial
-import tqdm
+from .utils import _iterate_and_show_progress
 
 
 def _perf_fair_read_ptbl(nii_fname):
@@ -72,10 +70,12 @@ def _perf_fair_read_ptbl(nii_fname):
     # process
     
     bfx = nii_fname.split('_')[-1].split('.')[0] # bfx = bruker folder number
-    ptbl = pd.read_table(nii_fname.replace(bfx + '.nii.gz', bfx + '_ptbl.txt'))
-    ti_list = ptbl.TI[ptbl.slice == 1][ptbl.FC == 'Selective Inversion'].tolist()
-    long_ti_list = ptbl.TI[ptbl.slice == 1].tolist()
-    fc_list = ptbl.FC[ptbl.slice == 1].tolist()
+    ptbl = np.recfromcsv(nii_fname.replace(bfx + '.nii.gz', bfx + '_ptbl.txt'),
+                         delimiter='\t')
+    ti_list = ptbl.ti[np.logical_and(ptbl.slice == 1,
+                                     ptbl.fc == 'Selective Inversion')].tolist()
+    long_ti_list = ptbl.ti[ptbl.slice == 1].tolist()
+    fc_list = ptbl.fc[ptbl.slice == 1].tolist()
     picker_sel = [n for n,x in enumerate(fc_list) if x == 'Selective Inversion']
     picker_nonsel = [n for n,x in enumerate(fc_list) if x == 'Non-selective Inversion']
     return {'TI':ti_list, 'long_TI':long_ti_list, 'FC':fc_list,
@@ -87,10 +87,8 @@ def _perf_fair_read_ptbl(nii_fname):
 # pars = parameters
 def _fair_t1_func(pars, s0, ti):
     
-    # return pars[0] + np.absolute(pars[1] * (1 - 2 * np.exp(-ti / pars[2]))) - s0
-    bias, m0, t1 = pars['bias'], pars['M0'], pars['T1']
-    m = bias + np.absolute(m0 * (1.0 - 2.0 * np.exp(-ti / t1)))
-    return m - s0
+    return pars[0] + np.absolute(pars[1] * (1 - 2 * np.exp(-ti / pars[2]))) - s0
+
 
 def _fair_t1_fit(s0, ti, t1_guess):
     """
@@ -187,9 +185,9 @@ def _perf_fair_fit(s0, t1_blood, ti, t1_guess, picker_sel, picker_nonsel,
     Returns
     -------
     If outtype='simple':
-        List of 14 floats- selective inversion bias, M0 and T1, non-selective
-        inversion bias, M0 and T1, all paired with their standard errors,
-        plus rCBF and CBF. Failed fits produce zeroes.
+        List of 8 floats- selective inversion bias, M0 and T1, non-selective
+        inversion bias, M0 and T1, plus rCBF and CBF. 
+        Failed fits produce zeroes.
     If outtype='complicated':
         List of 4- two scipy.optimize.OptimizeResult classes (selective fit
         then non-selective) plus floats for rCBF then CBF.
@@ -213,24 +211,15 @@ def _perf_fair_fit(s0, t1_blood, ti, t1_guess, picker_sel, picker_nonsel,
     
     if r_sel.success and r_nonsel.success:
         
-        # t1_sel = r_sel.x[2]
-        # t1_nonsel = r_nonsel.x[2]
-        t1_sel = r_sel.params['T1'].value
-        t1_nonsel = r_nonsel.params['T1'].value
+        t1_sel = r_sel.x[2]
+        t1_nonsel = r_nonsel.x[2]
         
         rCBF = 100 * (t1_nonsel - t1_sel) / t1_nonsel
         CBF = multiplier * lambda_blood * (
               (t1_nonsel / t1_blood) * ((1 / t1_sel) - (1 / t1_nonsel)))
      
         if outtype == 'simple':
-            # r = [x for x in r_sel.x] + [x for x in r_nonsel.x] + [rCBF, CBF]
-            r = [r_sel.params['bias'].value, r_sel.params['bias'].stderr,
-                 r_sel.params['M0'].value, r_sel.params['M0'].stderr,
-                 r_sel.params['T1'].value, r_sel.params['T1'].stderr,
-                 r_nonsel.params['bias'].value, r_nonsel.params['bias'].stderr,
-                 r_nonsel.params['M0'].value, r_nonsel.params['M0'].stderr,
-                 r_nonsel.params['T1'].value, r_nonsel.params['T1'].stderr,
-                 rCBF, CBF]
+            r = [x for x in r_sel.x] + [x for x in r_nonsel.x] + [rCBF, CBF]
             return [x if x is not None else 0 for x in r]
         else:
             return [r_sel, r_nonsel, rCBF, CBF]
@@ -238,8 +227,7 @@ def _perf_fair_fit(s0, t1_blood, ti, t1_guess, picker_sel, picker_nonsel,
     else:
         
         if outtype == 'simple':
-            # return np.repeat(0, 8)
-            return np.repeat(0, 14)
+            return np.repeat(0, 8)
         else:
             return ['r_sel fit ' + r_sel.success,
                     'r_nonsel fit ' + r_nonsel.success,
@@ -290,7 +278,7 @@ def _perf_fair_fit_mp(all_s0, t1_blood, ti, t1_guess, picker_sel,
 
     Returns
     -------
-    List of all_s0.shape[0] lists, each of 14 floats (see _perf_fair_fit).
+    List of all_s0.shape[0] lists, each of 8 floats (see _perf_fair_fit).
     """
     
     # inspiration provided by:
@@ -299,12 +287,13 @@ def _perf_fair_fit_mp(all_s0, t1_blood, ti, t1_guess, picker_sel,
     
     # cannot use a with statement in python 2.7; may cause problems
     pool = Pool(processes=ncpu)
-    return list(tqdm.tqdm(pool.imap(partial(_perf_fair_fit, t1_blood=t1_blood,
-                                            ti=ti, t1_guess=t1_guess,
-                                            picker_sel=picker_sel,
+    pool_iterator = pool.imap(partial(_perf_fair_fit, t1_blood=t1_blood,
+                                      ti=ti, t1_guess=t1_guess,
+                                      picker_sel=picker_sel,
                                             picker_nonsel=picker_nonsel,
                                             **kwargs),
-                                    all_s0), total = len(all_s0)))
+                                    all_s0)
+    return _iterate_and_show_progress(pool_iterator, len(all_s0))
 
 
 def perf_fair_nii_proc(nii_in_fname, t1_blood, ti, t1_guess, picker_sel,

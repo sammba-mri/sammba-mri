@@ -41,20 +41,12 @@ REQUIRED_MODULE_METADATA = (
     ('nibabel', {
         'min_version': '2.0.2',
         'required_at_installation': False}),
-    ('pandas', {
-        'min_version': '0.18',
-        'required_at_installation': True,
-        'install_info': _SAMMBA_INSTALL_MSG}),
     ('patsy', {
         'min_version': '0.4.1',
         'required_at_installation': True,
         'install_info': _SAMMBA_INSTALL_MSG}),
     ('sklearn', {
         'min_version': '0.18.0',
-        'required_at_installation': True,
-        'install_info': _SAMMBA_INSTALL_MSG}),
-    ('tqdm', {
-        'min_version': '4.11.2',
         'required_at_installation': True,
         'install_info': _SAMMBA_INSTALL_MSG}),
     ('nipype', {
