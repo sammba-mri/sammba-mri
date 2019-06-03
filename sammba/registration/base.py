@@ -78,7 +78,9 @@ def _rigid_body_register(moving_head_file, reference_head_file,
     # path is absolute
     out_matrix = fname_presuffix(
         reference_brain_file, suffix='_shr.aff12.1D', use_ext=False)
-    out_matrix = os.path.basename(out_matrix)    
+    if caching:
+        out_matrix = os.path.basename(out_matrix)    
+
     out_allineate = allineate2(
         in_file=reference_brain_file,
         reference=moving_brain_file,
