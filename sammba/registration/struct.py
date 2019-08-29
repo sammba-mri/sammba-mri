@@ -553,23 +553,18 @@ def anats_to_common(anat_filenames, write_dir, brain_volume,
     # 
     if nonlinear_levels is None:
         nonlinear_levels = [1, 2, 3]
-    if nonlinear_minimal_patches is None:
-       nonlinear_minimal_patches = []
 
-    for n_iter, maxlev in enumerate(nonlinear_levels):
-        
-        if n_iter == 0:
+    for n_lev, maxlev in enumerate(nonlinear_levels):        
+        if n_lev == 0:
             previous_warp_files = affine_transform_files
+
         warped_files = []
         warp_files = []
-    
         for warp_file, centered_head_file in zip(previous_warp_files, 
                                                  centered_head_files):
-            
             out_file = fname_presuffix(centered_head_file,
-                                       suffix='_warped{}'.format(n_iter))
-    
-            if n_iter == 0:
+                                       suffix='_warped{}'.format(n_lev))
+            if n_lev == 0:
                 out_nwarp_cat = nwarp_cat(
                     in_files=[('IDENT', centered_head_file), warp_file],
                     out_file=fname_presuffix(centered_head_file,
@@ -585,8 +580,7 @@ def anats_to_common(anat_filenames, write_dir, brain_volume,
                     maxlev=maxlev,
                     out_file=out_file,
                     **verb_quietness_kwargs)
-                
-            elif n_iter < len(nonlinear_levels):
+            elif n_lev < len(nonlinear_levels):
                 out_qwarp = qwarp(
                     in_file=centered_head_file,
                     base_file=nwarp_adjusted_mean,
@@ -594,7 +588,7 @@ def anats_to_common(anat_filenames, write_dir, brain_volume,
                     iwarp=True,
                     weight=nonlinear_weight_file,
                     iniwarp=[warp_file],
-                    inilev=nonlinear_levels[n_iter - 1] + 1,
+                    inilev=nonlinear_levels[n_lev - 1] + 1,
                     maxlev=maxlev,
                     out_file=out_file,
                     **verbosity_quietness_kwargs)
@@ -602,24 +596,28 @@ def anats_to_common(anat_filenames, write_dir, brain_volume,
             warped_files.append(out_qwarp.outputs.warped_source)
             warp_files.append(out_qwarp.outputs.source_warp)
             previous_warp_files = warp_files
+        nwarp_adjusted_mean = 'warped_{0}_adjusted_mean.nii.gz'.format(n_lev)
+        out_nwarp_adjust = nwarp_adjust(warps=warp_files,
+                                        in_files=centered_head_files,
+                                        out_file=nwarp_adjusted_mean)                            
+
+    if nonlinear_minimal_patches is None:
+       nonlinear_minimal_patches = []
 
     if nonlinear_levels == []:
         previous_warp_files = affine_transform_files
         inilev = 0
     else:
-        inilev = nonlinear_levels[-1]+1            
+        inilev = nonlinear_levels[-1] + 1            
   
-    for minpatch in enumerate(nonlinear_minimal_patches):
-        
+    for n_patch, minpatch in enumerate(nonlinear_minimal_patches):        
         warped_files = []
         warp_files = []
-    
+        n_iter = n_lev + n_patch
         for warp_file, centered_head_file in zip(previous_warp_files, 
-                                                 centered_head_files):
-            
+                                                 centered_head_files):            
             out_file = fname_presuffix(centered_head_file,
-                                       suffix='_warped{}'.format(n_iter)) 
-            
+                                       suffix='_warped{}'.format(n_iter))
             out_qwarp = qwarp2(
                 in_file=centered_head_file,
                 base_file=nwarp_adjusted_mean,
@@ -639,7 +637,7 @@ def anats_to_common(anat_filenames, write_dir, brain_volume,
             in_files=warped_files,
             out_file=os.path.join(
                 write_dir,
-                'warped_{0}iters_hetemplate_filenameads.nii.gz'.format(n_iter)),
+                'warped_{0}iters_template.nii.gz'.format(n_iter)),
             **verbosity_kwargs)
         out_tstat_warp_head = tstat(in_file=out_tcat.outputs.out_file,
                                     outputtype='NIFTI_GZ')
