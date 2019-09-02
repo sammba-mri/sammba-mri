@@ -515,7 +515,7 @@ def anats_to_common(anat_filenames, write_dir, brain_volume,
         out_file=os.path.join(write_dir, 'affine_registered_brains.nii.gz'),
         **verbosity_kwargs)
     out_tstat_allineated_brain = tstat(in_file=out_tcat_brain.outputs.out_file,
-                                      outputtype='NIFTI_GZ')
+                                       outputtype='NIFTI_GZ')
 
     if registration_kind == 'affine':
         os.chdir(current_dir)
@@ -548,111 +548,123 @@ def anats_to_common(anat_filenames, write_dir, brain_volume,
         nonlinear_weight_file = out_mask_tool.outputs.out_file
 
     ###########################################################################
-    # Description to fill
-    # 
+    # Successive cycles of non-linear registration are executed.
+    # The non-linear registration uses the AFNI tool 3dQwarp, which repeatedly
+    # composes incremental warps defined by Hermite cubic basis functions,
+    # first over the entire volume, then over steadily shrinking
+    # and overlapping patches, with the resulting final warp being a grid
+    # representation of a diffeomorphism between source and target images.
+    # We choose the final patch size relatively large in the first cycle
+    # and substantially reduce it with each subsequent cycle. The intermediate
+    # and final templates are all means in intensity space of transformed
+    # images.
     # 
     if nonlinear_levels is None:
         nonlinear_levels = [1, 2, 3]
-    if nonlinear_minimal_patches is None:
-       nonlinear_minimal_patches = []
 
-    for n_iter, maxlev in enumerate(nonlinear_levels):
-        
-        if n_iter == 0:
-            previous_warp_files = affine_transform_files
-        warped_files = []
-        warp_files = []
-    
-        for warp_file, centered_head_file in zip(previous_warp_files, 
-                                                 centered_head_files):
-            
-            out_file = fname_presuffix(centered_head_file,
-                                       suffix='_warped{}'.format(n_iter))
-    
-            if n_iter == 0:
+    for n_lev, maxlev in enumerate(nonlinear_levels):        
+        if n_lev == 0:
+            inilev = 0
+            # first cycle registers the centered heads to the affine template
+            common_head_file = out_tstat_allineated_head.outputs.out_file
+            # Transform the affine transforms to warps for initializing
+            # the first cycle non-linear registration
+            previous_warp_files = []
+            for affine_file, centered_head_file in zip(affine_transform_files, 
+                                                       centered_head_files):
                 out_nwarp_cat = nwarp_cat(
-                    in_files=[('IDENT', centered_head_file), warp_file],
+                    in_files=[('IDENT', centered_head_file), affine_file],
                     out_file=fname_presuffix(centered_head_file,
                                              suffix='_iniwarp'))
-                out_qwarp = qwarp(
-                    in_file=centered_head_file,
-                    base_file=out_tstat_allineated_head.outputs.out_file,
-                    noneg=True,
-                    iwarp=True,
-                    weight=nonlinear_weight_file,
-                    iniwarp=[out_nwarp_cat.outputs.out_file],
-                    inilev=0,
-                    maxlev=maxlev,
-                    out_file=out_file,
-                    **verb_quietness_kwargs)
-                
-            elif n_iter < len(nonlinear_levels):
-                out_qwarp = qwarp(
-                    in_file=centered_head_file,
-                    base_file=nwarp_adjusted_mean,
-                    noneg=True,
-                    iwarp=True,
-                    weight=nonlinear_weight_file,
-                    iniwarp=[warp_file],
-                    inilev=nonlinear_levels[n_iter - 1] + 1,
-                    maxlev=maxlev,
-                    out_file=out_file,
-                    **verbosity_quietness_kwargs)
+                previous_warp_files.append(out_nwarp_cat.outputs.out_file)
 
+        warped_files = []
+        warp_files = []
+        for warp_file, centered_head_file in zip(previous_warp_files, 
+                                                 centered_head_files):
+            out_file = fname_presuffix(centered_head_file,
+                                       suffix='_warped{}'.format(n_lev))
+            out_qwarp = qwarp(
+                in_file=centered_head_file,
+                base_file=common_head_file,
+                noneg=True,
+                iwarp=True,
+                weight=nonlinear_weight_file,
+                iniwarp=[warp_file],
+                inilev=inilev,
+                maxlev=maxlev,
+                out_file=out_file,
+                **verb_quietness_kwargs)
             warped_files.append(out_qwarp.outputs.warped_source)
+            # Collect the current warps to initialize the transforms of
+            # the next non-linear cycle
             warp_files.append(out_qwarp.outputs.source_warp)
             previous_warp_files = warp_files
+
+        inilev = maxlev + 1
+        # Compute the average of the warped images while accounting
+        # for systematic biases in the non-linear transforms
+        common_head_file = os.path.join(
+                write_dir, 'warped_{0}_adjusted_mean.nii.gz'.format(n_lev))
+        out_nwarp_adjust = nwarp_adjust(warps=warp_files,
+                                        in_files=centered_head_files,
+                                        out_file=common_head_file)                            
 
     if nonlinear_levels == []:
         previous_warp_files = affine_transform_files
         inilev = 0
+        n_lev = 0
     else:
-        inilev = nonlinear_levels[-1]+1            
+        inilev = maxlev + 1    # not ideal
   
-    for minpatch in enumerate(nonlinear_minimal_patches):
-        
+    if nonlinear_minimal_patches is None:
+       nonlinear_minimal_patches = []
+       n_iter = n_lev
+
+    for n_patch, minpatch in enumerate(nonlinear_minimal_patches):        
         warped_files = []
         warp_files = []
-    
+        n_iter = n_lev + n_patch
         for warp_file, centered_head_file in zip(previous_warp_files, 
-                                                 centered_head_files):
-            
+                                                 centered_head_files):            
             out_file = fname_presuffix(centered_head_file,
-                                       suffix='_warped{}'.format(n_iter)) 
-            
+                                       suffix='_warped{}'.format(n_iter))
             out_qwarp = qwarp2(
                 in_file=centered_head_file,
-                base_file=nwarp_adjusted_mean,
+                base_file=common_head_file,
                 noneg=True,
                 iwarp=True,
                 weight=nonlinear_weight_file,
                 iniwarp=[warp_file],
                 inilev=inilev,
                 minpatch=minpatch,
-                out_file=out_file)
+                out_file=out_file,
+                **verb_quietness_kwargs)
                     
             warped_files.append(out_qwarp.outputs.warped_source)
             warp_files.append(out_qwarp.outputs.source_warp)
             previous_warp_files = warp_files
-        
+
         out_tcat = tcat(
             in_files=warped_files,
             out_file=os.path.join(
                 write_dir,
-                'warped_{0}iters_hetemplate_filenameads.nii.gz'.format(n_iter)),
+                'warped_{0}iters_template.nii.gz'.format(n_iter)),
             **verbosity_kwargs)
         out_tstat_warp_head = tstat(in_file=out_tcat.outputs.out_file,
                                     outputtype='NIFTI_GZ')
 
-        nwarp_adjusted_mean = 'warped_{0}_adjusted_mean.nii.gz'.format(n_iter)
+        common_head_file = os.path.join(
+                write_dir, 'warped_{0}_adjusted_mean.nii.gz'.format(n_iter))
         out_nwarp_adjust = nwarp_adjust(warps=warp_files,
                                         in_files=centered_head_files,
-                                        out_file=nwarp_adjusted_mean)                            
+                                        out_file=common_head_file)                            
                                     
     ###########################################################################
     # Register to template
     # --------------------
     # Apply non-linear registration results to uncorrected images
+    # XXX has already been computed !
     warped_files = []
     for centered_head_file, warp_file in zip(centered_head_files, warp_files):
         suffixed_file = fname_presuffix(
