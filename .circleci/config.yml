@@ -3,7 +3,7 @@ version: 2
 jobs:
   build:
     docker:
-      - image: circleci/classic:201808-01
+      - image: circleci/python:3.6.7
     environment:
       DISTRIB: "conda"
       PYTHON_VERSION: "3.6"
