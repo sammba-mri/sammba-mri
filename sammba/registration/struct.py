@@ -992,7 +992,7 @@ def anats_to_template(anat_filenames, head_template_filename, write_dir,
         verbosity_quietness_kwargs = {'quiet': True}
 
     if use_rats_tool:
-        if segmentation.Info().version() is None:
+        if segmentation.interfaces.Info().version() is None:
             raise ValueError('Can not locate RATS')
         else:
             ComputeMask = segmentation.MathMorphoMask
