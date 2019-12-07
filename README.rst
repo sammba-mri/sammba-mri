@@ -29,24 +29,31 @@ Sammba-MRI integrates functionalities from a number of other packages (listed un
 Dependencies
 ============
 
-The required dependencies to use the software are the python packages:
+The required dependencies to use the software are the software:
 
-* Python 2.7
-* setuptools
-* Numpy >= 1.6.2
-* SciPy >= 0.11
-* Nibabel >= 2.0.1
-* Nilearn >= 0.1.3
-* Matplotlib >= 1.1.1
-* Nipype 0.11.0
-* NetworkX >= 1.7
-* Enthought Traits >= 4.3
-* Dateutil >= 1.5
-
-as well as the interfaces:
-
-* FSL >= 4.1.0
+* FSL >= 5.0
 * AFNI
+* ANTs
+* Python >= 3.5
+* `RATS <http://www.iibi.uiowa.edu/content/rats-overview/>`_ for brain extraction
+
+as well as the python packages:
+
+* setuptools
+* Numpy >= 1.14
+* SciPy >= 0.19
+* Nibabel >= 2.0.2
+* Nilearn >= 0.4.0
+* Sklearn >= 0.19
+* Nipype >= 1.0.4
+
+If you are running the examples, matplotlib >= 1.5.1 is required.
+
+If you want to run the tests, you need nose >= 1.2.1 and doctest-ignore-unicode.
+
+If you want to convert DICOM files to NIFTI files, you will need the
+`DICOM ToolKit (DCMTK) <http://support.dcmtk.org/docs/index.html>`_ package
+
 
 User guide and gallery of examples are available on
 ====================================================
