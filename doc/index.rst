@@ -5,8 +5,7 @@
 
 
 .. toctree::
-   :maxdepth: 2
-   :caption: Contents:
+   :hidden:
 
    user_guide.rst
    auto_examples/index.rst

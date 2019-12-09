@@ -1,5 +1,5 @@
 # Makefile for Sphinx documentation
-#
+# Adapted from nilearn doc Makefile
 
 # You can set these variables from the command line.
 SPHINXOPTS    =
@@ -208,7 +208,7 @@ check:
 
 install:
 	rm -rf _build/doctrees _build/sammba-mri.github.io/sammba-mri
-	# first clone the nilearn.github.io repo because it may ask
+	# first clone the sammba.github.io repo because it may ask
 	# for password and we don't want to delay this long build in
 	# the middle of it
 	# --no-checkout just fetches the root folder without content

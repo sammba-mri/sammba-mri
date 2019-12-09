@@ -114,7 +114,12 @@ pygments_style = 'sphinx'
 
 # The theme to use for HTML and HTML Help pages.  See the documentation for
 # a list of builtin themes.
-html_theme = 'sphinx_rtd_theme'  # default
+html_theme = 'sammba' # sphinx_rtd_theme # default
+
+# The style sheet to use for HTML and HTML Help pages. A file of that name
+# must exist either in Sphinx' static/ path, or in one of the custom paths
+# given in html_static_path.
+html_style = 'nature.css'
 
 # Theme options are theme-specific and customize the look and feel of a theme
 # further.  For a list of options available for each theme, see the
@@ -122,7 +127,7 @@ html_theme = 'sphinx_rtd_theme'  # default
 #html_theme_options = {}
 
 # Add any paths that contain custom themes here, relative to this directory.
-#html_theme_path = []
+html_theme_path = ['themes']
 
 # The name for this set of Sphinx documents.  If None, it defaults to
 # "<project> v<release> documentation".
@@ -216,7 +221,7 @@ latex_elements = {
 #  author, documentclass [howto, manual, or own class]).
 latex_documents = [
   ('index', 'sammba.tex', u'sammba-MRI Documentation',
-   u'Nadkarni', 'manual'),
+   u'Salma Bougacha and Nachiket Nadkarni', 'manual'),
 ]
 
 # The name of an image file (relative to this directory) to place at the top of
@@ -252,7 +257,7 @@ latex_show_urls = 'footnote'
 
 trim_doctests_flags = True
 
-_python_doc_base = 'http://docs.python.org/2.7'
+_python_doc_base = 'http://docs.python.org/3.6'
 
 # Example configuration for intersphinx: refer to the Python standard library.
 intersphinx_mapping = {
