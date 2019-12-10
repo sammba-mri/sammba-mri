@@ -108,10 +108,7 @@ if [[ "$DISTRIB" == "neurodebian" ]]; then
     create_new_venv
     bash <(wget -q -O- http://neuro.debian.net/_files/neurodebian-travis.sh)
     sudo apt-get install -y -qq python-scipy python-nose python-nibabel\
-         python-sklearn python-nilearn python-patsy\
-         python-networkx python-configparser python-future python-traits\
-         python-simplejson python-funcsigs python-click\
-         graphviz python-futures python-nipype
+         python-sklearn python-nilearn python-nipype
     travis_retry sudo apt-get install -y -qq  afni fsl
     source /etc/afni/afni.sh
     echo "AFNI plugin path $AFNI_PLUGINPATH."

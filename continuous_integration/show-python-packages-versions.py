@@ -1,8 +1,7 @@
 import sys
 
-DEPENDENCIES = ['numpy', 'scipy', 'nilearn', 'nibabel', 'patsy', 'sklearn',
-                'matplotlib', 'packaging', 'configparser', 'future', 'traits',
-                'simplejson', 'prov', 'funcsigs', 'click', 'nipype']
+DEPENDENCIES = ['numpy', 'scipy', 'nilearn', 'nibabel', 'sklearn',
+                'matplotlib', 'nipype']
 
 
 def print_package_version(package_name, indent='  '):
