@@ -22,8 +22,6 @@ create_new_venv() {
     deactivate
     virtualenv --system-site-packages testvenv
     source testvenv/bin/activate
-    pip install packaging
-    pip install prov
     pip install nose
     pip install doctest-ignore-unicode
 }
@@ -38,7 +36,7 @@ print_conda_requirements() {
     #   - for scikit-learn, SCIKIT_LEARN_VERSION is used
     TO_INSTALL_ALWAYS="pip nose"
     REQUIREMENTS="$TO_INSTALL_ALWAYS"
-    TO_INSTALL_MAYBE="python numpy scipy matplotlib scikit-learn configparser future traits simplejson networkx packaging funcsigs click futures nipype"
+    TO_INSTALL_MAYBE="python numpy scipy matplotlib scikit-learn nipype"
     for PACKAGE in $TO_INSTALL_MAYBE; do
         # Capitalize package name and add _VERSION
         PACKAGE_VERSION_VARNAME="${PACKAGE^^}_VERSION"
@@ -110,10 +108,7 @@ if [[ "$DISTRIB" == "neurodebian" ]]; then
     create_new_venv
     bash <(wget -q -O- http://neuro.debian.net/_files/neurodebian-travis.sh)
     sudo apt-get install -y -qq python-scipy python-nose python-nibabel\
-         python-sklearn python-nilearn python-patsy\
-         python-networkx python-configparser python-future python-traits\
-         python-simplejson python-funcsigs python-click\
-         graphviz python-futures python-nipype
+         python-sklearn python-nilearn python-nipype
     travis_retry sudo apt-get install -y -qq  afni fsl
     source /etc/afni/afni.sh
     echo "AFNI plugin path $AFNI_PLUGINPATH."
@@ -134,11 +129,9 @@ elif [[ "$DISTRIB" == "conda" ]]; then
     if [ -n "$NIBABEL_VERSION" ]; then
         pip install nibabel=="$NIBABEL_VERSION"
     fi
-    # Install the latest available version of nilearn and patsy
+    # Install the latest available version of nilearn
     pip install nilearn
-    pip install patsy
-    # dependencies that are only available through pip
-    pip install prov
+
     # Allow nose to ignore unicode in doctest
     pip install doctest-ignore-unicode
     
