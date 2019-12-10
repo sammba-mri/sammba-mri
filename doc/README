@@ -1,5 +1,5 @@
 ========================================================
-sammba-MRI: small-animal MRI with pydicom, nipype and nilearn
+sammba-MRI: small-animal MRI in Python
 ========================================================
 
 This repository contains code and documentation to use python
