@@ -10,22 +10,36 @@ Registering several MRI images and creating a template
 Registering several raw MRI images
 ==================================
 
-    Sammba-MRI allows to register several MR images.
-		° First it creates a template from multiple anatomical scans, then register all of them to it. 
-		° Initially, registration is of extracted brains. Once these are reasonably aligned, 
-		° whole heads are registered, weighted by masks that, if parameters are chosen well, include some scalp. 
-		The amount of scalp is hopefully enough to help in differentiating the brain-scalp boundary without including so much head tissue 
-		that it starts to contaminate the registration with the highly variable head tissue.
+    We use anats_to_common to register several MRI images.
 
-	The function to use is > anats_to_common(Images_to_register, Saved_Registered_dir, 400, caching=True)
+**Template creation**: First it creates a template from multiple anatomical scans. 
+**Brain extraction**: Brain are extracted and reasonably aligned to facilitate whole head registration
+**Registration**: We use masks that include 
+Brain extraction --> reasonably aligned.
+Whole head are registered using masks that include some scalp depend on chosen parameters
+The amount of scalp is hopefully enough to differentiate the brain-scalp boundary from the higly variable head tissue, excluding registration contamination
+
+ 
+and then register all scans to the template.
+ Initially, registration is of extracted brains. Once these are reasonably aligned, 
+whole heads are registered, weighted by masks that, if parameters are chosen well, include some scalp. 
+The amount of scalp is hopefully enough to help in differentiating the brain-scalp boundary without including so much head tissue 
+that it starts to contaminate the registration with the highly variable head tissue.
+
+::
+
+    from sammba import registration
+    anats_to_common(Images_to_register, Saved_Registered_dir, 400, caching=True)
 	
 
 Registering several MRI images to an existing template
 ======================================================
 
     Sammba-MRI allows to register several MR images to an existing template.
-	
-	The function to use is > anats_to_template(images_to_register, Template_name, Saved_Registered_dir, 400, caching=True)
+::
+
+from sammba import registration
+anats_to_template(images_to_register, Template_name, Saved_Registered_dir, 400, caching=True)
 	
 Registering several functional and anatomic MRI images to an existing template
 ==============================================================================
