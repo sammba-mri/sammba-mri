@@ -11,10 +11,10 @@ What is sammba-MRI: small mammals neuroimaging with Python
 ===========================================================
 
 Sammba-MRI provides **easy-to-use** pipelines to process and analyze small mammals brain MRI multimodal images. 
-Sammba-MRI will perform automatically several critical steps for MR image analysis.
+Sammba-MRI will perform automatically several critical steps for MRI image analysis.
 
 
-° Conversion of Bruker DICOM filles to NIFTI-1
+° Conversion of Bruker DICOM files to NIFTI-1
 
 ° Image quality assessment:
 
@@ -86,7 +86,7 @@ as a shell command (not a Python command)::
 
     git clone https://github.com/sammba-mri/sammba-mri.git
 
-Do not hesitate to readily update your copy of sammba-MRI by executing “git pull” in the samba-MRI root directory (as a shell command).
+Once commonly used, do not hesitate to update your copy of sammba-MRI by executing “git pull” in the samba-MRI root directory (as a shell command).
 
 A ``sammba-mri`` directory is created. You now need to change to this directory and install the package by running (again, as a shell command)::
 
@@ -94,7 +94,7 @@ A ``sammba-mri`` directory is created. You now need to change to this directory 
     python setup.py install --user
 
 Third: Run sammba-MRI
-===========================
+=====================
 To check your installation, open IPython by writing "ipython" in the terminal and type in the following line ::
 
     In [1]: import sammba
