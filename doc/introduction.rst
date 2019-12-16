@@ -86,9 +86,7 @@ as a shell command (not a Python command)::
 
     git clone https://github.com/sammba-mri/sammba-mri.git
 
-Once commonly used, do not hesitate to update your copy of sammba-MRI by executing “git pull” in the samba-MRI root directory (as a shell command).
-
-A ``sammba-mri`` directory is created. You now need to change to this directory and install the package by running (again, as a shell command)::
+A ``sammba-mri`` directory is created. Now, you need to change to this directory and install the package by running (again, as a shell command)::
 
     cd sammba-mri
     python setup.py install --user
