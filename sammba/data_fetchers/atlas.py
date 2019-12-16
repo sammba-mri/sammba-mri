@@ -15,7 +15,7 @@ from nilearn._utils import niimg
 def fetch_atlas_dorr_2008(image_format='nifti', downsample='30',
                           data_dir=None, url=None,
                           resume=True, verbose=1):
-    """Download and load Dorr et al. atlas and average (dated 2008)
+    """Download and load mouse atlas from Dorr et al. (2008)
 
     Parameters
     ----------
@@ -143,8 +143,7 @@ def fetch_atlas_dorr_2008(image_format='nifti', downsample='30',
 
 def fetch_masks_dorr_2008(image_format='nifti', downsample='30',
                           data_dir=None, resume=True, verbose=1):
-    """Downloads DORR 2008 atlas first, then uses its labels to produce tissue
-    masks.
+    """Download mouse atlas from Dorr et al. (2008) and then use its labels to produce tissue masks.
 
     Parameters
     ----------
@@ -277,8 +276,8 @@ def fetch_masks_dorr_2008(image_format='nifti', downsample='30',
 def fetch_atlas_waxholm_rat_2014(data_dir=None, url=None, resume=True,
                                  verbose=1, downsample='117',
                                  symmetric_split=False):
-    """Download and load Pape et al. rat atlas (dated 2014), downsampled
-       by the Scalable Brain Atlas.
+    """Download and load downsampled version of the rat atlas from Pape et al. (2014)
+      by the Scalable Brain Atlas.
 
     Parameters
     ----------
@@ -419,7 +418,7 @@ def fetch_atlas_waxholm_rat_2014(data_dir=None, url=None, resume=True,
 
 def fetch_atlas_lemur_mircen_2019(data_dir=None, url=None, resume=True,
                                   verbose=1):
-    """Download and load the MIRCen mouse lemur atlas and average (dated 2017)
+    """Download and load mouse lemur atlas from Nadkarni et al.(2017)
 
     Parameters
     ----------

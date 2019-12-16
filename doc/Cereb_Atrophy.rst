@@ -17,7 +17,7 @@ Sammba-MRI allows to register several MR images to an existing template.
 The function to use is > anats_to_template(images_to_register, Template_name, Saved_Registered_dir, 400, caching=False)
 	
 	
-Step 2 - Align the Atlas on the raw MR images thanks to the deformation evaluated in step 1
+Step 2 - Aligning the atlas on the raw MR images thanks to the deformation evaluated in step 1
 ============================================================================================
 
 So far we did not develop any Sammba procedure to perform this task
@@ -28,7 +28,7 @@ We recommend to use the > 3dNwarpApply funtion from AFNI::
     Images-to-Register/Aal1.nii.gz -ainterp NN -prefix Measures/Aal1_atlas.nii.gz
 	
 	
-Step 3 - Measure of the volume of each registered ROI of the atlas
+Step 3 - Measuring the volume of each registered ROI of the atlas
 ==================================================================
 So far we did not develop any Sammba procedure to perform this task
 We recommend to use the > 3dhistog from AFNI::

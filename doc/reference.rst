@@ -1,5 +1,5 @@
 ===============================
-sammba-MRI API Reference
+Sammba-MRI API Reference
 ===============================
 
 .. contents:: **List of modules**
@@ -8,7 +8,7 @@ sammba-MRI API Reference
 
 .. _io_conversions_ref:
 
-:mod:`sammba.io_conversions`: From scanner to NIFTI
+:mod:`sammba.io_conversions`: From scanner (Dicom files from Bruker) to NIFTI
 =====================================================
 
 .. automodule:: sammba.io_conversions
@@ -29,8 +29,8 @@ sammba-MRI API Reference
 
 .. _data_fetchers_ref:
 
-:mod:`sammba.data_fetchers`: Datasets and atlas
-=====================================================
+:mod:`sammba.data_fetchers`: To fetch specific  datasets and atlases
+===================================================================
 
 .. automodule:: sammba.data_fetchers
    :no-members:
@@ -109,7 +109,7 @@ sammba-MRI API Reference
 
 .. _graphs_ref:
 
-:mod:`sammba.graphs`: Pipelines graphs
+:mod:`sammba.graphs`: Pipeline graphs
 ==================================================
 
 .. automodule:: sammba.graphs

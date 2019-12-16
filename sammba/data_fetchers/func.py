@@ -11,7 +11,7 @@ from .utils import _get_dataset_descr
 def fetch_zurich_test_retest(subjects=range(15), sessions=[1], data_dir=None,
                              url=None, resume=True, verbose=1,
                              correct_headers=False):
-    """Download and loads the ETH-Zurich test-retest dataset.
+    """Download and load the ETH-Zurich test-retest dataset.
 
     Parameters
     ----------
@@ -188,7 +188,7 @@ def fetch_zurich_test_retest(subjects=range(15), sessions=[1], data_dir=None,
 
 def fetch_zurich_anesthesiant(subjects=range(30), url=None,
                               data_dir=None, resume=True, verbose=1):
-    """Download and loads the ETH-Zurich anesthesiant dataset.
+    """Download and load the ETH-Zurich anesthesia dataset.
 
     Parameters
     ----------

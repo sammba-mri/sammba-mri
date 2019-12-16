@@ -65,7 +65,7 @@ Installation
 Installing required neuroimaging software
 -----------------------------------------
 **FSL**: Follow the instructions
-from `FSL official installation guide <https://fsl.fmrib.ox.ac.uk/fsl/fslwiki/FslInstallation>`_. To be able to run FSL, your system first needs to know where the software is installed at. On a Ubuntu system, this is usually under ``/usr/share/fsl``. Therefore, add the following code to your  ``.bashrc`` file. (To open and edit your .bashrc file on Ubuntu, use the following command: gedit  ``~/.bashrc``)::
+from `FSL official installation guide <https://fsl.fmrib.ox.ac.uk/fsl/fslwiki/FslInstallation>`_. To be able to run FSL, your system first needs to know where the software is installed. On a Ubuntu system, this is usually under ``/usr/share/fsl``. Therefore, add the following code to your  ``.bashrc`` file. (To open and edit your .bashrc file on Ubuntu, use the following command: gedit  ``~/.bashrc``)::
 
     #FSL
     FSLDIR=/usr/share/fsl

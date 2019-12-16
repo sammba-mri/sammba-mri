@@ -8,7 +8,7 @@ from .utils import _get_dataset_descr, _parse_date
 
 def fetch_lemur_mircen_2019_t2(subjects=[0], data_dir=None, url=None,
                                resume=True, verbose=1):
-    """Download and loads the mouse lemur template dataset.
+    """Download and load mouse lemur template.
 
     Parameters
     ----------
