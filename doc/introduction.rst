@@ -19,9 +19,13 @@ Sammba-MRI will perform automatically several critical steps for MRI image analy
     * **Image quality assessment**:
 
         ° Image registration and creation of a template
+        
         ° Transformation of individual dataset to the template (or to an atlas)
+        
         ° Evaluation of regional cerebral atrophy on the basis of an atlas
+        
         ° Estimation of cerebral perfusion maps from FAIR EPI images
+        
         ° Resting state fMRI analysis connectivity  and brain images visualization are straightforward with nilearn once the registration is performed.
 
 Sammba-MRI integrates functionalities from other packages (listed under the dependencies section below).
@@ -56,8 +60,7 @@ If you want to convert DICOM files to NIFTI files, you will need the
 
 Installing required neuroimaging software
 -----------------------------------------
-:**FSL** (version 5.0):
-
+**FSL** (version 5.0):
 Follow the instructions from `FSL official installation guide <https://fsl.fmrib.ox.ac.uk/fsl/fslwiki/FslInstallation>`_. To be able to run FSL, your system first needs to know where the software is installed. On a Ubuntu system, this is usually under ``/usr/share/fsl``. Therefore, add the following code to your  ``.bashrc`` file. (To open and edit your .bashrc file on Ubuntu, use the following command: gedit  ``~/.bashrc``)::
 
     #FSL
@@ -66,23 +69,20 @@ Follow the instructions from `FSL official installation guide <https://fsl.fmrib
     PATH=${FSLDIR}/5.0/bin:${PATH}
     export FSLDIR PATH
 
-:**AFNI**: 
-
+**AFNI**: 
 If you have access to `Neurodebian <http://neuro.debian.net>`_, then simply install the `AFNI package <http://neuro.debian.net/pkgs/afni.html>`_ through Neurodebian. Otherwise, go to `AFNI installation page <https://afni.nimh.nih.gov/pub/dist/doc/htmldoc/background_install/main_toc.html>`_. Then add the following lines of code to your  ``.bashrc`` file::
 
     # AFNI
     export PATH=/usr/lib/afni/bin:$PATH
 
-:**ANTs**:
-
+**ANTs**:
 To install ANTS, we recommend that you build it from source for your own system. Go to the ANTs section in `Michael Notter's excellent tutorial <http://miykael.github.io/nipype-beginner-s-guide/installation.html>`_ and follow each step. When the installation is complete, add the following lines  to your  ``.bashrc`` file ::
 
     # ANTs
     export PATH=/usr/local/antsbin/bin:$PATH
     export ANTSPATH=/usr/local/antsbin/bin/
 
-:**RATS**:
-
+**RATS**:
 `RATS <http://www.iibi.uiowa.edu/content/rats-overview/>`_ allows brain extraction.
 
 Second: Install sammba-MRI
