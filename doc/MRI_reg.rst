@@ -20,7 +20,7 @@ Registering several raw MRI images
 		The amount of scalp is hopefully enough to help in differentiating the brain-scalp boundary without including so much head tissue 
 		that it starts to contaminate the registration with the highly variable head tissue.
 
-    We use anats_to_common to register several MRI images :: 
+    We use anats_to_common to register several MRI images:: 
 
     from sammba import registration
     anats_to_common(Images_to_register, Saved_Registered_dir, 400, caching=True)
