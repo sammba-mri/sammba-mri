@@ -1,6 +1,9 @@
-===============================
-Sammba-MRI API Reference
-===============================
+================================
+List of commands from sammba-MRI
+================================
+
+Sammba-MRI is an application programming interface (API).
+Its modules are presented underneath.
 
 .. contents:: **List of modules**
    :local:
@@ -29,7 +32,7 @@ Sammba-MRI API Reference
 
 .. _data_fetchers_ref:
 
-:mod:`sammba.data_fetchers`: To fetch specific  datasets and atlases
+:mod:`sammba.data_fetchers`: To fetch specific datasets and atlases
 ===================================================================
 
 .. automodule:: sammba.data_fetchers
