@@ -7,24 +7,24 @@ Introduction: Sammba-MRI
     :depth: 1
 
 
-What is sammba-MRI: small mammals neuroimaging with Python
+What is sammba-MRI: small-mammal neuroimaging with Python
 ===========================================================
 
 Sammba-MRI provides **easy-to-use** pipelines to process and analyze small mammals brain MRI multimodal images. 
 Sammba-MRI will perform automatically several critical steps for MRI image analysis.
 
 
-° Conversion of Bruker DICOM files to NIFTI-1
+    * **Conversion** of Bruker DICOM files to NIFTI-1
 
-° Image quality assessment:
+    * **Image quality assessment**:
 
-* Image registration and creation of a template
-* Transformation of individual dataset to the template (or to an atlas)
-* Evaluation of cerebral atrophy on the basis of an atlas
-* Estimation of cerebral perfusion maps from FAIR EPI images
-* Resting state fMRI analysis connectivity  and brain images visualization are straightforward with nilearn once the registration is performed.
+        ° Image registration and creation of a template
+        ° Transformation of individual dataset to the template (or to an atlas)
+        ° Evaluation of regional cerebral atrophy on the basis of an atlas
+        ° Estimation of cerebral perfusion maps from FAIR EPI images
+        ° Resting state fMRI analysis connectivity  and brain images visualization are straightforward with nilearn once the registration is performed.
 
-Sammba-MRI integrates functionalities from a number of other packages (listed under the dependencies section below).
+Sammba-MRI integrates functionalities from other packages (listed under the dependencies section below).
 Examples include (but are not restricted to) mouse models of Alzheimer disease and mouse lemur.
 
 
@@ -44,7 +44,7 @@ Sammba-MRI requires a Python environment and the following packages:
 * `Nilearn <http://nilearn.github.io/introduction.html#installing-nilearn/>`_ >= 0.4.0
 * Numpy >= 1.14
 * SciPy >= 0.19
-* Nibabel >= 2.0.2
+* `Nibabel <https://nipy.org/nibabel/installation.html>`_ >= 2.0.2
 * Sklearn >= 0.19
 
 Our `examples <https://sammba-mri.github.io/auto_examples/index.html>`_ require a plotting library: matplotlib >= 1.5.1
@@ -56,8 +56,9 @@ If you want to convert DICOM files to NIFTI files, you will need the
 
 Installing required neuroimaging software
 -----------------------------------------
-**FSL** (version 5.0): Follow the instructions
-from `FSL official installation guide <https://fsl.fmrib.ox.ac.uk/fsl/fslwiki/FslInstallation>`_. To be able to run FSL, your system first needs to know where the software is installed at. On a Ubuntu system, this is usually under ``/usr/share/fsl``. Therefore, add the following code to your  ``.bashrc`` file. (To open and edit your .bashrc file on Ubuntu, use the following command: gedit  ``~/.bashrc``)::
+:**FSL** (version 5.0):
+
+Follow the instructions from `FSL official installation guide <https://fsl.fmrib.ox.ac.uk/fsl/fslwiki/FslInstallation>`_. To be able to run FSL, your system first needs to know where the software is installed. On a Ubuntu system, this is usually under ``/usr/share/fsl``. Therefore, add the following code to your  ``.bashrc`` file. (To open and edit your .bashrc file on Ubuntu, use the following command: gedit  ``~/.bashrc``)::
 
     #FSL
     FSLDIR=/usr/share/fsl
@@ -65,18 +66,24 @@ from `FSL official installation guide <https://fsl.fmrib.ox.ac.uk/fsl/fslwiki/Fs
     PATH=${FSLDIR}/5.0/bin:${PATH}
     export FSLDIR PATH
 
-**AFNI**: If you have access to `Neurodebian <http://neuro.debian.net>`_, then simply install the `AFNI package <http://neuro.debian.net/pkgs/afni.html>`_ through Neurodebian. Otherwise, go to `AFNI installation page <https://afni.nimh.nih.gov/pub/dist/doc/htmldoc/background_install/main_toc.html>`_. Then add the following lines of code to your  ``.bashrc`` file::
+:**AFNI**: 
+
+If you have access to `Neurodebian <http://neuro.debian.net>`_, then simply install the `AFNI package <http://neuro.debian.net/pkgs/afni.html>`_ through Neurodebian. Otherwise, go to `AFNI installation page <https://afni.nimh.nih.gov/pub/dist/doc/htmldoc/background_install/main_toc.html>`_. Then add the following lines of code to your  ``.bashrc`` file::
 
     # AFNI
     export PATH=/usr/lib/afni/bin:$PATH
 
-**ANTs**: To install ANTS, we recommend that you build it from source for your own system. Go to the ANTs section in `Michael Notter's excellent tutorial <http://miykael.github.io/nipype-beginner-s-guide/installation.html>`_ and follow each step. When the installation is complete, add the following lines  to your  ``.bashrc`` file ::
+:**ANTs**:
+
+To install ANTS, we recommend that you build it from source for your own system. Go to the ANTs section in `Michael Notter's excellent tutorial <http://miykael.github.io/nipype-beginner-s-guide/installation.html>`_ and follow each step. When the installation is complete, add the following lines  to your  ``.bashrc`` file ::
 
     # ANTs
     export PATH=/usr/local/antsbin/bin:$PATH
     export ANTSPATH=/usr/local/antsbin/bin/
 
-**RATS**: `RATS <http://www.iibi.uiowa.edu/content/rats-overview/>`_ allows brain extraction.
+:**RATS**:
+
+`RATS <http://www.iibi.uiowa.edu/content/rats-overview/>`_ allows brain extraction.
 
 Second: Install sammba-MRI
 ===========================
