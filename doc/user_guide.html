@@ -1,0 +1,344 @@
+
+<!DOCTYPE html>
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <title>Sammba-MRI:Small mammals NeuroImaging in Python &#8212; Multimodal Imaging of Neurodegenerative Diseases and Therapies</title>
+    <link rel="stylesheet" href="_static/nature.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    <link rel="stylesheet" href="_static/gallery.css" type="text/css" />
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    './',
+        VERSION:     '',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true,
+        SOURCELINK_SUFFIX: '.txt'
+      };
+    </script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/underscore.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <script type="text/javascript" src="_static/copybutton.js"></script>
+    <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="1. Introduction: Sammba-MRI" href="introduction.html" />
+    <link rel="prev" title="&lt;no title&gt;" href="index.html" />
+<meta content="True" name="HandheldFriendly">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0">
+<meta name="keywords" content="sammba-mri, neuroimaging, python, small animal, rodent, mouse, rat">
+
+
+<script type="text/javascript">
+function updateTopMenuPosition(height, width) {
+    if($(window).scrollTop() > height && $(window).outerWidth() > 1024) {
+        //begin to scroll
+        $('.related-wrapper').css("z-index", 1000)
+        $('.related-wrapper').css("position", "sticky")
+        $('.related-wrapper').css("top", 0)
+        $('.related-wrapper').css("width", width)
+    } else {
+        //lock it back into place
+        $('.related-wrapper').css("position", "relative")
+        $('.related-wrapper').css("top", 0)
+    }
+}
+
+$(function() {
+    var banner_height = $('#logo-banner').outerHeight()
+    var banner_width = $('#logo-banner').outerWidth()
+    var width = $('.related-wrapper').css("height", $('.related').outerHeight())
+
+    updateTopMenuPosition(banner_height, width)
+
+    $(window).scroll(function(event) {
+        updateTopMenuPosition(banner_height, width)
+    });
+
+    $(window).resize(function(event) {
+        var banner_width = $('#logo-banner').outerWidth()
+        var menu_height = $('.related').outerHeight()
+        $('.related').css("width", banner_width)
+        $('.related-wrapper').css("height", menu_height)
+        updateTopMenuPosition(banner_height, width)
+    })
+});
+</script>
+<script type="text/javascript">
+function updateSideBarPosition(top, offset, sections) {
+    var pos = $(window).scrollTop()
+    // Lock the table of content to a fixed position once we scroll enough
+    var topShift = 2 * offset
+    if(pos > top + topShift + 1) {
+        // begin to scroll with sticky menu bar
+        var topShift = -topShift + 1
+        if ($(window).outerWidth() < 1024) {
+            // compensate top menu that disappears
+            topShift -= offset + 1
+        }
+        $('.sphinxsidebarwrapper').css("position", "fixed")
+        $('.sphinxsidebarwrapper').css("top", topShift)
+    }
+    else {
+        //lock it back into place
+        $('.sphinxsidebarwrapper').css("position", "relative")
+        $('.sphinxsidebarwrapper').css("top",0)
+    }
+
+    // Highlight the current section
+    i = 0
+    current_section = 0
+    $('a.internal').removeClass('active')
+    for(i in sections) {
+        if(sections[i] > pos) {
+            break
+        };
+        if($('a.internal[href$="' + i + '"]').is(':visible')){
+            current_section = i
+        };
+    }
+    $('a.internal[href$="' + current_section + '"]').addClass('active')
+    $('a.internal[href$="' + current_section + '"]').parent().addClass('active')
+}
+
+$(function () {
+    // Lock the table of content to a fixed position once we scroll enough
+    var tocOffset = $('.related-wrapper').outerHeight()
+    var marginTop = parseFloat($('.sphinxsidebarwrapper').css('margin-top').replace(/auto/, 0))
+    var top = $('.sphinxsidebarwrapper').offset().top - marginTop
+    sections = {}
+    url = document.URL.replace(/#.*$/, "")
+
+    // Grab positions of our sections
+    $('.headerlink').each(function(){
+        sections[this.href.replace(url, '')] = $(this).offset().top - 50
+    });
+
+    updateSideBarPosition(top, tocOffset, sections)
+
+    $(window).scroll(function(event) {
+        updateSideBarPosition(top, tocOffset, sections)
+    });
+
+    $(window).resize(function(event) {
+        tocOffset = $('.related-wrapper').outerHeight()
+        updateSideBarPosition(top, tocOffset, sections)
+    });
+});
+</script>
+
+
+<script type="text/javascript">
+
+        var _gaq = _gaq || [];
+        _gaq.push(['_setAccount', 'UA-41920728-1']);
+        _gaq.push(['_trackPageview']);
+
+        (function() {
+            var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
+            ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
+            var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
+        })();
+    </script>
+
+  </head>
+  <body>
+<div id="logo-banner">
+  <!-- A tag cloud to make it easy for people to find what they are
+                         looking for -->
+ <div class="tags">
+  <ul>
+    <li>
+      <big><a href="auto_examples/01_template/plot_register.html">Template creation</a></big>
+    </li>
+    <li>
+      <small><a href="auto_examples/02_preprocessing/plot_fmri_coregistration.html">fMRI preprocessing</a></small>
+    </li>
+    <li>
+      <a href="modules/reference.html#module-sammba.data_fetchers">Datasets</a>
+    </li>
+  </ul>
+ </div>
+
+  <div class="banner">
+    <h1>Sammba-MRI:</h1>
+    <h2>Small mammals NeuroImaging in Python</h2>
+  </div>
+  <div class="search_form">
+    <div class="gcse-search" id="cse" style="width: 100%;"></div>
+    <script>
+      (function() {
+        var cx = '017289614950330089114:elrt9qoutrq';
+        var gcse = document.createElement('script');
+        gcse.type = 'text/javascript';
+        gcse.async = true;
+        gcse.src = 'https://cse.google.com/cse.js?cx=' + cx;
+        var s = document.getElementsByTagName('script')[0];
+        s.parentNode.insertBefore(gcse, s);
+      })();
+    </script>
+  </div>
+</div>
+
+
+
+<div class=related-wrapper>
+    
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="py-modindex.html" title="Python Module Index"
+             >modules</a></li>
+        <li class="right" >
+          <a href="introduction.html" title="1. Introduction: Sammba-MRI"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="index.html" title="&lt;no title&gt;"
+             accesskey="P">previous</a> |</li>
+<li><a href="index.html">Sammba-MRI Home</a> |&nbsp;</li>
+<li><a href="#">User Guide</a> |&nbsp;</li>
+<li><a href="auto_examples/index.html">Examples</a> |&nbsp;</li>
+<li><a href="reference.html">Reference</a> |&nbsp;</li>
+<li id="navbar-about"><a href="authors.html">About</a>|&nbsp;</li>
+ 
+      </ul>
+    </div>
+</div>
+
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+
+
+<h4> Giving credit </h4>
+  <ul class="simple">
+    <li><p>Please consider <a href="authors.html#citing">citing the
+                    papers</a>.</p></li>
+  </ul>
+
+	   <div class="sidebartoc"></div>
+
+  <h4>Previous topic</h4>
+  <p class="topless"><a href="index.html"
+                        title="previous chapter">&lt;no title&gt;</a></p>
+  <h4>Next topic</h4>
+  <p class="topless"><a href="introduction.html"
+                        title="next chapter">1. Introduction: Sammba-MRI</a></p>
+
+<script type="text/javascript">$('#searchbox-ml').show(0);</script>
+<script type="text/javascript">$('#searchbox-site').show(0);</script>
+
+
+        </div>
+      </div>
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <div class="section" id="user-guide-table-of-contents">
+<span id="user-guide"></span><h1>User guide: table of contents<a class="headerlink" href="#user-guide-table-of-contents" title="Permalink to this headline">¶</a></h1>
+<div class="toctree-wrapper compound">
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="introduction.html">1. Introduction: Sammba-MRI</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="introduction.html#what-is-sammba-mri-small-mammal-neuroimaging-with-python">1.1. What is sammba-MRI: small-mammal neuroimaging with Python</a></li>
+<li class="toctree-l2"><a class="reference internal" href="introduction.html#first-install-dependencies">1.2. First: Install dependencies</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="introduction.html#installing-python-packages">1.2.1. Installing Python packages</a></li>
+<li class="toctree-l3"><a class="reference internal" href="introduction.html#installing-required-neuroimaging-software">1.2.2. Installing required neuroimaging software</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="introduction.html#second-install-sammba-mri">1.3. Second: Install sammba-MRI</a></li>
+<li class="toctree-l2"><a class="reference internal" href="introduction.html#third-run-sammba-mri">1.4. Third: Run sammba-MRI</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="dataorg.html">2. Data organization</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="dataorg.html#conversion-from-dicom-bruker-dicom-to-nifti-1">2.1. conversion from Dicom (Bruker-Dicom) to NIfTI-1</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="MRI_reg.html">3. Registering several MRI images and creating a template</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="MRI_reg.html#registering-several-raw-mri-images">3.1. Registering several raw MRI images</a></li>
+<li class="toctree-l2"><a class="reference internal" href="MRI_reg.html#registering-several-mri-images-to-an-existing-template">3.2. Registering several MRI images to an existing template</a></li>
+<li class="toctree-l2"><a class="reference internal" href="MRI_reg.html#registering-several-functional-and-anatomic-mri-images-to-an-existing-template">3.3. Registering several functional and anatomic MRI images to an existing template</a></li>
+<li class="toctree-l2"><a class="reference internal" href="MRI_reg.html#registering-several-functional-mri-images-to-an-existing-template-and-epi-correction">3.4. Registering several functional MRI images to an existing template and EPI correction</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="Cereb_Atrophy.html">4. Measuring regional brain volumes</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="Cereb_Atrophy.html#step-1-registering-several-mri-images-to-an-existing-template">4.1. Step 1 - Registering several MRI images to an existing template</a></li>
+<li class="toctree-l2"><a class="reference internal" href="Cereb_Atrophy.html#step-2-align-the-atlas-on-the-raw-mr-images-thanks-to-the-deformation-evaluated-in-step-1">4.2. Step 2 - Align the Atlas on the raw MR images thanks to the deformation evaluated in step 1</a></li>
+<li class="toctree-l2"><a class="reference internal" href="Cereb_Atrophy.html#step-3-measure-of-the-volume-of-each-registered-roi-of-the-atlas">4.3. Step 3 - Measure of the volume of each registered ROI of the atlas</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="reference.html">5. sammba-MRI API Reference</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="reference.html#module-sammba.io_conversions">5.1. <code class="docutils literal"><span class="pre">sammba.io_conversions</span></code>: From scanner to NIFTI</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="generated/sammba.io_conversions.dcm_to_nii.html">5.1.1. sammba.io_conversions.dcm_to_nii</a></li>
+<li class="toctree-l3"><a class="reference internal" href="generated/sammba.io_conversions.recursive_dcm_to_nii.html">5.1.2. sammba.io_conversions.recursive_dcm_to_nii</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="reference.html#module-sammba.data_fetchers">5.2. <code class="docutils literal"><span class="pre">sammba.data_fetchers</span></code>: Datasets and atlas</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="generated/sammba.data_fetchers.fetch_zurich_test_retest.html">5.2.1. sammba.data_fetchers.fetch_zurich_test_retest</a></li>
+<li class="toctree-l3"><a class="reference internal" href="generated/sammba.data_fetchers.fetch_zurich_anesthesiant.html">5.2.2. sammba.data_fetchers.fetch_zurich_anesthesiant</a></li>
+<li class="toctree-l3"><a class="reference internal" href="generated/sammba.data_fetchers.fetch_atlas_dorr_2008.html">5.2.3. sammba.data_fetchers.fetch_atlas_dorr_2008</a></li>
+<li class="toctree-l3"><a class="reference internal" href="generated/sammba.data_fetchers.fetch_atlas_waxholm_rat_2014.html">5.2.4. sammba.data_fetchers.fetch_atlas_waxholm_rat_2014</a></li>
+<li class="toctree-l3"><a class="reference internal" href="generated/sammba.data_fetchers.fetch_masks_dorr_2008.html">5.2.5. sammba.data_fetchers.fetch_masks_dorr_2008</a></li>
+<li class="toctree-l3"><a class="reference internal" href="generated/sammba.data_fetchers.fetch_atlas_lemur_mircen_2019.html">5.2.6. sammba.data_fetchers.fetch_atlas_lemur_mircen_2019</a></li>
+<li class="toctree-l3"><a class="reference internal" href="generated/sammba.data_fetchers.fetch_lemur_mircen_2019_t2.html">5.2.7. sammba.data_fetchers.fetch_lemur_mircen_2019_t2</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="reference.html#sammba-registration-registration-utilities">5.3. <code class="docutils literal"><span class="pre">sammba.registration</span></code>: Registration utilities</a><ul class="simple">
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="reference.html#module-sammba.segmentation">5.4. <code class="docutils literal"><span class="pre">sammba.segmentation</span></code>: Segmentation utilities</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="generated/sammba.segmentation.brain_extraction_report.html">5.4.1. sammba.segmentation.brain_extraction_report</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="reference.html#module-sammba.graphs">5.5. <code class="docutils literal"><span class="pre">sammba.graphs</span></code>: Pipelines graphs</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="generated/sammba.graphs.create_pipeline_graph.html">5.5.1. sammba.graphs.create_pipeline_graph</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="reference.html#external-tools-wrapped-in-python">5.6. External tools wrapped in python</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="interfaces/generated/sammba.segmentation.interfaces.html">5.6.1. segmentation.interfaces</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="interfaces/generated/sammba.segmentation.interfaces.html#histogrammask">5.6.1.1. HistogramMask</a><ul>
+<li class="toctree-l5"><a class="reference internal" href="interfaces/generated/sammba.segmentation.interfaces.html#examples">5.6.1.1.1. Examples</a></li>
+</ul>
+</li>
+<li class="toctree-l4"><a class="reference internal" href="interfaces/generated/sammba.segmentation.interfaces.html#mathmorphomask">5.6.1.2. MathMorphoMask</a><ul>
+<li class="toctree-l5"><a class="reference internal" href="interfaces/generated/sammba.segmentation.interfaces.html#id1">5.6.1.2.1. Examples</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="auto_examples/index.html">6. Gallery of Examples</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="auto_examples/index.html#template-creation">6.1. Template creation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="auto_examples/index.html#fmri-spatial-preprocessing">6.2. fMRI spatial preprocessing</a></li>
+<li class="toctree-l2"><a class="reference internal" href="auto_examples/index.html#functional-connectivity">6.3. Functional connectivity</a><ul>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+
+    <div class="footer">
+            &copy; 2017, The sammba-MRI developers.
+        <span style="padding-left: 5ex;">
+          <a href="_sources/user_guide.rst.txt"
+        	 rel="nofollow">Show this page source</a>
+        </span>
+    </div>
+  </body>
+</html>
