@@ -1,6 +1,9 @@
-===============================
-sammba-MRI API Reference
-===============================
+================================
+List of commands from sammba-MRI
+================================
+
+Sammba-MRI is an application programming interface (API). Its modules are
+presented underneath.
 
 .. contents:: **List of modules**
    :local:
@@ -8,8 +11,8 @@ sammba-MRI API Reference
 
 .. _io_conversions_ref:
 
-:mod:`sammba.io_conversions`: From scanner to NIFTI
-=====================================================
+:mod:`sammba.io_conversions`: From scanner (DICOM files from Bruker) to NIFTI
+=============================================================================
 
 .. automodule:: sammba.io_conversions
    :no-members:
@@ -29,8 +32,8 @@ sammba-MRI API Reference
 
 .. _data_fetchers_ref:
 
-:mod:`sammba.data_fetchers`: Datasets and atlas
-=====================================================
+:mod:`sammba.data_fetchers`: To fetch specific datasets and atlas
+=================================================================
 
 .. automodule:: sammba.data_fetchers
    :no-members:
@@ -109,7 +112,7 @@ sammba-MRI API Reference
 
 .. _graphs_ref:
 
-:mod:`sammba.graphs`: Pipelines graphs
+:mod:`sammba.graphs`: Pipeline graphs
 ==================================================
 
 .. automodule:: sammba.graphs
