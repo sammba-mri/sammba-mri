@@ -33,7 +33,7 @@ For skull-stripping, the open source `RATS <http://www.iibi.uiowa.edu/content/ra
 tool is also available by setting the parameter ``use_rats_tool`` to True.
 
 An example of use this function is available
-`here <plot_register.html#sphx-glr-auto-examples-01-template-plot-register-py>`_ .
+`here <https://sammba-mri.github.io/auto_examples/01_template/plot_register.html#sphx-glr-auto-examples-01-template-plot-register-py>`_ .
 
 Registering several MRI images to template space
 =================================================
@@ -57,7 +57,7 @@ interpolation errors.
         registrator.fit_modality(moadality_images, name_of_the_modality
 
 An example of use this function is available
-`here <plot_ica.html#sphx-glr-auto-examples-03-connectivity-plot-ica-py>`_ .
+`here <https://sammba-mri.github.io/auto_examples/03_connectivity/plot_ica.html#sphx-glr-auto-examples-03-connectivity-plot-ica-py>`_ .
 
 Note that TemplateRegistrator class encapsulate several functions
 that are available as "stand-alone" in sammba-MRI:
