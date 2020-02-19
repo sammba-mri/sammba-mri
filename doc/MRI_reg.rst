@@ -32,15 +32,15 @@ software.
 For skull-stripping, the open source `RATS <http://www.iibi.uiowa.edu/content/rats-overview/>`_
 tool is also available by setting the parameter ``use_rats_tool`` to True.
 
-An example of use this function is available
-`here <https://sammba-mri.github.io/auto_examples/01_template/plot_register.html#sphx-glr-auto-examples-01-template-plot-register-py>`_ .
+An `example <https://sammba-mri.github.io/auto_examples/01_template/plot_register.html#sphx-glr-auto-examples-01-template-plot-register-py>`_of  
+use this function is available.
 
 Registering several MRI images to template space
 =================================================
 
 Matching of individual MRI image to standard template is critical to perform
 group-wise analysis. Multimodal images preprocessing can be performed in the
-template space through the ``**TemplateRegistrator**`` class. 
+template space through the **TemplateRegistrator** class. 
 User can fit each anatomical images to a a set of modality (functional or 
 perfusion MRI). This **ready-to-use** pipelines align first the 
 functional or perfusion volume to the anatomical images through a rigid body
