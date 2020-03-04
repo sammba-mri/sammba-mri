@@ -10,14 +10,16 @@ Data conversion
 Data conversion: from DICOM (Bruker-Dicom) to NIfTI-1 format
 =================================================================
 
-    Sammba-MRI allows to convert Bruker Paravision enhanced multiframe DICOM files 
-    to the standard NIfTI-1 format. Extensive information such as date is also 
-    extracted. Depends on the number of file to be converted, two options are 
-    available:
-	To convert a single file, we use ::
+Sammba-MRI allows to convert Bruker Paravision enhanced multiframe DICOM files 
+to the standard NIfTI-1 format. Extensive information such as date is also 
+extracted. Depends on the number of file to be converted, two options are 
+available:
+
+
+    * To convert a **single** file, we use ::
+
 io_conversions.dcm_to_nii ('/usr/bin/dcmdump', Dicom_input, Saved_Nifty_dir)
 
-        To convert several files, we use::
+    * To convert **several** files, we use ::
 io_conversions.recursive_dcm_to_nii('/usr/bin/dcmdump', session_dir, Saved_Nifty_dir)
-	
-	
+
