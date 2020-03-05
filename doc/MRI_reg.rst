@@ -7,38 +7,73 @@ Registering several MRI images and creating a template
     :depth: 1
 
 
-Registering several raw MRI images
-==================================
+Registering several raw MRI images to common space
+====================================================
 
-    Sammba-MRI allows to register several MR images.
-		° First it creates a template from multiple anatomical scans, then register all of them to it. 
-		° Initially, registration is of extracted brains. Once these are reasonably aligned, 
-		° whole heads are registered, weighted by masks that, if parameters are chosen well, include some scalp. 
-		The amount of scalp is hopefully enough to help in differentiating the brain-scalp boundary without including so much head tissue 
-		that it starts to contaminate the registration with the highly variable head tissue.
+The **anats_to_common** pipeline implements the multi-level, iterative scheme 
+to create a fine anatomical template from individual anatomical MRI scans. 
+First, head images are centered on their respective brain mask centroid while 
+intensity biais corrected is performed. A first rough template is obtained by
+rigid-body aligning extracted brain to a digitized version of a previous 
+histological atlas and applying the transform to the original heads. 
+Thereafter, sucessive averaging and registration process is iterated while 
+increasing the number of degrees of freedom of the estimated
+transform. The target template updated at each step allowing the 
+creation of high quality templates.   
+    
+    In sammba-MRI, you can call the function by typing ::
 
-	The function to use is > anats_to_common(Images_to_register, Saved_Registered_dir, 400, caching=True)
+	from sammba import registration
+        anats_to_common(Images_to_register, Saved_Registered_dir, 400, caching=True)
 	
+Note that most of registration steps relies on the freely available 
+`AFNI <https://afni.nimh.nih.gov/pub/dist/doc/htmldoc/background_install/main_toc.html>`_ 
+software.
+For skull-stripping, the open source `RATS <http://www.iibi.uiowa.edu/content/rats-overview/>`_
+tool is also available by setting the parameter ``use_rats_tool`` to True.
 
-Registering several MRI images to an existing template
-======================================================
+An example of use this function is available called *Template creation*
 
-    Sammba-MRI allows to register several MR images to an existing template.
-	
-	The function to use is > anats_to_template(images_to_register, Template_name, Saved_Registered_dir, 400, caching=True)
-	
-Registering several functional and anatomic MRI images to an existing template
-==============================================================================
+Registering several MRI images to template space
+=================================================
 
-    The function to use is > fmri_sessions_to_template(session, Atlas_name,Saved_Registered_dir, maxlev=7, t_r=1.0, brain_volume=400)
-	
-Registering several functional MRI images to an existing template and EPI correction
-=====================================================================================
+Matching of individual MRI image to standard template is critical to perform
+group-wise analysis. Multimodal images preprocessing can be performed in the
+template space through the *TemplateRegistrator* class. 
+User can fit each anatomical images to a a set of modality (functional or 
+perfusion MRI). This **ready-to-use** pipelines align first the 
+functional or perfusion volume to the anatomical images through a rigid body
+registration. Then, a per-slice basis registration is performed allowing
+correction of EPI distortion. Finally, the rigid body transform and the 
+per-slice warps are combined and applied to the initial volume to minimize
+interpolation errors.
 
-	Sammba allows to align the functional volume to the anatomical images, first with a rigid body registration 
-	and then on a per-slice basis (only a fine correction, this is mostly for correction of EPI distortion).
+    In sammba-MRI, the class can be call by typing ::
 
-	The first function to use to encapsulate the data is > FMRISession(Anats_to_register, Funcs_to_register, Saved_Registered_dir)
-	The second function to use to process the data is > coregister_fmri_session(session, t_r=1.0, Saved_Registered_dir, brain_volume=400, slice_timing=True)
+        from sammba import registration
+        registrator = TemplateRegistrator(template, brain_volume, caching=True)
+        registrator.fit_anat(anat_files)
+        registrator.fit_modality(moadality_images, name_of_the_modality
 
-	
+An example of use this function is available.
+
+Note that TemplateRegistrator class encapsulate several functions
+that are available as "stand-alone" in sammba-MRI:
+
+* anats_to_template : Allow to registering several MRI images to an existing template ::
+
+    anats_to_template(images_to_register, Template_name, Saved_Registered_dir, 400, caching=True)
+
+* fmri_sessions_to_template : Allow to register several functional and anatomic MRI images to an existing template ::
+
+    fmri_sessions_to_template(session, Atlas_name,Saved_Registered_dir, maxlev=7, t_r=1.0, brain_volume=400)
+
+* FMRISession : Encapsulate the data for performing registration of several functional MRI images to an existing template and EPI correction ::
+
+    FMRISession(Anats_to_register, Funcs_to_register, Saved_Registered_dir)
+
+* coregister_fmri_session : process the data for performing registration of several functional MRI images to an existing template and EPI correction ::
+
+    coregister_fmri_session(session, t_r=1.0, Saved_Registered_dir, brain_volume=400, slice_timing=True)
+
+
