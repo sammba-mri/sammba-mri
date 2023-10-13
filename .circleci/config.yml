@@ -3,7 +3,7 @@ version: 2
 jobs:
   build:
     docker:
-      - image: circleci/python:3.6.7
+      - image: cimg/python:3.6.15
     environment:
       DISTRIB: "conda"
       PYTHON_VERSION: "3.6"
@@ -21,6 +21,7 @@ jobs:
       FUNCSIGS_VERSION: "*"
       CLICK_VERSION: "6.6.0"
       NIPYPE_VERSION: "1.0.4"
+      ANTS_VERSION: "*"
 
     steps:
       - checkout
@@ -44,19 +45,24 @@ jobs:
       - run:
           name: Create conda env
           command: |
-            conda create -n testenv python=3.6 numpy scipy scikit-learn matplotlib \
-            networkx future packaging traits simplejson funcsigs click  patsy graphviz \
+            # Use mamba solver to accelerate install
+            # Trick found here:
+            # https://conda.github.io/conda-libmamba-solver/getting-started
+            conda create -n testenv conda-libmamba-solver
+            conda config --set solver libmamba
+            conda install -n testenv python=3.6 numpy scipy scikit-learn matplotlib \
+            networkx future packaging traits simplejson funcsigs click patsy graphviz \
             lxml mkl sphinx pillow -yq
             conda install -n testenv nibabel -c conda-forge -yq
             conda install -n testenv nipype -c conda-forge -yq
+            conda install -n testenv ants -c aramislab -yq
       - run:
           name: Add the NeuroDebian repository
           command: |
             sudo apt-get install lsb-release
             DISTRIB_CODENAME=$(lsb_release  -c -s)
             wget -O- http://neuro.debian.net/lists/${DISTRIB_CODENAME}.us-nh.full | sudo tee /etc/apt/sources.list.d/neurodebian.sources.list
-            sudo apt-key adv --recv-keys --keyserver pool.sks-keyservers.net 2649A5A9 \
-            || { wget -q -O- http://neuro.debian.net/_static/neuro.debian.net.asc | sudo apt-key add -; }
+            sudo wget -q -O- http://neuro.debian.net/_static/neuro.debian.net.asc | sudo gpg --batch -o /etc/apt/trusted.gpg.d/neurodebian.gpg --dearmor
             sudo apt-get update -qq
             sudo apt-cache policy  # provide a summary over which repositories are currently available
       - run:
@@ -64,23 +70,19 @@ jobs:
           command: |
             chmod +x tools/retry_cmd.sh
             tools/retry_cmd.sh -n 5 -s 15 
-              sudo apt-get install -y -qq afni
+              sudo apt-get install -y -qq afni || 
+            tools/retry_cmd.sh -n 5 -s 15 
+              sudo apt-get install -y -qq afni-atlases
             tools/retry_cmd.sh -n 5 -s 15 
               sudo apt-get install -y -qq fsl
-            tools/retry_cmd.sh -n 5 -s 15 
-              sudo apt-get install -y -qq  ants
       - run:
           name: Running CircleCI test (make html)
           command: |
             source activate testenv
             pip install -q prov
             pip install -q nilearn
-            source /etc/afni/afni.sh
             source /etc/fsl/fsl.sh
             export FSLOUTPUTTYPE=NIFTI_GZ
-            export ANTSPATH=${ANTSPATH:="/usr/lib/ants"}
-            export PATH=${PATH}:/usr/bin/ANTS
-            export PATH=${PATH}:/usr/lib/ants
             pip install -e .
             set -o pipefail && cd doc && make html-strict 2>&1 | tee ~/log.txt
           no_output_timeout: 5h

@@ -1,10 +1,10 @@
 import warnings
 import os
-from sklearn.datasets.base import Bunch
+from sklearn.utils import Bunch
 from nipype.caching import Memory
 from nipype.interfaces import afni
 from nipype.utils.filemanip import fname_presuffix
-from nilearn._utils.exceptions import VisibleDeprecationWarning
+from numpy import VisibleDeprecationWarning
 from .base import (_rigid_body_register, _warp, _per_slice_qwarp)
 
 
@@ -50,7 +50,7 @@ def coregister(unifized_anat_file,
 
     Returns
     -------
-    data : sklearn.datasets.base.Bunch
+    data : sklearn.utils.Bunch
     Dictionary-like object, the interest attributes are :
         - `coreg_perf_` : str
                           Path to paths to the coregistered perfusion

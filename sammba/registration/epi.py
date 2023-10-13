@@ -1,6 +1,6 @@
 import warnings
-from sklearn.datasets.base import Bunch
-from nilearn._utils.exceptions import VisibleDeprecationWarning
+from sklearn.utils import Bunch
+from numpy import VisibleDeprecationWarning
 from .base import (_reorient, _rigid_body_register_and_reorient,
                    _per_slice_qwarp)
 
@@ -45,7 +45,7 @@ def _coregister_epi(unifized_anat_file,
 
     Returns
     -------
-    data : sklearn.datasets.base.Bunch
+    data : sklearn.utils.Bunch
     Dictionary-like object, the interest attributes are :
         - `coreg_epi_` : str
                           Path to paths to the coregistered EPI image.

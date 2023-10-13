@@ -1,6 +1,4 @@
 import os
-from nilearn._utils.compat import _basestring
-
 
 class FMRISession(object):
     """
@@ -38,7 +36,7 @@ class FMRISession(object):
                 raise IOError('anat must be an existing image file,'
                               'you gave {0}'.format(self.anat))
 
-        if not isinstance(self.animal_id, _basestring):
+        if not isinstance(self.animal_id, str):
             raise ValueError('animal_id must be a string, you provided '
                              '{0}'.format(self.animal_id))
 

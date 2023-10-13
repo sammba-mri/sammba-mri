@@ -292,7 +292,8 @@ def setup(app):
     for key in ['plot_gallery', 'abort_on_example_error']:
         app.add_config_value(key, get_default_config_value(key), 'html')
 
-    app.add_stylesheet('gallery.css')
+    #app.add_stylesheet('gallery.css')
+    app.add_css_file('gallery.css')
 
     # Sphinx < 1.6 calls it `_extensions`, >= 1.6 is `extensions`.
     extensions_attr = '_extensions' if hasattr(app, '_extensions') else 'extensions'

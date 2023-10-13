@@ -1,7 +1,7 @@
 import os
 import warnings
 import numpy as np
-from sklearn.datasets.base import Bunch
+from sklearn.utils import Bunch
 from nilearn.datasets.utils import _fetch_files, _fetch_file, _get_dataset_dir
 from .utils import _get_dataset_descr, _parse_date
 
@@ -27,7 +27,7 @@ def fetch_lemur_mircen_2019_t2(subjects=[0], data_dir=None, url=None,
 
     Returns
     -------
-    data : sklearn.datasets.base.Bunch
+    data : sklearn.utils.Bunch
         Dictionary-like object, the interest attributes are :
 
         - 'anat': string list. Paths to T2-weighted images.

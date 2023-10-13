@@ -1,6 +1,6 @@
 import warnings
-from sklearn.datasets.base import Bunch
-from nilearn._utils.exceptions import VisibleDeprecationWarning
+from sklearn.utils import Bunch
+from numpy import VisibleDeprecationWarning
 from .base import (_reorient, _rigid_body_register_and_reorient)
 
 
@@ -42,7 +42,7 @@ def _coregister_nonepi(unifized_anat_file,
 
     Returns
     -------
-    data : sklearn.datasets.base.Bunch
+    data : sklearn.utils.Bunch
     Dictionary-like object, the interest attributes are :
         - `coreg_anat_` : str
                           Path to paths to the coregistered anat image.
