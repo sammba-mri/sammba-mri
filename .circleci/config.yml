@@ -3,7 +3,7 @@ version: 2
 jobs:
   build:
     docker:
-      - image: cimg/python:3.6.7
+      - image: cimg/python:3.6.15
     environment:
       DISTRIB: "conda"
       PYTHON_VERSION: "3.6"
