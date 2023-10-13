@@ -3,7 +3,7 @@ import numpy as np
 import os
 import nibabel
 from scipy import ndimage
-from sklearn.datasets.base import Bunch
+from sklearn.utils import Bunch
 from nilearn import image
 from nilearn.datasets.utils import _get_dataset_dir, _fetch_files
 from nipype.utils.filemanip import fname_presuffix
@@ -40,7 +40,7 @@ def fetch_atlas_dorr_2008(image_format='nifti', downsample='30',
 
     Returns
     -------
-    data: sklearn.datasets.base.Bunch
+    data: sklearn.utils.Bunch
         dictionary-like object, contains:
 
         - 't2' : str, path to nifti file containing the T2 weighted average.
@@ -166,7 +166,7 @@ def fetch_masks_dorr_2008(image_format='nifti', downsample='30',
 
     Returns
     -------
-    mask_imgs: sklearn.datasets.base.Bunch
+    mask_imgs: sklearn.utils.Bunch
         dictionary-like object, contains:
 
         - 'brain' : nibabel.nifti1.Nifti1Image brain mask image.
@@ -300,7 +300,7 @@ def fetch_atlas_waxholm_rat_2014(data_dir=None, url=None, resume=True,
 
     Returns
     -------
-    data: sklearn.datasets.base.Bunch
+    data: sklearn.utils.Bunch
         dictionary-like object, contains:
 
         - 't2star': str, path to nifti file containing the averaged T2* images.
@@ -438,7 +438,7 @@ def fetch_atlas_lemur_mircen_2019(data_dir=None, url=None, resume=True,
 
     Returns
     -------
-    data: sklearn.datasets.base.Bunch
+    data: sklearn.utils.Bunch
         dictionary-like object, contains:
 
         - 't2' : str, path to nifti file containing the T2 weighted average.

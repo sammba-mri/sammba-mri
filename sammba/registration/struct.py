@@ -2,8 +2,7 @@ import os
 from nipype.interfaces import afni, fsl
 from nipype.utils.filemanip import fname_presuffix
 from nipype.caching import Memory
-from sklearn.datasets.base import Bunch
-from sklearn.utils import deprecated
+from sklearn.utils import deprecated, Bunch
 from sammba import segmentation
 from ..orientation import fix_obliquity
 
@@ -76,7 +75,7 @@ def anats_to_common(anat_filenames, write_dir, brain_volume,
 
     Returns
     -------
-    data : sklearn.datasets.base.Bunch
+    data : sklearn.utils.Bunch
         Dictionary-like object, the interest attributes are :
 
         - `registered` : list of str.
@@ -726,7 +725,7 @@ def anat_to_template(anat_filename, brain_filename,
         control bias correction of the template.
     Returns
     -------
-    data : sklearn.datasets.base.Bunch
+    data : sklearn.utils.Bunch
         Dictionary-like object, the interest attributes are :
         - `registered` : str.
                          Path to registered image.
@@ -955,7 +954,7 @@ def anats_to_template(anat_filenames, head_template_filename, write_dir,
 
     Returns
     -------
-    data : sklearn.datasets.base.Bunch
+    data : sklearn.utils.Bunch
         Dictionary-like object, the interest attributes are :
 
         - `registered` : list of str.

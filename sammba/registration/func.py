@@ -2,8 +2,7 @@ import warnings
 import os
 import numpy as np
 import nibabel
-from sklearn.datasets.base import Bunch
-from sklearn.utils import deprecated
+from sklearn.utils import deprecated, Bunch
 from nipype.caching import Memory
 from nipype.interfaces import afni, ants, fsl
 from nipype.utils.filemanip import fname_presuffix
