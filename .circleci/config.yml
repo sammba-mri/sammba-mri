@@ -81,12 +81,8 @@ jobs:
             source activate testenv
             pip install -q prov
             pip install -q nilearn
-            source /etc/afni/afni.sh
             source /etc/fsl/fsl.sh
             export FSLOUTPUTTYPE=NIFTI_GZ
-            #export ANTSPATH=${ANTSPATH:="/usr/lib/ants"}
-            #export PATH=${PATH}:/usr/bin/ANTS
-            #export PATH=${PATH}:/usr/lib/ants
             pip install -e .
             set -o pipefail && cd doc && make html-strict 2>&1 | tee ~/log.txt
           no_output_timeout: 5h
