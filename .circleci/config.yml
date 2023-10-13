@@ -62,7 +62,7 @@ jobs:
             sudo apt-get install lsb-release
             DISTRIB_CODENAME=$(lsb_release  -c -s)
             wget -O- http://neuro.debian.net/lists/${DISTRIB_CODENAME}.us-nh.full | sudo tee /etc/apt/sources.list.d/neurodebian.sources.list
-            sudo wget -q -O- http://neuro.debian.net/_static/neuro.debian.net.asc | gpg --batch -o /etc/apt/trusted.gpg.d/neurodebian.gpg --dearmor
+            sudo wget -q -O- http://neuro.debian.net/_static/neuro.debian.net.asc | sudo gpg --batch -o /etc/apt/trusted.gpg.d/neurodebian.gpg --dearmor
             sudo apt-get update -qq
             sudo apt-cache policy  # provide a summary over which repositories are currently available
       - run:
