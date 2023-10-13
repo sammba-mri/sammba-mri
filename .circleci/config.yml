@@ -44,7 +44,12 @@ jobs:
       - run:
           name: Create conda env
           command: |
-            conda create -n testenv python=3.6 numpy scipy scikit-learn matplotlib \
+            # Use mamba solver to accelerate install
+            # Trick found here:
+            # https://conda.github.io/conda-libmamba-solver/getting-started
+            conda create -n testenv conda-libmamba-solver
+            conda config --set solver libmamba
+            conda install -n testenv python=3.6 numpy scipy scikit-learn matplotlib \
             networkx future packaging traits simplejson funcsigs click  patsy graphviz \
             lxml mkl sphinx pillow -yq
             conda install -n testenv nibabel -c conda-forge -yq
