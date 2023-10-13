@@ -4,7 +4,7 @@ from sklearn.utils import Bunch
 from nipype.caching import Memory
 from nipype.interfaces import afni
 from nipype.utils.filemanip import fname_presuffix
-from nilearn._utils.exceptions import VisibleDeprecationWarning
+from numpy import VisibleDeprecationWarning
 from .base import (_rigid_body_register, _warp, _per_slice_qwarp)
 
 

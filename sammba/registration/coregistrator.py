@@ -1,5 +1,5 @@
 import warnings
-from nilearn._utils.exceptions import VisibleDeprecationWarning
+from numpy import VisibleDeprecationWarning
 from ..segmentation.brain_mask import (compute_histo_brain_mask,
                                        compute_morpho_brain_mask,
                                        _apply_mask)

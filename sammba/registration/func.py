@@ -6,7 +6,7 @@ from sklearn.utils import deprecated, Bunch
 from nipype.caching import Memory
 from nipype.interfaces import afni, ants, fsl
 from nipype.utils.filemanip import fname_presuffix
-from nilearn._utils.exceptions import VisibleDeprecationWarning
+from numpy import VisibleDeprecationWarning
 from sammba import segmentation
 from ..orientation import fix_obliquity
 from .fmri_session import FMRISession

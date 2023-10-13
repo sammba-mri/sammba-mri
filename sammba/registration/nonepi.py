@@ -1,6 +1,6 @@
 import warnings
 from sklearn.utils import Bunch
-from nilearn._utils.exceptions import VisibleDeprecationWarning
+from numpy import VisibleDeprecationWarning
 from .base import (_reorient, _rigid_body_register_and_reorient)
 
 
